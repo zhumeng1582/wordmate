@@ -1,1 +1,36 @@
-{"appid":"wxcf7d28bc513949d4","projectname":"wordmate-0.1","compileType":"miniprogram","miniprogramRoot":"dist/","setting":{"es6":true,"minified":true,"urlCheck":true},"description":"私有单词共学项目 0.1"}
+{
+  "appid": "wxcf7d28bc513949d4",
+  "projectname": "wordmate-0.1",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "dist/",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "urlCheck": true,
+    "postcss": false,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "enhance": false,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "description": "私有单词共学项目 0.1",
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "editorSetting": {}
+}
