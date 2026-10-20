@@ -15,7 +15,7 @@ apps/api/src/main.ts：HTTP 入口、服务端登录、错误脱敏。
 apps/api/src/validation.ts：本轮已实现请求的严格 DTO 校验。
 apps/api/test/core.test.ts：真实 SQL 引擎的端到端业务事务测试。
 apps/miniapp：家庭、词本、复习、月测、日历和错题页面；AppID 已填入 project.config.json。
-packages/ai：既有 OpenAI/Qwen 和阿里云 CosyVoice 适配器。
+packages/ai：DeepSeek（默认）/OpenAI/Qwen 和阿里云 CosyVoice 适配器。
 infra/compose.yaml：只绑定本机的 PostgreSQL 开发配置。
 deliverables/0.1/database/001_schema.sql：数据库的初始迁移唯一来源。
 

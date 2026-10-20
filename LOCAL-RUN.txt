@@ -30,7 +30,7 @@ corepack pnpm test:smoke
 资源清单：
 本地运行：能访问 npm 的终端；微信开发者工具。现有电脑即可，不必购买其他资源。
 真实微信登录：只需在本机服务端环境填写 AppSecret，勿发在聊天中。
-真实 AI 例句：OpenAI API Key、可用模型名，以及后端能访问 OpenAI API 的网络。
+真实 AI 例句：DeepSeek API Key（已写入本地 .env）、DEEPSEEK_MODEL，以及后端访问 api.deepseek.com 的网络；业务生成流程尚待接入。
 国内语音：阿里云百炼 CosyVoice 对应权限、API Key、工作空间配置。
 手机真机/多人联调：阿里云服务器、已备案域名、HTTPS 与微信合法域名配置；之后再安排。
 完整任意单词查询：正式词典来源及授权，或先实现用户自定义释义。

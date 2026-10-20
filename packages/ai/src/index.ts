@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export type Provider = 'openai' | 'qwen';
+export type Provider = 'openai' | 'qwen' | 'deepseek';
 export type Fetch = typeof globalThis.fetch;
 export type JsonRequest<T> = {
   name: string;
@@ -43,12 +43,12 @@ async function json(response: Response): Promise<any> {
   catch { throw new ProviderError('UPSTREAM_INVALID_JSON', true); }
 }
 export function createTextGenerator(env: Record<string, string | undefined> = process.env, fetcher: Fetch = fetch): TextGenerator {
-  const provider = env.LLM_PROVIDER || 'openai';
-  if (provider !== 'openai' && provider !== 'qwen') throw new ProviderError('UNSUPPORTED_LLM_PROVIDER');
-  const prefix = provider === 'openai' ? 'OPENAI' : 'QWEN';
+  const provider = env.LLM_PROVIDER || 'deepseek';
+  if (provider !== 'openai' && provider !== 'qwen' && provider !== 'deepseek') throw new ProviderError('UNSUPPORTED_LLM_PROVIDER');
+  const prefix = provider === 'openai' ? 'OPENAI' : provider === 'deepseek' ? 'DEEPSEEK' : 'QWEN';
   const apiKey = required(env, `${prefix}_API_KEY`);
   const model = required(env, `${prefix}_MODEL`);
-  let base = 'https://api.openai.com/v1';
+  let base = provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com/v1';
   if (provider === 'qwen') {
     base = required(env, 'QWEN_BASE_URL').replace(/\/$/, '');
     const url = new URL(base);
@@ -62,6 +62,8 @@ export function createTextGenerator(env: Record<string, string | undefined> = pr
       const userInput = JSON.stringify(r.input);
       const body = provider === 'openai'
         ? { model, store: false, instructions: r.instructions, input: userInput, text: { format }, max_output_tokens: 8192 }
+         : provider === 'deepseek'
+        ? { model, thinking: { type: 'disabled' }, messages: [{ role: 'system', content: `${r.instructions}\nReturn only a JSON object. Follow this JSON Schema exactly: ${JSON.stringify(r.schema)}` }, { role: 'user', content: userInput }], response_format: { type: 'json_object' }, max_tokens: 8192 }
         : { model, enable_thinking: false, messages: [{ role: 'system', content: r.instructions }, { role: 'user', content: userInput }],
             response_format: { type: 'json_schema', json_schema: { name: r.name, strict: true, schema: r.schema } }, max_tokens: 8192 };
       const response = await request(fetcher, `${base}/${provider === 'openai' ? 'responses' : 'chat/completions'}`, {

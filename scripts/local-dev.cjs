@@ -9,4 +9,9 @@ run(['--filter','@wordmate/miniapp','build']);
 const artifacts=spawnSync(process.execPath,['scripts/check-miniapp.cjs'],{cwd:root,env,stdio:'inherit'});
 if(artifacts.status!==0)process.exit(artifacts.status??1);
 console.log('\n小程序构建完成。微信开发者工具导入 apps/miniapp；本地开发时关闭合法域名检查。\n后端将监听 http://127.0.0.1:3000。数据持久保存在 .local/dev-db，Ctrl+C 停止。\n');
-const r=spawnSync(process.execPath,['apps/api/dist/main.js'],{cwd:root,env,stdio:'inherit'});process.exit(r.status??1);
+// Load provider secrets only for the server, after the miniapp build.
+const {existsSync,readFileSync}=require('node:fs'),{parseEnv}=require('node:util');
+const local=existsSync(resolve(root,'.env'))?parseEnv(readFileSync(resolve(root,'.env'),'utf8')):{};
+const providers=Object.fromEntries(Object.entries(local).filter(([key])=>/^(LLM_|DEEPSEEK_|OPENAI_|QWEN_|TTS_|COSYVOICE_)/.test(key)));
+const serverEnv={...env,...providers};
+const r=spawnSync(process.execPath,['apps/api/dist/main.js'],{cwd:root,env:serverEnv,stdio:'inherit'});process.exit(r.status??1);
