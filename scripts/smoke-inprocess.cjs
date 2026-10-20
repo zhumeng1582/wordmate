@@ -9,7 +9,7 @@ const name=`inprocess-${randomUUID()}`;
 Object.assign(process.env,{NODE_ENV:'development',AUTH_MODE:'development',DICTIONARY_PROVIDER:'fixture',DATABASE_URL:`pglite:.local/${name}`});
 const {createApplication}=require('../apps/api/dist/main.js');
 (async()=>{
- const {app,dispose}=await createApplication({vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
+ const {app,dispose}=await createApplication({vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
  function request(path,body,key=randomUUID(),method=body?'POST':'GET'){
   return new Promise((resolve,reject)=>{
    const chunks=[];const socket=new Duplex({read(){},write(chunk,encoding,callback){chunks.push(Buffer.from(chunk));callback();}});
@@ -62,7 +62,8 @@ const {createApplication}=require('../apps/api/dist/main.js');
   const practiced=await ok('/reviews',{session_id:extra.id,lease_generation:extra.lease_generation,card_id:queue.items[0].id,expected_version:queue.items[0].version,event_id:randomUUID(),rating:'good'});
   assert.equal(practiced.practice_only,true);assert.equal(practiced.version,queue.items[0].version);assert.equal(practiced.today.completed_words,1);
   await ok(`/study-sessions/${extra.id}/end`,{lease_generation:extra.lease_generation});
-  const aiBody={wordbook_id:book.id,words:['pencil'],theme:'课堂'};
+  const aiBody={wordbook_id:book.id,source_type:'text',raw_text:'1. pencil 铅笔',theme:'课堂'};
+  assert.equal((await request(`/children/${c.id}/ai-batches`,{...aiBody,source_type:'image',url:'https://example.invalid/a.png'})).status,422);
   const created=await ok(`/children/${c.id}/ai-batches`,aiBody,'ai-dedupe');assert.equal(created.status,'queued');
   assert.equal((await ok(`/children/${c.id}/ai-batches`,aiBody,'ai-dedupe')).id,created.id);
   let ai=created;for(let n=0;n<30&&['queued','running'].includes(ai.status);n++){await new Promise(r=>setTimeout(r,100));ai=await ok(`/ai-batches/${created.id}`);}

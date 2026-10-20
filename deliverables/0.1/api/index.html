@@ -12529,9 +12529,9 @@
       }
     }
   ]
-}</pre></details><details class="operation"><summary><span class="pill">POST</span> /children/{child_id}/ai-batches · AI批量生成并自动保存</summary><p>需要有效家庭成员权限。后台生成并自动保存，不要求逐词确认。任务最多3次尝试，重复输入复用任务。</p><pre>{
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /children/{child_id}/ai-batches · AI批量生成并自动保存</summary><p>原文作为数据交给AI解析，不在客户端拆分。最多8000字符、识别最多30项；无词/超限/不安全输入明确失败，不截断保存。words数组仅兼容旧调用。</p><pre>{
   &quot;x-role&quot;: &quot;member&quot;,
-  &quot;description&quot;: &quot;需要有效家庭成员权限。后台生成并自动保存，不要求逐词确认。任务最多3次尝试，重复输入复用任务。&quot;,
+  &quot;description&quot;: &quot;原文作为数据交给AI解析，不在客户端拆分。最多8000字符、识别最多30项；无词/超限/不安全输入明确失败，不截断保存。words数组仅兼容旧调用。&quot;,
   &quot;parameters&quot;: [
     {
       &quot;in&quot;: &quot;path&quot;,
@@ -12656,31 +12656,62 @@
     &quot;content&quot;: {
       &quot;application/json&quot;: {
         &quot;schema&quot;: {
-          &quot;type&quot;: &quot;object&quot;,
-          &quot;additionalProperties&quot;: false,
-          &quot;properties&quot;: {
-            &quot;wordbook_id&quot;: {
-              &quot;type&quot;: &quot;string&quot;,
-              &quot;format&quot;: &quot;uuid&quot;
-            },
-            &quot;words&quot;: {
-              &quot;type&quot;: &quot;array&quot;,
-              &quot;minItems&quot;: 1,
-              &quot;maxItems&quot;: 30,
-              &quot;items&quot;: {
-                &quot;type&quot;: &quot;string&quot;,
-                &quot;minLength&quot;: 1,
-                &quot;maxLength&quot;: 120
+          &quot;oneOf&quot;: [
+            {
+              &quot;type&quot;: &quot;object&quot;,
+              &quot;additionalProperties&quot;: false,
+              &quot;required&quot;: [
+                &quot;wordbook_id&quot;,
+                &quot;raw_text&quot;
+              ],
+              &quot;properties&quot;: {
+                &quot;wordbook_id&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;format&quot;: &quot;uuid&quot;
+                },
+                &quot;source_type&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;const&quot;: &quot;text&quot;
+                },
+                &quot;raw_text&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;minLength&quot;: 1,
+                  &quot;maxLength&quot;: 8000
+                },
+                &quot;theme&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;maxLength&quot;: 80
+                }
               }
             },
-            &quot;theme&quot;: {
-              &quot;type&quot;: &quot;string&quot;,
-              &quot;maxLength&quot;: 80
+            {
+              &quot;type&quot;: &quot;object&quot;,
+              &quot;additionalProperties&quot;: false,
+              &quot;properties&quot;: {
+                &quot;wordbook_id&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;format&quot;: &quot;uuid&quot;
+                },
+                &quot;words&quot;: {
+                  &quot;type&quot;: &quot;array&quot;,
+                  &quot;minItems&quot;: 1,
+                  &quot;maxItems&quot;: 30,
+                  &quot;items&quot;: {
+                    &quot;type&quot;: &quot;string&quot;,
+                    &quot;minLength&quot;: 1,
+                    &quot;maxLength&quot;: 120
+                  }
+                },
+                &quot;theme&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;maxLength&quot;: 80
+                }
+              },
+              &quot;required&quot;: [
+                &quot;wordbook_id&quot;,
+                &quot;words&quot;
+              ]
             }
-          },
-          &quot;required&quot;: [
-            &quot;wordbook_id&quot;,
-            &quot;words&quot;
           ]
         }
       }
@@ -15974,6 +16005,20 @@
       &quot;items&quot;: {
         &quot;$ref&quot;: &quot;#/components/schemas/AiBatchItem&quot;
       }
+    },
+    &quot;input_type&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;enum&quot;: [
+        &quot;text&quot;,
+        &quot;words&quot;
+      ]
+    },
+    &quot;raw_text&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;maxLength&quot;: 8000
     }
   },
   &quot;required&quot;: [
@@ -15986,6 +16031,8 @@
     &quot;provider&quot;,
     &quot;model&quot;,
     &quot;retryable&quot;,
-    &quot;items&quot;
+    &quot;items&quot;,
+    &quot;input_type&quot;,
+    &quot;raw_text&quot;
   ]
 }</pre></details><script>document.getElementById("filter").addEventListener("input",e=>{const q=e.target.value.toLowerCase();document.querySelectorAll(".operation").forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?"":"none")})</script><p class="muted">本地设计交付。无远程脚本、字体或数据上传；可以用浏览器打印为PDF。全部功能统一属于0.1。</p></main></html>

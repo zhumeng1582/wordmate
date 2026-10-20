@@ -6,6 +6,7 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  aiBatch:{oneOf:[object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80}},['wordbook_id','raw_text']),object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:30},theme:{type:'string',maxLength:80}},['wordbook_id','words'])]},
   quizCreate:object({month:{type:'string',pattern:'^\\d{4}-(0[1-9]|1[0-2])$'},mode:{enum:['sample','full']},sample_count:{type:'integer',enum:[10,20,30,50]}},['month','mode']),
   quizVersion:object({expected_version:positive}),
   quizTakeover:object({expected_version:positive,expected_session_id:id,confirmed:{const:true}}),
@@ -30,7 +31,7 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='monthly-quizzes'){kind=path[2]==='items'&&path[4]==='answer'?'quizAnswer':path[2]==='submit'?'quizSubmit':path[2]==='takeover'?'quizTakeover':['resume','abandon'].includes(path[2])?'quizVersion':'';}
   else if(path[0]==='ai-batches'&&path[2]==='retry')kind='empty';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
-  else if(path[0]==='children')kind=({wordbooks:'book',batches:'batch','ai-batches':'batch','study-sessions':'session'} as Record<string,string>)[path[2]];
+  else if(path[0]==='children')kind=({wordbooks:'book',batches:'batch','ai-batches':'aiBatch','study-sessions':'session'} as Record<string,string>)[path[2]];
   else if(path[0]==='batches'&&path[2]==='confirm')kind='confirm';
   else if(path[0]==='study-sessions'&&['heartbeat','end'].includes(path[2]))kind='lease';
   if(kind)ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');

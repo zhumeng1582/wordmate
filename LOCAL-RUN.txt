@@ -49,3 +49,5 @@ Taro 的 Rust 配置诊断在受限 macOS 环境发生 NULL object panic，构�
 本轮新增：首页→学习日历 / 历史错题集；月测成绩→重新练习本次全部错词。重启后端后编译即可，无需安装新依赖或重建数据库。详见 apps/CALENDAR-REVIEW.txt。
 
 AI录词验收见 apps/AI-VOCABULARY.txt；完整真实隔离验收命令：corepack pnpm test:ai:flow。
+
+整段输入更新：现在可直接粘贴编号、混合格式或表格文本，由AI识别；图片/表格文件上传尚未开放。重启后端并编译后生效，安全限制见 apps/AI-VOCABULARY.txt。

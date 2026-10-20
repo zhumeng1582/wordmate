@@ -73,3 +73,22 @@ test('Chinese list separators are split before persistence; old malformed jobs c
   await assert.rejects(core.vocabulary.retry(dad,'old-retry',old.id),{code:'INPUT_REENTRY_REQUIRED'});assert.equal(calls,1);
  }finally{await pg.close();}
 });
+
+test('raw text jobs preserve input, reject secrets before calls, enforce quotas and handle empty extraction',async()=>{
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
+ let captured='',calls=0,mode='ok';const raw='编号\t词汇\t意思\n1、cat 猫\n2｜dog 狗';
+ const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',rawPromptVersion:'raw-test',generate:async()=>{throw Error('not expected');},generateRaw:async input=>{calls++;captured=input;return mode==='empty'?{items:[],error:'NO_WORDS_FOUND'}:{items:['cat','dog'].map(result),error:null};}};
+ const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'raw-test',()=>new Date(),provider);
+ try{
+ const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'f',{name:'测试'}),c=await core.createChild(dad,'c',f.id,{nickname:'孩子'}),book=await core.createWordbook(dad,'b',c.id,{name:'本'});
+ const create=(key:string,raw_text:string)=>core.vocabulary.create(dad,key,c.id,{wordbook_id:book.id,raw_text,source_type:'text'});
+ await assert.rejects(create('secret','sk-'+ 'x'.repeat(24)),{code:'SENSITIVE_INPUT'});assert.equal(calls,0);
+ await assert.rejects(create('control','cat\u0000'),{code:'INVALID_RAW_TEXT'});await assert.rejects(create('length','a'.repeat(8001)),{code:'INVALID_TEXT'});
+ const job=await create('raw',raw);assert.equal(job.items.length,0);assert.equal(job.raw_text,raw);await core.vocabulary.processOne();assert.equal(captured,raw);assert.equal((await core.vocabulary.get(dad,job.id)).items.length,2);assert.equal((await core.words(dad,c.id)).items.length,2);
+ mode='empty';const empty=await create('empty','只有说明文字');await core.vocabulary.processOne();const failed=await core.vocabulary.get(dad,empty.id);assert.equal(failed.error_code,'NO_WORDS_FOUND');assert.equal(failed.retryable,false);assert.equal((await core.words(dad,c.id)).items.length,2);
+ // Simulate ten prior jobs with three attempts each, without external calls.
+ await pg.query(`INSERT INTO wordmate.generation_jobs(child_id,requested_by,kind,dedupe_key,payload,status,attempts,max_attempts) SELECT $1,$2,'sentences','quota:'||n,'{"flow":"vocabulary_v1"}'::jsonb,'failed',3,3 FROM generate_series(1,10) n`,[c.id,dad]);
+ const limited=await create('limit','apple');const before=calls;await core.vocabulary.processOne();assert.equal(calls,before);assert.equal((await core.vocabulary.get(dad,limited.id)).error_code,'AI_DAILY_LIMIT');
+ }finally{await pg.close();}
+});

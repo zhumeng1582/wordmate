@@ -18,13 +18,13 @@ const {StoredMeaningQuizBuilder}=require('../apps/api/dist/quiz.js');
   if(offline)global.fetch=async(url,init)=>{
    assert.equal(String(url),'https://api.deepseek.com/chat/completions');const body=JSON.parse(init.body),input=JSON.parse(body.messages[1].content);
    const meanings={airport:'机场',luggage:'行李',delay:'延误'};
-   return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({items:input.words.map((word,i)=>({input_index:i,input:word,status:'ok',lemma:word,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:meanings[word],sentence_en:`We talk about ${word}.`,sentence_zh:`我们谈论${meanings[word]}。`,reason:null}))})}}]});
+   return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({error:null,items:['airport','luggage','delay'].map((word,i)=>({input_index:i,input:word,status:'ok',lemma:word,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:meanings[word],sentence_en:`We talk about ${word}.`,sentence_zh:`我们谈论${meanings[word]}。`,reason:null}))})}}]});
   };
   const provider=await vocabularyProvider(env);assert(provider,'AI_NOT_CONFIGURED');
   const connection=await connect(`pglite:.local/${databaseName}`);source=connection.source;
   const core=new Core(connection.db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'ai-flow-test',()=>new Date(),provider);
   const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'family',{name:'隔离验收家庭'}),c=await core.createChild(dad,'child',f.id,{nickname:'验收'}),book=await core.createWordbook(dad,'book',c.id,{name:'验收词本'});
-  const body={wordbook_id:book.id,words:['airport','luggage','delay'],theme:'一家人的机场旅行'};
+  const body={wordbook_id:book.id,source_type:'text',raw_text:'1. airport 机场\n2、luggage 行李\n3｜delay 延误',theme:'一家人的机场旅行'};
   const job=await core.vocabulary.create(dad,'batch',c.id,body);assert.equal(job.status,'queued');await core.vocabulary.processOne();
   const finished=await core.vocabulary.get(dad,job.id);if(finished.status!=='succeeded')throw Object.assign(Error(),{code:finished.error_code||'BATCH_NOT_FULLY_SAVED'});
   assert.equal((await core.vocabulary.create(dad,'repeat',c.id,body)).id,job.id);

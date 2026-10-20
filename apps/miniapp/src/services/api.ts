@@ -15,6 +15,14 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  NO_WORDS_FOUND:'未识别到可学习的词汇，请编辑输入内容后重新提交。',
+  TOO_MANY_WORDS:'识别内容超过 30 项，请拆成几批提交；本次未保存。',
+  UNSAFE_INPUT:'内容不适合词汇识别，请只提供要学习的词汇或材料。',
+  SENSITIVE_INPUT:'输入疑似包含密钥或私钥，尚未发送给 AI，请先删除敏感信息。',
+  INVALID_RAW_TEXT:'输入含不支持的控制字符，请粘贴纯文本后重试。',
+  INVALID_INPUT_TYPE:'目前只支持文本；图片和表格文件上传尚未开放。',
+  AI_DAILY_LIMIT:'已达到最近 24 小时的 AI 调用额度，请稍后再试。',
+
   INPUT_REENTRY_REQUIRED:'旧任务未正确拆分单词，请重新编辑输入后提交，不要重试旧任务。',
   AI_NOT_CONFIGURED:'AI 尚未配置，请检查服务端密钥和模型配置并重启后端。',
   ACTIVE_GENERATION:'孩子已有一批正在生成，请刷新并等待完成。',
