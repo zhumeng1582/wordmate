@@ -1,0 +1,28 @@
+{
+  "name": "@wordmate/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsc -p tsconfig.json --watch",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file=../../.env dist/main.js",
+    "migrate": "node --env-file=../../.env dist/migrate.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.6",
+    "@nestjs/core": "11.1.6",
+    "@nestjs/platform-express": "11.1.6",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "typeorm": "0.3.27",
+    "pg": "8.16.3",
+    "ts-fsrs": "5.2.3",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.15.30",
+    "@types/express": "5.0.3"
+  }
+}

@@ -1,0 +1,1 @@
+export default defineAppConfig({pages:['pages/home/index','pages/family/index','pages/words/index','pages/review/index'],window:{navigationBarTitleText:'单词共学',navigationBarBackgroundColor:'#f6f8f4',navigationBarTextStyle:'black',backgroundColor:'#f6f8f4'}});

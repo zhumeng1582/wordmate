@@ -1,0 +1,4 @@
+{
+ "compilerOptions": { "target": "ES2022", "module": "CommonJS", "moduleResolution": "Node", "lib": ["ES2022", "DOM"], "strict": true, "esModuleInterop": true, "experimentalDecorators": true, "emitDecoratorMetadata": true, "skipLibCheck": true, "outDir": "dist", "rootDir": "src", "rewriteRelativeImportExtensions": true },
+ "include": ["src/**/*.ts"]
+}

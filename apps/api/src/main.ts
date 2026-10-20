@@ -1,0 +1,59 @@
+import 'reflect-metadata';
+import {All,Controller,Module,Req,Res} from '@nestjs/common';
+import {NestFactory} from '@nestjs/core';
+import type {Request,Response} from 'express';
+import {randomUUID} from 'node:crypto';
+import {Core} from './core';
+import {connect} from './database';
+import {createScheduler,DevIdentity,FixtureDictionary,UnconfiguredDictionary,WechatIdentity} from './providers';
+import {DomainError,ensure} from './errors';
+import {validateBody} from './validation';
+const env=process.env,development=env.AUTH_MODE==='development';
+if(development&&env.NODE_ENV!=='development')throw Error('Development identities require NODE_ENV=development');
+if(env.DICTIONARY_PROVIDER==='fixture'&&!development)throw Error('Fixture dictionary requires development auth');
+let core:Core;
+@Controller('api')
+class ApiController {
+  @All('*path') async handle(@Req() req:Request,@Res() res:Response){
+    const request_id=randomUUID();res.setHeader('Cache-Control','no-store');
+    try {
+      const p=req.path.replace(/^\/api/,'').split('/').filter(Boolean),b=req.body??{},method=req.method;
+      ensure(!Object.keys(req.query).length,422,'QUERY_NOT_IMPLEMENTED');
+      validateBody(p,method,b);
+      if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
+      const auth=req.headers.authorization;ensure(auth?.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
+      const key=String(req.headers['idempotency-key']??'');let data:any;
+      if(method==='GET'&&p.join('/')==='me')data=await core.me(actor);
+      else if(method==='POST'&&p.join('/')==='families')data=await core.createFamily(actor,key,b);
+      else if(p[0]==='families'&&p[2]==='invites'&&p.length===3)data=method==='GET'?await core.invites(actor,p[1]):method==='POST'?await core.createInvite(actor,key,p[1]):undefined;
+      else if(method==='POST'&&p.join('/')==='family-invites/claim')data=await core.claimInvite(actor,key,b);
+      else if(method==='POST'&&p[0]==='family-invites'&&p[2]==='approve'&&p.length===3)data=await core.approveInvite(actor,key,p[1]);
+      else if(p[0]==='families'&&p[2]==='children'&&p.length===3){data=method==='GET'?await core.children(actor,p[1]):method==='POST'?await core.createChild(actor,key,p[1],b):undefined;}
+      else if(method==='GET'&&p[0]==='children'&&p[2]==='words'&&p.length===4)data=await core.word(actor,p[1],p[3]);
+      else if(p[0]==='children'&&p.length===3){const id=p[1];
+        if(method==='GET'&&p[2]==='today')data=await core.today(actor,id);
+        if(p[2]==='wordbooks')data=method==='GET'?await core.wordbooks(actor,id):method==='POST'?await core.createWordbook(actor,key,id,b):undefined;
+        if(method==='GET'&&p[2]==='words')data=await core.words(actor,id);
+        if(method==='POST'&&p[2]==='batches')data=await core.createBatch(actor,key,id,b);
+        if(method==='POST'&&p[2]==='study-sessions')data=await core.startSession(actor,key,id,b);
+      }
+      else if(method==='POST'&&p[0]==='batches'&&p[2]==='confirm'&&p.length===3)data=await core.confirmBatch(actor,key,p[1],b);
+      else if(p[0]==='study-sessions'&&p.length===3){
+        if(method==='GET'&&p[2]==='cards')data=await core.cards(actor,p[1]);
+        if(method==='POST'&&['heartbeat','end'].includes(p[2]))data=await core.heartbeat(actor,p[1],b,p[2]==='end');
+      }
+      else if(method==='POST'&&p.join('/')==='reviews')data=await core.review(actor,b);
+      ensure(data!==undefined,404,'ROUTE_NOT_IMPLEMENTED');res.json({request_id,data});
+    }catch(e){const known=e instanceof DomainError;res.status(known?e.status:500).json({request_id,error:{code:known?e.code:'INTERNAL_ERROR',message:known?e.code:'请求未完成，请重试'}});}
+  }
+}
+@Module({controllers:[ApiController]}) class AppModule{}
+async function bootstrap(){
+  const {db,source}=await connect(env.DATABASE_URL??'');
+  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4');
+  const app=await NestFactory.create(AppModule,{bodyParser:true,logger:['error','warn']});
+  app.enableShutdownHooks();
+  const close=()=>{void source.destroy();};process.once('SIGTERM',close);process.once('SIGINT',close);
+  await app.listen(Number(env.PORT??3000),development?'127.0.0.1':env.HOST??'127.0.0.1');
+}
+bootstrap().catch(()=>{console.error('Backend startup failed. Check database, credentials and installed dependencies.');process.exitCode=1;});

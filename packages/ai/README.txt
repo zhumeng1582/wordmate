@@ -3,7 +3,7 @@ Wordmate 0.1 服务端 AI/TTS 适配层
 现已实现：OpenAI Responses、千问 Chat Completions（JSON Schema）、阿里云CosyVoice北京HTTP。
 统一 TextGenerator.generate 接口；TtsProvider 独立，不随大模型供应商切换。
 其他供应商必须新增并验证适配器，不能仅换base_url就假设协议兼容。
-当前是可供NestJS Worker调用的基础模块，未接业务HTTP路由、COS、数据库任务调度或完整题目/例句语义校验。
+当前是可供NestJS Worker调用的基础模块，未接业务HTTP路由、OSS、数据库任务调度或完整题目/例句语义校验。
 
 配置
 项目根目录.env.example复制为.env，仅服务器加载；不要提交真实密钥或放进小程序。
@@ -28,7 +28,7 @@ const tts = createTtsProvider(process.env);
 const voices = await tts.listVoices();
 const audio = await tts.synthesize({ text: 'Our luggage arrived at the airport.', accent: 'en-GB', voiceId: 'loongemily_v3', rate: 1.0 });
 例中音色只是候选，必须在实际voices目录中存在。不会把英音失败自动改成美音。
-音频由上层保存COS私有桶，API鉴权下载；audioCacheKey传入孩子范围、内容版本及含供应商/地域/策略版本的profile，避免串用音频。不得跨孩子复用私有句子。
+音频由上层保存OSS私有桶，API鉴权下载；audioCacheKey传入孩子范围、内容版本及含供应商/地域/策略版本的profile，避免串用音频。不得跨孩子复用私有句子。
 
 测试
 node --experimental-strip-types --test packages/ai/test/*.test.ts
@@ -37,7 +37,7 @@ node --experimental-strip-types --test packages/ai/test/*.test.ts
 
 TTS选型决定：国内阿里云百炼CosyVoice，北京地域cosyvoice-v3-flash。
 官方明确标注英音loongemily_v3（女）/loongeric_v3（男），美音loongabby_v3（女）/loongandy_v3（男）。可只启用经过账号验证的子集；口音不符直接拒绝。
-采用非流式HTTP合成，原生rate设置语速，MP3/24kHz；供应商返回临时下载地址，由服务端通过HTTPS获取后存私有COS，小程序不接触供应商密钥或签名地址。
+采用非流式HTTP合成，原生rate设置语速，MP3/24kHz；供应商返回临时下载地址，由服务端通过HTTPS获取后存私有OSS，小程序不接触供应商密钥或签名地址。
 限定官方北京结果桶，禁止跳转，下载不携带API密钥，识别MP3头；若供应商未来变更桶域名，需要根据官方文档更新白名单，不能随意放开。
 当前英美音色不支持SSML；文本按纯文本发送。同形异音词仍须实际试听和词典音频等可靠方案，不保证孤立词义项读音自动正确。
 费用按百炼北京实际模型计费项和账号额度核对，Azure额度不再适用。未提供真实凭证，未产生收费调用或完成音质评测。

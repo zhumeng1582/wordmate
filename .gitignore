@@ -16,3 +16,10 @@ coverage/
 *.p12
 .aws/
 # All deliverable documents, sources, designs and delivery ZIPs are tracked.
+# Application builds and local databases
+dist/
+.taro/
+.swc/
+.local/
+*.tsbuildinfo
+project.private.config.json

@@ -1,0 +1,17 @@
+{
+  "name": "wordmate",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @wordmate/api dev",
+    "build:api": "pnpm --filter @wordmate/api build",
+    "dev:miniapp": "pnpm --filter @wordmate/miniapp dev",
+    "build:miniapp": "pnpm --filter @wordmate/miniapp build",
+    "test:core": "node --experimental-strip-types --test apps/api/test/core.test.ts",
+    "test:ai": "node --experimental-strip-types --test packages/ai/test/*.test.ts"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.15"
+  }
+}
