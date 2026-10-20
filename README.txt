@@ -1,7 +1,7 @@
 词伴 Wordmate — 0.1 私有项目
 
 入口：deliverables/0.1/index.html
-所有功能版本均为0.1；当前为需求、设计、接口、数据库与检查源码，尚无真实业务后端或小程序工程。
+所有功能版本均为0.1；当前为需求、设计、接口、数据库与检查源码，另含packages/ai模型与语音适配代码，尚无完整业务后端或小程序工程。
 
 唯一编辑源：deliverables/0.1/
   tools/content.py        PRD、技术方案、权限规则
@@ -32,11 +32,13 @@
   python3 deliverables/0.1/tools/package.py
 检查脚本目前使用本机firebase-tools附带的pglite-2及ajv；其他机器须通过WORDMATE_CHECK_DEPS指向含同名包的依赖目录。Swift图片生成需macOS AppKit。正式业务工程版本与lockfile按开工清单固定，不能把上述环境当作已经锁定的业务依赖。
 
+AI/TTS适配源码
+packages/ai/src/index.ts：OpenAI/千问切换及Azure Speech实现。
+packages/ai/README.txt：配置、集成、验证边界和TTS选型来源。
+.env.example：无真实密钥的服务端配置模板。
+运行：node --experimental-strip-types --test packages/ai/test/*.test.ts
+
 Git管理
-当前沙箱禁止写项目.git目录，自动初始化被系统拒绝，因此尚未产生Git提交。
-请在本机终端执行：
-  cd /Users/mac/Desktop/word
-  sh scripts/init-git.sh
-脚本初始化main并提交所有当前文档、源码、SVG/PNG、交付ZIP与生成副本；忽略缓存、环境变量及私钥文件。使用本机已有Git提交身份。
-脚本不创建远程仓库，不推送，不上传Figma或蓝湖。
-执行成功后用git status、git log -1核对；后续修改在独立提交中记录。
+项目已有本地Git仓库，main分支初始提交e190a09。
+后续文档、源码和生成资源统一提交；.env等密钥文件保持忽略。
+不自动创建远程仓库或上传私有项目。
