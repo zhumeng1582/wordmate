@@ -1,0 +1,18 @@
+# Local OS and generated runtime caches
+.DS_Store
+__pycache__/
+*.py[cod]
+node_modules/
+.venv/
+venv/
+coverage/
+*.log
+# Local credentials; commit only sanitized examples
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.aws/
+# All deliverable documents, sources, designs and delivery ZIPs are tracked.

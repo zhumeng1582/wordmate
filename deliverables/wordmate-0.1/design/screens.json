@@ -1,0 +1,1515 @@
+[
+  {
+    "id": "welcome",
+    "title": "一起，把单词记久一点",
+    "sub": "WORDMATE / 词伴 · 家庭共学",
+    "cards": [
+      {
+        "title": "每个孩子，一份进度",
+        "body": "爸爸妈妈各自登录，一起陪伴。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "你的单词，你的节奏",
+        "body": "录入生活里的词，在句子中理解。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "每天一点，长期记住",
+        "body": "复习、月测和错词回顾，都在这里。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "微信登录",
+    "to": "family_create",
+    "tab": "今日",
+    "secondary": [
+      [
+        "我收到邀请",
+        "join"
+      ]
+    ]
+  },
+  {
+    "id": "home",
+    "title": "晚上好，小明",
+    "sub": "小明的学习空间  ▾",
+    "cards": [
+      {
+        "title": "6 / 10",
+        "body": "今日学习目标 · 再学4词就完成",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "今天该复习 8 词",
+        "body": "到期优先；还可以学4个新词",
+        "kind": "tint",
+        "to": "review"
+      },
+      {
+        "title": "连续学习 5 天",
+        "body": "一 ✓　 二 ✓　 三 ✓　 四 ✓　 五 ●",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "家人的陪伴",
+        "body": "妈妈 19:20 陪练6词 · 爸爸添加了旅行词",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "开始陪孩子复习",
+    "to": "review",
+    "tab": "今日",
+    "secondary": [
+      [
+        "切换孩子",
+        "children"
+      ],
+      [
+        "本月测验",
+        "quiz_setup"
+      ]
+    ]
+  },
+  {
+    "id": "words",
+    "title": "装进自己的单词",
+    "sub": "旅行小词本 · 24个义项",
+    "cards": [
+      {
+        "title": "⌕ 搜索英文 / 中文",
+        "body": "全部　收藏　易错　简单　待纠错",
+        "kind": "search",
+        "to": "search"
+      },
+      {
+        "title": "luggage　行李",
+        "body": "易错 · 收藏 · 历史错3次",
+        "kind": "tint",
+        "to": "word"
+      },
+      {
+        "title": "airport　机场",
+        "body": "简单 · 今天待复习",
+        "kind": "plain",
+        "to": "word"
+      },
+      {
+        "title": "delay　延迟",
+        "body": "待纠错 · 已保存释义",
+        "kind": "plain",
+        "to": "correction"
+      }
+    ],
+    "primary": "＋ 添加 / 批量添加",
+    "to": "add",
+    "tab": "单词本",
+    "secondary": [
+      [
+        "导出单词",
+        "export"
+      ],
+      [
+        "分享清单",
+        "share_words"
+      ]
+    ]
+  },
+  {
+    "id": "add",
+    "title": "今天想学什么？",
+    "sub": "单个输入 / 批量粘贴 · 每批最多30项",
+    "cards": [
+      {
+        "title": "单词或短语",
+        "body": "airport\nluggage\ndelay",
+        "kind": "input",
+        "to": null
+      },
+      {
+        "title": "关联例句主题",
+        "body": "旅行 ✓　校园　日常",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "发音偏好",
+        "body": "美音 ✓　英音　·　女声A　·　正常语速",
+        "kind": "plain",
+        "to": "settings"
+      }
+    ],
+    "primary": "解析并确认词义",
+    "to": "confirm",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "confirm",
+    "title": "选对意思，再开始",
+    "sub": "识别3项 · 重复项沿用已有学习进度",
+    "cards": [
+      {
+        "title": "airport",
+        "body": "✓ 名词 · 机场",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "luggage",
+        "body": "✓ 名词 · 行李（不可数）",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "delay",
+        "body": "● 名词 · 延迟\n○ 动词 · 推迟",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "单词先保存，例句随后生成",
+        "body": "如个别条目无结果，可修改后重试。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "保存并生成关联例句",
+    "to": "word",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "word",
+    "title": "luggage",
+    "sub": "/ˈlʌɡɪdʒ/　n. 行李",
+    "cards": [
+      {
+        "title": "▶ 美音 · 女声A",
+        "body": "切换：英音 / 美音　 正常 / 慢速",
+        "kind": "tint",
+        "to": "settings"
+      },
+      {
+        "title": "在句子里理解",
+        "body": "Our luggage arrived at the airport after a short delay.",
+        "kind": "sentence",
+        "to": "lookup"
+      },
+      {
+        "title": "词条标注",
+        "body": "简单　易错 ✓　收藏 ☆　待纠错",
+        "kind": "plain",
+        "to": "annotations"
+      },
+      {
+        "title": "历史错误 3 次",
+        "body": "最近一次：10月16日 · 月测",
+        "kind": "plain",
+        "to": "wrong"
+      }
+    ],
+    "primary": "复习这个词",
+    "to": "review",
+    "tab": "单词本",
+    "secondary": [
+      [
+        "换一句",
+        "generating"
+      ],
+      [
+        "提交纠错",
+        "correction"
+      ]
+    ]
+  },
+  {
+    "id": "annotations",
+    "title": "给单词做个标记",
+    "sub": "luggage · 标注由爸爸妈妈共享",
+    "cards": [
+      {
+        "title": "简单词",
+        "body": "目前觉得容易回忆；不跳过复习。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "易错词 ✓",
+        "body": "想多留意的词；与简单词互斥。",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "收藏 ☆",
+        "body": "留作重点回看，可与其他标注并存。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "待纠错",
+        "body": "词条或例句可能需要修正。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "保存标注",
+    "to": "word",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "search",
+    "title": "查一个词",
+    "sub": "查我的单词本 / 查词典",
+    "cards": [
+      {
+        "title": "⌕ luggage",
+        "body": "支持英文或中文查询",
+        "kind": "search",
+        "to": null
+      },
+      {
+        "title": "我的单词本 · 1条",
+        "body": "luggage　n. 行李",
+        "kind": "tint",
+        "to": "word"
+      },
+      {
+        "title": "词典结果",
+        "body": "查到词形与多种词义，选择后添加。",
+        "kind": "plain",
+        "to": "lookup"
+      }
+    ],
+    "primary": "查看词典释义",
+    "to": "lookup",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "lookup",
+    "title": "在句子中查词",
+    "sub": "点词弹层 · 可选择相邻词查询短语",
+    "cards": [
+      {
+        "title": "原句",
+        "body": "Our luggage arrived at the airport after a short delay.",
+        "kind": "sentence",
+        "to": null
+      },
+      {
+        "title": "luggage",
+        "body": "n. 行李（不可数）\n▶ 英音　▶ 美音",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "已有义项",
+        "body": "已在旅行小词本 · 收藏 ☆",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "词义选择",
+        "body": "词典来源及音标展示；上下文建议仅供参考。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "收起，继续阅读",
+    "to": "word",
+    "tab": "单词本",
+    "secondary": [
+      [
+        "添加其他义项",
+        "confirm"
+      ]
+    ]
+  },
+  {
+    "id": "review",
+    "title": "先想一想，它是什么意思？",
+    "sub": "小明 · 妈妈陪学 · 第3 / 8词",
+    "cards": [
+      {
+        "title": "luggage",
+        "body": "▶ 听发音",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "回忆以后，再揭晓",
+        "body": "这次先不展示释义和例句。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "学习进度已同步",
+        "body": "断网时会保留当前反馈，不提前计打卡。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "揭晓答案",
+    "to": "review_answer",
+    "tab": "今日",
+    "secondary": []
+  },
+  {
+    "id": "review_answer",
+    "title": "这次回忆得怎么样？",
+    "sub": "luggage · n. 行李",
+    "cards": [
+      {
+        "title": "Our luggage arrived at the airport.",
+        "body": "我们的行李到达了机场。",
+        "kind": "sentence",
+        "to": "lookup"
+      },
+      {
+        "title": "请按真实回忆情况选择",
+        "body": "忘记 / 困难 / 记得 / 轻松",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "忘记会加入错题集",
+        "body": "困难不算答错；每次反馈会保存。",
+        "kind": "tint",
+        "to": null
+      }
+    ],
+    "primary": "记得 · 正常想起来了",
+    "to": "checkin",
+    "tab": "今日",
+    "secondary": [
+      [
+        "忘记",
+        "wrong"
+      ],
+      [
+        "困难",
+        "checkin"
+      ],
+      [
+        "轻松",
+        "checkin"
+      ]
+    ]
+  },
+  {
+    "id": "checkin",
+    "title": "今天的陪伴，完成啦",
+    "sub": "小明 · 今日已打卡",
+    "cards": [
+      {
+        "title": "10 / 10",
+        "body": "完成今日目标 · 连续学习5天",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "记住的，会慢慢变多",
+        "body": "爸爸妈妈的接力，共享一份进度。",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "下一次见",
+        "body": "下次复习时间由记忆状态安排。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "分享打卡海报",
+    "to": "share",
+    "tab": "今日",
+    "secondary": [
+      [
+        "返回今日",
+        "home"
+      ],
+      [
+        "查看日历",
+        "calendar"
+      ]
+    ]
+  },
+  {
+    "id": "calendar",
+    "title": "每一天，都有迹可循",
+    "sub": "2026年10月　‹　›",
+    "cards": [
+      {
+        "title": "学习日历",
+        "body": "calendar",
+        "kind": "calendar",
+        "to": null
+      },
+      {
+        "title": "10月16日 · 已打卡",
+        "body": "学习10词 · 错词2个 / 错误3次",
+        "kind": "tint",
+        "to": "wrong"
+      },
+      {
+        "title": "本月复习测验",
+        "body": "抽样或全量，看看记住了多少。",
+        "kind": "plain",
+        "to": "quiz_setup"
+      }
+    ],
+    "primary": "复习这天错词",
+    "to": "wrong",
+    "tab": "日历",
+    "secondary": [
+      [
+        "测验记录",
+        "quiz_history"
+      ]
+    ]
+  },
+  {
+    "id": "wrong",
+    "title": "错过的，再见一面",
+    "sub": "10月16日 · 全部来源 ▾",
+    "cards": [
+      {
+        "title": "luggage　行李",
+        "body": "错2次 · 月测 / 复习",
+        "kind": "tint",
+        "to": "word"
+      },
+      {
+        "title": "delay　延迟",
+        "body": "未作答1次 · 月测",
+        "kind": "plain",
+        "to": "word"
+      },
+      {
+        "title": "记录一直保留",
+        "body": "以后练对不会删除历史，方便回看。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "复习这些错词",
+    "to": "review",
+    "tab": "日历",
+    "secondary": [
+      [
+        "导出错词",
+        "export"
+      ]
+    ]
+  },
+  {
+    "id": "quiz_setup",
+    "title": "看看这个月记住了多少",
+    "sub": "2026年10月 ▾ · 学习过24个义项",
+    "cards": [
+      {
+        "title": "抽样测试 ●",
+        "body": "随机抽取，不重复出题",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "题量：10　20 ✓　30　50",
+        "body": "少于选择数量时测试全部可用词。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "全量测试 ○",
+        "body": "覆盖全部24词，可中途退出续答。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "四档成绩",
+        "body": "优秀 ≥90%　良好 ≥80%\n合格 ≥60%　待加强 <60%",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "开始月测",
+    "to": "quiz_preparing",
+    "tab": "日历",
+    "secondary": [
+      [
+        "历史成绩",
+        "quiz_history"
+      ]
+    ]
+  },
+  {
+    "id": "quiz_preparing",
+    "title": "正在准备题目",
+    "sub": "本次题目和顺序将在开始后固定",
+    "cards": [
+      {
+        "title": "准备中 · 12 / 20",
+        "body": "正在检查选项与词义，稍等一下。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "生成失败也不会丢失词库",
+        "body": "可重试或放弃；不生成不完整试卷。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "预览准备完成状态",
+    "to": "quiz",
+    "tab": "日历",
+    "secondary": [
+      [
+        "返回日历",
+        "calendar"
+      ]
+    ]
+  },
+  {
+    "id": "quiz",
+    "title": "选择最符合词义的答案",
+    "sub": "10月月测 · 第1 / 20题 · 已保存",
+    "cards": [
+      {
+        "title": "luggage（名词）",
+        "body": "在旅行中携带的 luggage",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "A　行李",
+        "body": "选择答案",
+        "kind": "option",
+        "to": null
+      },
+      {
+        "title": "B　机场",
+        "body": "选择答案",
+        "kind": "option",
+        "to": null
+      },
+      {
+        "title": "C　航班",
+        "body": "选择答案",
+        "kind": "option",
+        "to": null
+      },
+      {
+        "title": "D　座位",
+        "body": "选择答案",
+        "kind": "option",
+        "to": null
+      }
+    ],
+    "primary": "下一题",
+    "to": "quiz_submit",
+    "tab": "日历",
+    "secondary": [
+      [
+        "答题卡 / 交卷",
+        "quiz_submit"
+      ],
+      [
+        "暂存退出",
+        "quiz_history"
+      ]
+    ]
+  },
+  {
+    "id": "quiz_submit",
+    "title": "准备好交卷了吗？",
+    "sub": "交卷后不能修改答案",
+    "cards": [
+      {
+        "title": "已答18 / 20题",
+        "body": "还有2题未作答，将按错误计分。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "回到答题卡检查",
+        "body": "可以继续补答或修改已有答案。",
+        "kind": "plain",
+        "to": "quiz"
+      },
+      {
+        "title": "交卷后自动整理错题",
+        "body": "答错和未答都会进入错题集。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "确认交卷",
+    "to": "quiz_score",
+    "tab": "日历",
+    "secondary": [
+      [
+        "继续作答",
+        "quiz"
+      ]
+    ]
+  },
+  {
+    "id": "quiz_score",
+    "title": "良好 · 再巩固一点",
+    "sub": "2026年10月 · 抽样测试",
+    "cards": [
+      {
+        "title": "85.0 分",
+        "body": "答对17 / 20 · 覆盖24词中的20词",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "错题3个已自动归集",
+        "body": "包括未答2题 · 可直接开始复习",
+        "kind": "tint",
+        "to": "wrong"
+      },
+      {
+        "title": "抽样成绩仅反映本次样本",
+        "body": "再次测验保留新的独立成绩。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "复习本次错题",
+    "to": "wrong",
+    "tab": "日历",
+    "secondary": [
+      [
+        "查看试卷解析",
+        "quiz_results"
+      ],
+      [
+        "返回日历",
+        "calendar"
+      ]
+    ]
+  },
+  {
+    "id": "quiz_results",
+    "title": "回看每一道题",
+    "sub": "交卷后显示正确答案和解析",
+    "cards": [
+      {
+        "title": "luggage　✓ 正确",
+        "body": "你的答案：行李\n正确答案：行李",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "delay　未作答",
+        "body": "正确答案：延迟\n已加入错题集",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "boarding　回答错误",
+        "body": "正确答案：登机\n你的答案：行李",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "复习本次错题",
+    "to": "wrong",
+    "tab": "日历",
+    "secondary": []
+  },
+  {
+    "id": "quiz_history",
+    "title": "每一次，都有记录",
+    "sub": "2026年10月 ▾",
+    "cards": [
+      {
+        "title": "10月16日 · 抽样20题",
+        "body": "85.0分 · 良好 · 已完成",
+        "kind": "tint",
+        "to": "quiz_score"
+      },
+      {
+        "title": "10月12日 · 全量24题",
+        "body": "75.0分 · 合格 · 已完成",
+        "kind": "plain",
+        "to": "quiz_score"
+      },
+      {
+        "title": "未完成测验可继续",
+        "body": "再次测验不覆盖原来的成绩。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "开始新的月测",
+    "to": "quiz_setup",
+    "tab": "日历",
+    "secondary": []
+  },
+  {
+    "id": "share",
+    "title": "把今天的坚持留下来",
+    "sub": "分享预览 · 默认隐藏昵称",
+    "cards": [
+      {
+        "title": "今日学习 10 词",
+        "body": "连续5天 · 今天也在慢慢进步",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "显示孩子昵称：关闭",
+        "body": "预览不含家长身份、错题或家庭邀请。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "由你决定分享给谁",
+        "body": "保存图片后可自行分享；分享不开放学习档案。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "保存海报（演示）",
+    "to": "checkin",
+    "tab": "今日",
+    "secondary": []
+  },
+  {
+    "id": "share_words",
+    "title": "分享选定的单词",
+    "sub": "清单预览 · 最多20个义项",
+    "cards": [
+      {
+        "title": "旅行小词单",
+        "body": "airport　机场\nluggage　行李\ndelay　延迟",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "只分享你选中的内容",
+        "body": "不含孩子姓名、错题和家庭成员信息。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "保存清单图（演示）",
+    "to": "words",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "export",
+    "title": "把单词带走",
+    "sub": "当前筛选：易错词 · 3个义项",
+    "cards": [
+      {
+        "title": "导出范围",
+        "body": "当前单词本 / 勾选词 / 收藏 / 易错 / 日期错词",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "文件格式",
+        "body": "CSV ✓　JSON\n包含例句：关闭",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "生成后24小时内下载",
+        "body": "下载时仍需家庭权限；完整档案导出仅管理员。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "生成导出文件",
+    "to": "export_done",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "export_done",
+    "title": "文件已准备好",
+    "sub": "单词清单 · CSV · 3条",
+    "cards": [
+      {
+        "title": "wordmate-words.csv",
+        "body": "24小时内有效",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "下载需要登录",
+        "body": "退出家庭后不可再获取该文件。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "下载文件（演示）",
+    "to": "words",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "correction",
+    "title": "让词条更准确",
+    "sub": "luggage · 词义版本2",
+    "cards": [
+      {
+        "title": "问题类型",
+        "body": "释义 ✓　音标　例句　拼写　其他",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "当前内容",
+        "body": "n. 行李",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "建议修正",
+        "body": "补充：行李通常作不可数名词。",
+        "kind": "input",
+        "to": null
+      },
+      {
+        "title": "提交后由家庭管理员处理",
+        "body": "词义身份改变时重新添加，不转移旧历史。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "提交纠错建议",
+    "to": "correction_list",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "correction_list",
+    "title": "一起把词条整理好",
+    "sub": "管理员 · 待处理1项",
+    "cards": [
+      {
+        "title": "luggage · 释义纠错",
+        "body": "妈妈提交 · 当前版本2",
+        "kind": "tint",
+        "to": "correction"
+      },
+      {
+        "title": "建议内容",
+        "body": "行李（不可数名词）",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "处理前再次核对原内容",
+        "body": "若家人已修改，会提示版本冲突。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "采纳并保存（演示）",
+    "to": "word",
+    "tab": "我的",
+    "secondary": [
+      [
+        "驳回并说明",
+        "word"
+      ]
+    ]
+  },
+  {
+    "id": "family",
+    "title": "两个人陪，一个进度",
+    "sub": "我的 / 小明一家",
+    "cards": [
+      {
+        "title": "爸爸 · 管理员",
+        "body": "邀请、审批、移除成员和管理孩子",
+        "kind": "tint",
+        "to": "approval"
+      },
+      {
+        "title": "妈妈 · 共同家长",
+        "body": "录词、陪学、查看进度和月测",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "孩子档案",
+        "body": "小明 · A2　　小雨 · A1",
+        "kind": "plain",
+        "to": "children"
+      }
+    ],
+    "primary": "邀请另一位家长",
+    "to": "invite",
+    "tab": "我的",
+    "secondary": [
+      [
+        "学习设置",
+        "settings"
+      ],
+      [
+        "处理纠错",
+        "correction_list"
+      ],
+      [
+        "账号管理",
+        "account"
+      ]
+    ]
+  },
+  {
+    "id": "invite",
+    "title": "一起陪孩子学单词",
+    "sub": "家庭邀请 · 24小时有效",
+    "cards": [
+      {
+        "title": "一次邀请，一位家长",
+        "body": "对方微信登录申请后，由管理员确认。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "邀请不等于立即加入",
+        "body": "审批前不会开放孩子的词库与学习记录。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "由家长主动分享邀请",
+    "to": "approval",
+    "tab": "我的",
+    "secondary": []
+  },
+  {
+    "id": "approval",
+    "title": "确认加入家庭的人",
+    "sub": "管理员待审批",
+    "cards": [
+      {
+        "title": "妈妈申请加入",
+        "body": "称呼只是展示，核对后再批准。",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "批准后共享孩子学习数据",
+        "body": "可以录词、复习、月测和下载单词清单。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "批准加入（演示）",
+    "to": "family",
+    "tab": "我的",
+    "secondary": [
+      [
+        "拒绝申请",
+        "family"
+      ]
+    ]
+  },
+  {
+    "id": "children",
+    "title": "每个孩子，一份成长",
+    "sub": "切换学习空间",
+    "cards": [
+      {
+        "title": "小明 ✓",
+        "body": "A2 · 美音 · 每日10词",
+        "kind": "tint",
+        "to": "home"
+      },
+      {
+        "title": "小雨",
+        "body": "A1 · 英音 · 每日5词",
+        "kind": "plain",
+        "to": "home"
+      },
+      {
+        "title": "添加孩子（管理员）",
+        "body": "昵称即可，不需要真实姓名或生日。",
+        "kind": "plain",
+        "to": "child_create"
+      }
+    ],
+    "primary": "进入小明的学习空间",
+    "to": "home",
+    "tab": "我的",
+    "secondary": []
+  },
+  {
+    "id": "settings",
+    "title": "找到舒服的学习节奏",
+    "sub": "小明的设置 · 家庭共享",
+    "cards": [
+      {
+        "title": "口音与音色",
+        "body": "美音 ✓　英音　·　女声A ▾\n▶ 试听当前音色",
+        "kind": "tint",
+        "to": null
+      },
+      {
+        "title": "语速与难度",
+        "body": "正常1.0x　·　英语水平A2",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "每日计划",
+        "body": "目标10词 · 最多10个新词\n今天已开始学习，目标调整明日生效。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "账号与家庭",
+        "body": "退出登录 / 退出家庭 / 注销\n删除孩子与完整数据导出仅管理员。",
+        "kind": "plain",
+        "to": "account"
+      }
+    ],
+    "primary": "保存设置",
+    "to": "home",
+    "tab": "我的",
+    "secondary": []
+  },
+  {
+    "id": "takeover",
+    "title": "爸爸正在陪孩子学习",
+    "sub": "同一孩子同时只有一位答题操作者",
+    "cards": [
+      {
+        "title": "已保存的进度会保留",
+        "body": "接管后爸爸的旧页面不能继续提交。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "其他家长仍可查看进度",
+        "body": "不需要共用微信账号或密码。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "确认由我接着陪学",
+    "to": "review",
+    "tab": "今日",
+    "secondary": [
+      [
+        "只查看进度",
+        "home"
+      ]
+    ]
+  },
+  {
+    "id": "generating",
+    "title": "单词已保存",
+    "sub": "例句正在生成，不影响稍后复习",
+    "cards": [
+      {
+        "title": "把词放进同一个场景",
+        "body": "airport · luggage · delay",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "生成中 / 部分失败",
+        "body": "已生成内容保留，只重试未完成的部分。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "预览生成成功",
+    "to": "word",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "empty",
+    "title": "从今天遇到的词开始",
+    "sub": "这个孩子还没有学习记录",
+    "cards": [
+      {
+        "title": "先录入几个单词吧",
+        "body": "确认词义后，就能开始复习。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "月测需要已有学习记录",
+        "body": "没有可测单词时不会生成空试卷。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "添加第一批单词",
+    "to": "add",
+    "tab": "单词本",
+    "secondary": []
+  },
+  {
+    "id": "error",
+    "title": "还没同步成功",
+    "sub": "网络断开 · 当前输入已保留",
+    "cards": [
+      {
+        "title": "请连接网络后重试",
+        "body": "保存成功之前，不推进进度或打卡。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "家人修改了内容？",
+        "body": "出现版本冲突时，先刷新再确认，不覆盖对方修改。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "重试（演示）",
+    "to": "home",
+    "tab": "今日",
+    "secondary": []
+  },
+  {
+    "id": "family_create",
+    "title": "给家人一个学习空间",
+    "sub": "微信登录成功 · 尚未加入家庭",
+    "cards": [
+      {
+        "title": "家庭名称",
+        "body": "小明一家",
+        "kind": "input",
+        "to": null
+      },
+      {
+        "title": "你将成为家庭管理员",
+        "body": "可以邀请家人和添加孩子。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "创建家庭",
+    "to": "child_create",
+    "tab": "我的",
+    "secondary": [
+      [
+        "我收到邀请",
+        "join"
+      ]
+    ]
+  },
+  {
+    "id": "child_create",
+    "title": "先认识一下小小学习者",
+    "sub": "添加孩子 · 管理员",
+    "cards": [
+      {
+        "title": "孩子昵称",
+        "body": "小明",
+        "kind": "input",
+        "to": null
+      },
+      {
+        "title": "起始水平",
+        "body": "A1　A2 ✓　B1　B2",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "每日目标",
+        "body": "10个词 · 新词上限10个",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "发音偏好",
+        "body": "美音 ✓　英音",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "保存孩子档案",
+    "to": "empty",
+    "tab": "我的",
+    "secondary": []
+  },
+  {
+    "id": "join",
+    "title": "一起陪孩子学单词",
+    "sub": "你收到一份家庭邀请",
+    "cards": [
+      {
+        "title": "爸爸邀请你加入家庭",
+        "body": "加入后可一起管理词库与陪学。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "加入需要管理员确认",
+        "body": "审批前不显示孩子学习记录。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "微信登录并申请加入",
+    "to": "pending",
+    "tab": "我的",
+    "secondary": []
+  },
+  {
+    "id": "pending",
+    "title": "申请已提交",
+    "sub": "等待家庭管理员确认",
+    "cards": [
+      {
+        "title": "稍等一下，就能一起陪学",
+        "body": "目前尚未获得孩子资料访问权限。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "邀请失效怎么办？",
+        "body": "请管理员重新生成邀请。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "查看批准后的状态（演示）",
+    "to": "family",
+    "tab": "我的",
+    "secondary": []
+  },
+  {
+    "id": "account",
+    "title": "管理自己的账号",
+    "sub": "爸爸 · 当前家庭管理员",
+    "cards": [
+      {
+        "title": "退出登录",
+        "body": "仅退出当前设备，不删除记录。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "转交管理员 / 退出家庭",
+        "body": "退出前先将管理员交给有效成员。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "完整孩子数据导出",
+        "body": "仅管理员 · JSON · 24小时有效",
+        "kind": "plain",
+        "to": "export"
+      },
+      {
+        "title": "注销自己的账号",
+        "body": "先转交或解散自己管理的家庭。",
+        "kind": "plain",
+        "to": "delete_account"
+      }
+    ],
+    "primary": "返回我的家庭",
+    "to": "family",
+    "tab": "我的",
+    "secondary": [
+      [
+        "解散家庭",
+        "dissolve_family"
+      ],
+      [
+        "删除孩子",
+        "delete_child"
+      ]
+    ]
+  },
+  {
+    "id": "delete_child",
+    "title": "确认删除孩子档案",
+    "sub": "管理员专属操作",
+    "cards": [
+      {
+        "title": "将删除小明的学习档案",
+        "body": "单词、复习、月测和音频都会清理。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "输入昵称确认",
+        "body": "小明",
+        "kind": "input",
+        "to": null
+      },
+      {
+        "title": "删除在后台执行",
+        "body": "先停止陪学和生成任务，处理中不可继续学习。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "确认删除（演示，不执行）",
+    "to": "deletion_progress",
+    "tab": "我的",
+    "secondary": [
+      [
+        "取消",
+        "children"
+      ]
+    ]
+  },
+  {
+    "id": "dissolve_family",
+    "title": "确认解散这个家庭",
+    "sub": "仅剩自己一位有效成员时可操作",
+    "cards": [
+      {
+        "title": "家庭数据将被删除",
+        "body": "所有孩子的词库、学习记录和音频都会删除。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "删除前可先导出",
+        "body": "如需保留，请返回账号页完成下载。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "输入家庭名称",
+        "body": "小明一家",
+        "kind": "input",
+        "to": null
+      },
+      {
+        "title": "确认删除全部家庭数据",
+        "body": "有其他家长时，先转交或明确移除；不自动移除。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "确认解散（演示）",
+    "to": "deletion_progress",
+    "tab": "我的",
+    "secondary": [
+      [
+        "返回账号",
+        "account"
+      ]
+    ]
+  },
+  {
+    "id": "deletion_progress",
+    "title": "正在清理数据",
+    "sub": "后台处理 · 目标已停止学习",
+    "cards": [
+      {
+        "title": "正在删除文件",
+        "body": "随后清理学习记录，离开页面也会继续。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "失败时可重试",
+        "body": "沿用同一任务继续，不恢复学习状态。",
+        "kind": "plain",
+        "to": null
+      },
+      {
+        "title": "任务结果独立保存",
+        "body": "档案删除后，仍可查看结果。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "预览删除完成",
+    "to": "deletion_done",
+    "tab": "我的",
+    "secondary": [
+      [
+        "演示失败后重试",
+        "deletion_progress"
+      ],
+      [
+        "返回账号",
+        "account"
+      ]
+    ]
+  },
+  {
+    "id": "deletion_done",
+    "title": "数据已清理完成",
+    "sub": "删除任务 · 已完成",
+    "cards": [
+      {
+        "title": "该目标的学习数据已删除",
+        "body": "其他家庭不受影响。",
+        "kind": "hero",
+        "to": null
+      },
+      {
+        "title": "接下来可以管理账号",
+        "body": "若已没有管理员职责和进行中的删除任务，可注销。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "返回账号",
+    "to": "account",
+    "tab": "我的",
+    "secondary": [
+      [
+        "注销自己的账号",
+        "delete_account"
+      ]
+    ]
+  },
+  {
+    "id": "delete_account",
+    "title": "注销自己的账号",
+    "sub": "需要确认 · 不可撤销",
+    "cards": [
+      {
+        "title": "先处理管理员职责",
+        "body": "有其他家长可转交；只有自己可解散家庭。",
+        "kind": "plain",
+        "to": "dissolve_family"
+      },
+      {
+        "title": "等待删除任务完成",
+        "body": "未完成时保留登录，方便查询和重试。",
+        "kind": "plain",
+        "to": "deletion_progress"
+      },
+      {
+        "title": "确认注销自己的账号",
+        "body": "完成后撤销登录；其他家庭学习历史仍保留。",
+        "kind": "plain",
+        "to": null
+      }
+    ],
+    "primary": "确认注销（演示）",
+    "to": "welcome",
+    "tab": "我的",
+    "secondary": [
+      [
+        "返回账号",
+        "account"
+      ]
+    ]
+  }
+]

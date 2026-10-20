@@ -1,0 +1,25 @@
+erDiagram
+ users ||--o{ family_members : joins
+ families ||--o{ family_members : contains
+ families ||--o{ children : owns
+ children ||--o{ child_words : learns
+ children ||--o{ wordbooks : organizes
+ wordbooks ||--o{ wordbook_words : contains
+ child_words ||--o{ wordbook_words : appears
+ child_words ||--o{ review_cards : has
+ review_cards ||--o{ review_logs : records
+ children ||--o{ study_sessions : leases
+ study_sessions ||--o{ study_session_items : queues
+ review_cards ||--o{ study_session_items : queued
+ child_words ||--o{ word_annotations : marks
+ child_words ||--o{ word_corrections : corrects
+ children ||--o{ monthly_quizzes : tests
+ monthly_quizzes ||--o{ monthly_quiz_items : freezes
+ child_words ||--o{ monthly_quiz_items : tests
+ monthly_quiz_items ||--o| mistake_events : creates
+ review_logs ||--o| mistake_events : creates
+ children ||--o{ daily_word_activity : counts
+ children ||--o{ daily_activity : summarizes
+ children ||--o{ generation_jobs : schedules
+ users ||--o{ lifecycle_jobs : requests
+ %% lifecycle_jobs target UUIDs intentionally have no target foreign keys

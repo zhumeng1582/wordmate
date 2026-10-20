@@ -1,0 +1,311 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>数据库结构与事务设计 · 词伴0.1</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f4f6f0;color:#203e34;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:1180px;margin:auto;padding:45px 30px 100px}h1{font-size:36px;line-height:1.3;margin:15px 0 25px}h2{font-size:25px;margin:0 0 18px}h3{font-size:18px}a{color:#23634c}section{background:white;border:1px solid #e0e6db;border-radius:19px;padding:26px;margin:22px 0}p{overflow-wrap:anywhere}small,.muted{color:#647568}.eyebrow{font-size:12px;letter-spacing:2px;color:#57795b}nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #dce4d7;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf1e5}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5ee;border-radius:12px;padding:18px;font:13px/1.65 ui-monospace,monospace}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.grid section{margin:0}.button{display:inline-block;padding:11px 17px;background:#255d48;color:white;border-radius:12px;text-decoration:none;margin:5px 5px 5px 0}.notice{border-left:4px solid #b7873c;background:#fff7e8;padding:16px 20px;margin:20px 0}.screen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}.screen-grid img{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 10px 25px #203e3415}.screen-grid h3{font-size:16px;margin:8px 0}.screen-grid p{font-size:12px;color:#67796e}.pill{font-size:12px;background:#e4eedc;padding:4px 8px;border-radius:6px}details{border:1px solid #e0e6db;border-radius:10px;padding:12px;margin:10px 0}summary{cursor:pointer;font-weight:600}input{width:100%;padding:14px;border:1px solid #d1dcc9;border-radius:10px;font:inherit}.flow{display:flex;gap:10px;flex-wrap:wrap}.flow span{background:#e8f1e4;padding:12px;border-radius:9px}@media print{body{background:white}main{max-width:none;padding:0}section{break-inside:avoid;border-color:#ccc}nav,.noprint{display:none}h1{font-size:26px}h2{font-size:20px}a{color:inherit}pre{font-size:10px}.screen-grid{grid-template-columns:repeat(3,1fr)}}</style><main><div class="eyebrow">WORDMATE / 词伴 · 0.1 · 2026-10-20</div><h1>数据库结构与事务设计</h1><nav><a href="../index.html">交付总览</a><a href="../requirements/index.html">需求文档</a><a href="../design/index.html">页面设计</a><a href="../technical/index.html">技术方案</a><a href="../database/index.html">数据库</a><a href="../api/index.html">接口契约</a><a href="../checks/index.html">验证报告</a></nav><p>29张表完整初始DDL，已在内嵌PostgreSQL执行验证。只用于空库，不连接或修改任何生产数据库。</p><a class="button" href="001_schema.sql">下载完整 SQL</a><a class="button" href="er.mmd">ER图 Mermaid源文件</a><section><h2>关系总览</h2><pre>users ─ family_members ─ families ─ children
+children ─ wordbooks ─ wordbook_words ─ child_words
+children ─ batches ─ batch_items ─ child_words
+child_words ─ sentences / sentence_targets ─ audio_assets
+child_words ─ word_annotations / word_corrections
+child_words ─ review_cards ─ review_logs ─ mistake_events
+children ─ study_sessions ─ study_session_items ─ review_cards
+children ─ daily_word_activity / daily_activity
+children ─ monthly_quizzes ─ monthly_quiz_items ─ mistake_events
+children ─ generation_jobs；family ─ audit_logs；users ─ lifecycle_jobs（目标UUID无外键）</pre></section><section><h2>数据一致性与事务边界</h2><p>身份以family_members有效关系授权，复合外键只防跨孩子关联，不代替鉴权。所有业务写锁顺序为家庭→孩子→测验→会话→队列项/题目→卡片（无该实体时跳过）。</p><p>review_logs与mistake_events是追加事实；SQL不提供通用UPDATE接口。应用账户通过服务层控制不可变历史；SQL未使用触发器实现所有状态机。月测候选数组去重、选项属于题目、词义正确、题量齐全、daily_word与card真实义项一致，必须在应用事务校验。</p><p>每日按义项去重，不按题型卡重复计数。原子交卷必须写成绩和错误事实；例句/音频任务入队与词保存同事务，PG任务表是可恢复事实。所有这些事务已在技术方案详述。</p></section><section><h2>表目录</h2><table><thead><tr><th>表</th><th>含义</th></tr></thead><tbody><tr><td><a href="#users">users</a></td><td>登录家长；账号注销时清除微信身份，孩子记录不级联删除</td></tr><tr><td><a href="#auth_sessions">auth_sessions</a></td><td>自有登录会话，只存访问令牌哈希，不存明文</td></tr><tr><td><a href="#families">families</a></td><td>家庭协作范围；owner_user_id 为唯一管理员来源，避免角色字段与所有者双写不一致</td></tr><tr><td><a href="#family_members">family_members</a></td><td>家庭成员；爸爸妈妈是显示称呼，权限由家庭所有者与有效成员关系决定</td></tr><tr><td><a href="#family_invites">family_invites</a></td><td>一次性邀请及待审批申请；领取与审批锁定本行，批准需再次校验有效期</td></tr><tr><td><a href="#children">children</a></td><td>实际学习者；口音、目标、时区与进度归孩子，昵称不要求真实姓名</td></tr><tr><td><a href="#wordbooks">wordbooks</a></td><td>孩子的单词本；跨本复用同一孩子的词与卡</td></tr><tr><td><a href="#batches">batches</a></td><td>系列单词的明确批次；草稿确认后保存选定义项并创建生成任务</td></tr><tr><td><a href="#batch_items">batch_items</a></td><td>保留原始输入、候选词义、错误和重复项，支持逐项确认</td></tr><tr><td><a href="#child_words">child_words</a></td><td>已确认的词义；sense_key 必填，源词典义项 ID 或服务端规范化词义哈希</td></tr><tr><td><a href="#wordbook_words">wordbook_words</a></td><td>单词本与义项多对多关系，复合外键防止跨孩子挂接</td></tr><tr><td><a href="#sentences">sentences</a></td><td>AI 例句；仅 validated 可展示，更新产生新内容版本</td></tr><tr><td><a href="#sentence_targets">sentence_targets</a></td><td>目标词及词形映射；位置采用 JS UTF-16 半开区间，由服务端校验</td></tr><tr><td><a href="#audio_assets">audio_assets</a></td><td>0.1 按孩子存储音频；不返回公共存储地址，播放入口每次验证家庭权限</td></tr><tr><td><a href="#review_cards">review_cards</a></td><td>每孩子每义项每题型独立 FSRS 状态；scheduler_state 存所锁定库完整序列化状态</td></tr><tr><td><a href="#study_sessions">study_sessions</a></td><td>孩子独占陪学租约；锁 children 行后先关闭过期会话再创建，不在索引中使用 now()</td></tr><tr><td><a href="#review_logs">review_logs</a></td><td>不可变复习事件；事件键持久去重、存前后状态和第一次响应，操作家长可匿名化</td></tr><tr><td><a href="#daily_word_activity">daily_word_activity</a></td><td>每天每义项一行，数据库约束保证两个家长重复练习不重复计学习词数</td></tr><tr><td><a href="#daily_activity">daily_activity</a></td><td>可重建每日汇总；达标由 distinct_words &gt;= goal_snapshot 推导，不冗余存储</td></tr><tr><td><a href="#generation_jobs">generation_jobs</a></td><td>持久化任务；FOR UPDATE SKIP LOCKED 领取；外部供应商计费无法靠本地事务保证恰好一次</td></tr><tr><td><a href="#lifecycle_jobs">lifecycle_jobs</a></td><td>删除凭据与恢复清单；family_id/target_id为不带外键的历史UUID，目标删除后仍可查询；仅发起者本人可读，不存昵称或学习正文</td></tr><tr><td><a href="#idempotency_keys">idempotency_keys</a></td><td>通用写请求去重，24 小时保留；复习事件另外持久去重</td></tr><tr><td><a href="#audit_logs">audit_logs</a></td><td>家庭成员、档案及内容修改审计，不存登录或邀请明文凭证</td></tr><tr><td><a href="#word_annotations">word_annotations</a></td><td>孩子义项标注；简单与易错互斥；待纠错展示为手动标记与pending纠错记录的并集</td></tr><tr><td><a href="#word_corrections">word_corrections</a></td><td>成员提交、管理员处理；不改变lemma/词性/sense_key的编辑才可原地应用</td></tr><tr><td><a href="#monthly_quizzes">monthly_quizzes</a></td><td>月测候选集、规则及最终成绩快照；sample/full可比较范围明确；四档按整数交叉乘积判断</td></tr><tr><td><a href="#monthly_quiz_items">monthly_quiz_items</a></td><td>只提交前端安全DTO；正确选项和解析在正式交卷前不可返回；选项属于本题由应用校验</td></tr><tr><td><a href="#study_session_items">study_session_items</a></td><td>服务端快照复习队列；每个队列项首次提交一次，重练重新开会话；月测错题队列不限100词并分页</td></tr><tr><td><a href="#mistake_events">mistake_events</a></td><td>统一错题事件事实；review again与已交卷月测错误同事务写入，日历不再重复合并review_logs</td></tr></tbody></table></section><section id="users"><h2>users</h2><p>登录家长；账号注销时清除微信身份，孩子记录不级联删除</p><pre>CREATE TABLE users (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ wx_app_id text NOT NULL, wx_open_id text NOT NULL,
+ display_name varchar(40) NOT NULL,
+ status text NOT NULL DEFAULT &#x27;active&#x27; CHECK (status IN (&#x27;active&#x27;,&#x27;deleting&#x27;,&#x27;deleted&#x27;)),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(wx_app_id, wx_open_id)
+);</pre></section><section id="auth_sessions"><h2>auth_sessions</h2><p>自有登录会话，只存访问令牌哈希，不存明文</p><pre>CREATE TABLE auth_sessions (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id),
+ token_hash text NOT NULL UNIQUE,
+ expires_at timestamptz NOT NULL, revoked_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now()
+);</pre></section><section id="families"><h2>families</h2><p>家庭协作范围；owner_user_id 为唯一管理员来源，避免角色字段与所有者双写不一致</p><pre>CREATE TABLE families (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name varchar(40) NOT NULL,
+ owner_user_id uuid NOT NULL REFERENCES users(id),
+ version integer NOT NULL DEFAULT 1 CHECK(version &gt; 0),
+ status text NOT NULL DEFAULT &#x27;active&#x27; CHECK(status IN (&#x27;active&#x27;,&#x27;deleting&#x27;)),
+ created_at timestamptz NOT NULL DEFAULT now()
+);</pre></section><section id="family_members"><h2>family_members</h2><p>家庭成员；爸爸妈妈是显示称呼，权限由家庭所有者与有效成员关系决定</p><pre>CREATE TABLE family_members (
+family_id uuid NOT NULL REFERENCES families(id),
+ user_id uuid NOT NULL REFERENCES users(id),
+ display_name varchar(40) NOT NULL,
+ status text NOT NULL DEFAULT &#x27;active&#x27; CHECK(status IN (&#x27;active&#x27;,&#x27;left&#x27;,&#x27;removed&#x27;)),
+ joined_at timestamptz NOT NULL DEFAULT now(), revoked_at timestamptz,
+ PRIMARY KEY(family_id,user_id)
+);</pre></section><section id="family_invites"><h2>family_invites</h2><p>一次性邀请及待审批申请；领取与审批锁定本行，批准需再次校验有效期</p><pre>CREATE TABLE family_invites (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ family_id uuid NOT NULL REFERENCES families(id),
+ created_by uuid NOT NULL REFERENCES users(id), token_hash text NOT NULL UNIQUE,
+ status text NOT NULL DEFAULT &#x27;pending&#x27; CHECK(status IN (&#x27;pending&#x27;,&#x27;claimed&#x27;,&#x27;approved&#x27;,&#x27;rejected&#x27;,&#x27;revoked&#x27;,&#x27;expired&#x27;)),
+ claimed_by uuid REFERENCES users(id), approved_by uuid REFERENCES users(id),
+ expires_at timestamptz NOT NULL, claimed_at timestamptz, approved_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CHECK(expires_at &gt; created_at),
+ CHECK(status NOT IN (&#x27;claimed&#x27;,&#x27;approved&#x27;) OR claimed_by IS NOT NULL),
+ CHECK(status &lt;&gt; &#x27;approved&#x27; OR (approved_by IS NOT NULL AND approved_at IS NOT NULL))
+);</pre></section><section id="children"><h2>children</h2><p>实际学习者；口音、目标、时区与进度归孩子，昵称不要求真实姓名</p><pre>CREATE TABLE children (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), family_id uuid NOT NULL REFERENCES families(id),
+ nickname varchar(40) NOT NULL, timezone text NOT NULL DEFAULT &#x27;Asia/Shanghai&#x27;,
+ accent text NOT NULL DEFAULT &#x27;en-US&#x27; CHECK(accent IN (&#x27;en-US&#x27;,&#x27;en-GB&#x27;)),
+ voice_id text, speech_rate numeric(3,2) NOT NULL DEFAULT 1 CHECK(speech_rate BETWEEN 0.5 AND 1.5),
+ level text NOT NULL DEFAULT &#x27;A2&#x27; CHECK(level IN (&#x27;A1&#x27;,&#x27;A2&#x27;,&#x27;B1&#x27;,&#x27;B2&#x27;,&#x27;C1&#x27;,&#x27;C2&#x27;)),
+ daily_new_limit integer NOT NULL DEFAULT 10 CHECK(daily_new_limit BETWEEN 0 AND 100),
+ daily_goal integer NOT NULL DEFAULT 10 CHECK(daily_goal BETWEEN 1 AND 500),
+ version integer NOT NULL DEFAULT 1 CHECK(version &gt; 0),
+ archived_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(id,family_id)
+);</pre></section><section id="wordbooks"><h2>wordbooks</h2><p>孩子的单词本；跨本复用同一孩子的词与卡</p><pre>CREATE TABLE wordbooks (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ name varchar(60) NOT NULL, created_by uuid REFERENCES users(id),
+ version integer NOT NULL DEFAULT 1 CHECK(version &gt; 0), archived_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(id,child_id)
+);</pre></section><section id="batches"><h2>batches</h2><p>系列单词的明确批次；草稿确认后保存选定义项并创建生成任务</p><pre>CREATE TABLE batches (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ wordbook_id uuid NOT NULL, created_by uuid REFERENCES users(id),
+ theme varchar(80), status text NOT NULL DEFAULT &#x27;draft&#x27; CHECK(status IN (&#x27;draft&#x27;,&#x27;confirmed&#x27;,&#x27;archived&#x27;)),
+ version integer NOT NULL DEFAULT 1 CHECK(version &gt; 0),
+ created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(id,child_id),
+ FOREIGN KEY(wordbook_id,child_id) REFERENCES wordbooks(id,child_id)
+);</pre></section><section id="batch_items"><h2>batch_items</h2><p>保留原始输入、候选词义、错误和重复项，支持逐项确认</p><pre>CREATE TABLE batch_items (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), batch_id uuid NOT NULL, child_id uuid NOT NULL,
+ ordinal integer NOT NULL CHECK(ordinal BETWEEN 1 AND 30), raw_text varchar(120) NOT NULL,
+ candidates jsonb NOT NULL DEFAULT &#x27;[]&#x27; CHECK(jsonb_typeof(candidates)=&#x27;array&#x27;),
+ status text NOT NULL DEFAULT &#x27;needs_confirmation&#x27; CHECK(status IN (&#x27;needs_confirmation&#x27;,&#x27;ready&#x27;,&#x27;invalid&#x27;,&#x27;duplicate&#x27;,&#x27;confirmed&#x27;)),
+ child_word_id uuid,
+ FOREIGN KEY(batch_id,child_id) REFERENCES batches(id,child_id), UNIQUE(batch_id,ordinal)
+);</pre></section><section id="child_words"><h2>child_words</h2><p>已确认的词义；sense_key 必填，源词典义项 ID 或服务端规范化词义哈希</p><pre>CREATE TABLE child_words (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ lemma varchar(120) NOT NULL, normalized_lemma varchar(120) NOT NULL,
+ part_of_speech varchar(24) NOT NULL,
+ sense_key text NOT NULL, meaning_zh varchar(500) NOT NULL,
+ dictionary_source text NOT NULL, dictionary_entry_id text,
+ ipa_gb text, ipa_us text,
+ created_by uuid REFERENCES users(id), version integer NOT NULL DEFAULT 1 CHECK(version &gt; 0),
+ archived_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(id,child_id), UNIQUE(child_id,normalized_lemma,part_of_speech,sense_key)
+);</pre></section><section id="wordbook_words"><h2>wordbook_words</h2><p>单词本与义项多对多关系，复合外键防止跨孩子挂接</p><pre>CREATE TABLE wordbook_words (
+child_id uuid NOT NULL, wordbook_id uuid NOT NULL, child_word_id uuid NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(wordbook_id,child_word_id),
+ FOREIGN KEY(wordbook_id,child_id) REFERENCES wordbooks(id,child_id),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id)
+);</pre></section><section id="sentences"><h2>sentences</h2><p>AI 例句；仅 validated 可展示，更新产生新内容版本</p><pre>CREATE TABLE sentences (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ batch_id uuid, text_en text NOT NULL, translation_zh text NOT NULL,
+ level text NOT NULL, model text NOT NULL, prompt_version text NOT NULL,
+ status text NOT NULL DEFAULT &#x27;draft&#x27; CHECK(status IN (&#x27;draft&#x27;,&#x27;validated&#x27;,&#x27;rejected&#x27;,&#x27;archived&#x27;)),
+ locked boolean NOT NULL DEFAULT false, content_version integer NOT NULL DEFAULT 1 CHECK(content_version &gt; 0),
+ created_by uuid REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(id,child_id),
+ FOREIGN KEY(batch_id,child_id) REFERENCES batches(id,child_id)
+);</pre></section><section id="sentence_targets"><h2>sentence_targets</h2><p>目标词及词形映射；位置采用 JS UTF-16 半开区间，由服务端校验</p><pre>CREATE TABLE sentence_targets (
+child_id uuid NOT NULL, sentence_id uuid NOT NULL, child_word_id uuid NOT NULL,
+ surface text NOT NULL, start_utf16 integer NOT NULL CHECK(start_utf16 &gt;= 0),
+ end_utf16 integer NOT NULL, PRIMARY KEY(sentence_id,child_word_id,start_utf16),
+ CHECK(end_utf16 &gt; start_utf16),
+ FOREIGN KEY(sentence_id,child_id) REFERENCES sentences(id,child_id),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id)
+);</pre></section><section id="audio_assets"><h2>audio_assets</h2><p>0.1 按孩子存储音频；不返回公共存储地址，播放入口每次验证家庭权限</p><pre>CREATE TABLE audio_assets (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ child_word_id uuid, sentence_id uuid, content_version integer NOT NULL CHECK(content_version &gt; 0),
+ content_hash text NOT NULL, pronunciation_key text NOT NULL DEFAULT &#x27;&#x27;,
+ accent text NOT NULL CHECK(accent IN (&#x27;en-US&#x27;,&#x27;en-GB&#x27;)), voice_id text NOT NULL,
+ speech_rate numeric(3,2) NOT NULL CHECK(speech_rate BETWEEN 0.5 AND 1.5),
+ provider text NOT NULL, provider_version text NOT NULL,
+ status text NOT NULL DEFAULT &#x27;queued&#x27; CHECK(status IN (&#x27;queued&#x27;,&#x27;running&#x27;,&#x27;succeeded&#x27;,&#x27;failed&#x27;)),
+ storage_key text, mime_type text, duration_ms integer CHECK(duration_ms &gt;= 0), error_code text,
+ created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(id,child_id),
+ CHECK(num_nonnulls(child_word_id,sentence_id)=1),
+ CHECK(status &lt;&gt; &#x27;succeeded&#x27; OR storage_key IS NOT NULL),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id),
+ FOREIGN KEY(sentence_id,child_id) REFERENCES sentences(id,child_id),
+ UNIQUE NULLS NOT DISTINCT(child_id,child_word_id,sentence_id,content_version,content_hash,pronunciation_key,accent,voice_id,speech_rate,provider,provider_version)
+);</pre></section><section id="review_cards"><h2>review_cards</h2><p>每孩子每义项每题型独立 FSRS 状态；scheduler_state 存所锁定库完整序列化状态</p><pre>CREATE TABLE review_cards (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL, child_word_id uuid NOT NULL,
+ card_type text NOT NULL DEFAULT &#x27;meaning&#x27; CHECK(card_type IN (&#x27;meaning&#x27;,&#x27;spelling&#x27;,&#x27;listening&#x27;)),
+ state text NOT NULL DEFAULT &#x27;new&#x27; CHECK(state IN (&#x27;new&#x27;,&#x27;learning&#x27;,&#x27;review&#x27;,&#x27;relearning&#x27;)),
+ due_at timestamptz NOT NULL DEFAULT now(), last_review_at timestamptz,
+ scheduler_state jsonb NOT NULL DEFAULT &#x27;{}&#x27; CHECK(jsonb_typeof(scheduler_state)=&#x27;object&#x27;),
+ scheduler_version text NOT NULL, parameter_version text NOT NULL,
+ desired_retention numeric(4,3) NOT NULL DEFAULT 0.9 CHECK(desired_retention &gt; 0 AND desired_retention &lt; 1),
+ version integer NOT NULL DEFAULT 1 CHECK(version &gt; 0), suspended_at timestamptz,
+ UNIQUE(id,child_id), UNIQUE(child_id,child_word_id,card_type),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id)
+);</pre></section><section id="study_sessions"><h2>study_sessions</h2><p>孩子独占陪学租约；锁 children 行后先关闭过期会话再创建，不在索引中使用 now()</p><pre>CREATE TABLE study_sessions (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ actor_user_id uuid NOT NULL REFERENCES users(id),
+ status text NOT NULL DEFAULT &#x27;active&#x27; CHECK(status IN (&#x27;active&#x27;,&#x27;ended&#x27;,&#x27;expired&#x27;,&#x27;taken_over&#x27;,&#x27;revoked&#x27;)),
+ started_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL,
+ ended_at timestamptz, UNIQUE(id,child_id), CHECK(expires_at &gt; started_at)
+);</pre></section><section id="review_logs"><h2>review_logs</h2><p>不可变复习事件；事件键持久去重、存前后状态和第一次响应，操作家长可匿名化</p><pre>CREATE TABLE review_logs (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL,
+ card_id uuid NOT NULL, session_id uuid NOT NULL, actor_user_id uuid REFERENCES users(id),
+ event_id uuid NOT NULL, request_hash text NOT NULL,
+ rating text NOT NULL CHECK(rating IN (&#x27;again&#x27;,&#x27;hard&#x27;,&#x27;good&#x27;,&#x27;easy&#x27;)),
+ reviewed_at timestamptz NOT NULL DEFAULT now(), local_date date NOT NULL, timezone_snapshot text NOT NULL,
+ before_version integer NOT NULL, after_version integer NOT NULL,
+ practice_only boolean NOT NULL DEFAULT false,
+ review_source text NOT NULL DEFAULT &#x27;scheduled&#x27; CHECK(review_source IN (&#x27;scheduled&#x27;,&#x27;calendar&#x27;,&#x27;manual&#x27;,&#x27;quiz&#x27;)),
+ word_snapshot jsonb NOT NULL CHECK(jsonb_typeof(word_snapshot)=&#x27;object&#x27;),
+ before_state jsonb NOT NULL, after_state jsonb NOT NULL, response_snapshot jsonb NOT NULL,
+ UNIQUE(id,child_id), UNIQUE(child_id,event_id), CHECK((practice_only AND after_version=before_version) OR (NOT practice_only AND after_version=before_version+1)),
+ FOREIGN KEY(card_id,child_id) REFERENCES review_cards(id,child_id),
+ FOREIGN KEY(session_id,child_id) REFERENCES study_sessions(id,child_id)
+);</pre></section><section id="daily_word_activity"><h2>daily_word_activity</h2><p>每天每义项一行，数据库约束保证两个家长重复练习不重复计学习词数</p><pre>CREATE TABLE daily_word_activity (
+child_id uuid NOT NULL, local_date date NOT NULL, card_id uuid NOT NULL,
+ child_word_id uuid NOT NULL, first_review_at timestamptz NOT NULL, was_new boolean NOT NULL,
+ PRIMARY KEY(child_id,local_date,child_word_id),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id),
+ FOREIGN KEY(card_id,child_id) REFERENCES review_cards(id,child_id)
+);</pre></section><section id="daily_activity"><h2>daily_activity</h2><p>可重建每日汇总；达标由 distinct_words &gt;= goal_snapshot 推导，不冗余存储</p><pre>CREATE TABLE daily_activity (
+child_id uuid NOT NULL REFERENCES children(id), local_date date NOT NULL,
+ distinct_words integer NOT NULL DEFAULT 0 CHECK(distinct_words &gt;= 0),
+ new_words integer NOT NULL DEFAULT 0 CHECK(new_words &gt;= 0 AND new_words &lt;= distinct_words),
+ goal_snapshot integer NOT NULL CHECK(goal_snapshot &gt; 0), timezone_snapshot text NOT NULL,
+ updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(child_id,local_date)
+);</pre></section><section id="generation_jobs"><h2>generation_jobs</h2><p>持久化任务；FOR UPDATE SKIP LOCKED 领取；外部供应商计费无法靠本地事务保证恰好一次</p><pre>CREATE TABLE generation_jobs (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ requested_by uuid REFERENCES users(id), kind text NOT NULL CHECK(kind IN (&#x27;sentences&#x27;,&#x27;audio&#x27;,&#x27;export&#x27;,&#x27;quiz_prepare&#x27;)),
+ dedupe_key text NOT NULL, payload jsonb NOT NULL,
+ status text NOT NULL DEFAULT &#x27;queued&#x27; CHECK(status IN (&#x27;queued&#x27;,&#x27;running&#x27;,&#x27;partial&#x27;,&#x27;succeeded&#x27;,&#x27;failed&#x27;,&#x27;cancelled&#x27;)),
+ attempts integer NOT NULL DEFAULT 0 CHECK(attempts &gt;= 0),
+ max_attempts integer NOT NULL DEFAULT 2 CHECK(max_attempts BETWEEN 1 AND 5),
+ run_after timestamptz NOT NULL DEFAULT now(), lease_until timestamptz,
+ result jsonb, error_code text, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(child_id,kind,dedupe_key)
+);</pre></section><section id="lifecycle_jobs"><h2>lifecycle_jobs</h2><p>删除凭据与恢复清单；family_id/target_id为不带外键的历史UUID，目标删除后仍可查询；仅发起者本人可读，不存昵称或学习正文</p><pre>CREATE TABLE lifecycle_jobs (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ requested_by uuid NOT NULL REFERENCES users(id),
+ family_id uuid NOT NULL, target_id uuid NOT NULL,
+ kind text NOT NULL CHECK(kind IN (&#x27;delete_child&#x27;,&#x27;delete_family&#x27;)),
+ status text NOT NULL DEFAULT &#x27;queued&#x27; CHECK(status IN (&#x27;queued&#x27;,&#x27;running&#x27;,&#x27;succeeded&#x27;,&#x27;failed&#x27;)),
+ phase text NOT NULL DEFAULT &#x27;freeze&#x27; CHECK(phase IN (&#x27;freeze&#x27;,&#x27;objects&#x27;,&#x27;records&#x27;,&#x27;complete&#x27;)),
+ attempts integer NOT NULL DEFAULT 0 CHECK(attempts &gt;= 0),
+ lease_until timestamptz, next_attempt_at timestamptz NOT NULL DEFAULT now(),
+ error_code text, created_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz,
+ CHECK((status = &#x27;succeeded&#x27;) = (completed_at IS NOT NULL)),
+ CHECK((status = &#x27;succeeded&#x27;) = (phase = &#x27;complete&#x27;)),
+ UNIQUE(kind,target_id)
+);</pre></section><section id="idempotency_keys"><h2>idempotency_keys</h2><p>通用写请求去重，24 小时保留；复习事件另外持久去重</p><pre>CREATE TABLE idempotency_keys (
+actor_user_id uuid NOT NULL REFERENCES users(id), operation text NOT NULL, key varchar(128) NOT NULL,
+ request_hash text NOT NULL, status text NOT NULL CHECK(status IN (&#x27;running&#x27;,&#x27;completed&#x27;)),
+ http_status integer CHECK(http_status BETWEEN 200 AND 599), response_body jsonb,
+ created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL,
+ PRIMARY KEY(actor_user_id,operation,key), CHECK(expires_at &gt; created_at)
+);</pre></section><section id="audit_logs"><h2>audit_logs</h2><p>家庭成员、档案及内容修改审计，不存登录或邀请明文凭证</p><pre>CREATE TABLE audit_logs (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), family_id uuid NOT NULL REFERENCES families(id),
+ actor_user_id uuid REFERENCES users(id), action text NOT NULL, target_type text NOT NULL,
+ target_id uuid NOT NULL, detail jsonb NOT NULL DEFAULT &#x27;{}&#x27;, created_at timestamptz NOT NULL DEFAULT now()
+);</pre></section><section id="word_annotations"><h2>word_annotations</h2><p>孩子义项标注；简单与易错互斥；待纠错展示为手动标记与pending纠错记录的并集</p><pre>CREATE TABLE word_annotations (
+child_id uuid NOT NULL, child_word_id uuid NOT NULL,
+ easy boolean NOT NULL DEFAULT false, error_prone boolean NOT NULL DEFAULT false,
+ favorite boolean NOT NULL DEFAULT false, manual_needs_correction boolean NOT NULL DEFAULT false,
+ version integer NOT NULL DEFAULT 1 CHECK(version&gt;0),
+ updated_by uuid REFERENCES users(id), updated_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(child_id,child_word_id), CHECK(NOT(easy AND error_prone)),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id)
+);</pre></section><section id="word_corrections"><h2>word_corrections</h2><p>成员提交、管理员处理；不改变lemma/词性/sense_key的编辑才可原地应用</p><pre>CREATE TABLE word_corrections (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL, child_word_id uuid NOT NULL,
+ sentence_id uuid, kind text NOT NULL CHECK(kind IN (&#x27;spelling&#x27;,&#x27;meaning&#x27;,&#x27;ipa&#x27;,&#x27;sentence&#x27;,&#x27;other&#x27;)),
+ before_snapshot jsonb NOT NULL CHECK(jsonb_typeof(before_snapshot)=&#x27;object&#x27;),
+ proposed_snapshot jsonb NOT NULL CHECK(jsonb_typeof(proposed_snapshot)=&#x27;object&#x27;),
+ base_version integer NOT NULL CHECK(base_version&gt;0),
+ note varchar(1000) NOT NULL DEFAULT &#x27;&#x27;,
+ status text NOT NULL DEFAULT &#x27;pending&#x27; CHECK(status IN (&#x27;pending&#x27;,&#x27;applied&#x27;,&#x27;rejected&#x27;,&#x27;cancelled&#x27;)),
+ version integer NOT NULL DEFAULT 1 CHECK(version&gt;0),
+ created_by uuid REFERENCES users(id), resolved_by uuid REFERENCES users(id),
+ resolution_note varchar(1000), created_at timestamptz NOT NULL DEFAULT now(), resolved_at timestamptz,
+ UNIQUE(id,child_id),
+ CHECK((kind=&#x27;sentence&#x27;)=(sentence_id IS NOT NULL)),
+ CHECK((status=&#x27;pending&#x27; AND resolved_at IS NULL) OR (status&lt;&gt;&#x27;pending&#x27; AND resolved_at IS NOT NULL)),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id),
+ FOREIGN KEY(sentence_id,child_id) REFERENCES sentences(id,child_id)
+);</pre></section><section id="monthly_quizzes"><h2>monthly_quizzes</h2><p>月测候选集、规则及最终成绩快照；sample/full可比较范围明确；四档按整数交叉乘积判断</p><pre>CREATE TABLE monthly_quizzes (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
+ month date NOT NULL CHECK(extract(day FROM month)=1), timezone_snapshot text NOT NULL,
+ mode text NOT NULL CHECK(mode IN (&#x27;sample&#x27;,&#x27;full&#x27;)), requested_count integer,
+ candidate_word_ids jsonb NOT NULL CHECK(jsonb_typeof(candidate_word_ids)=&#x27;array&#x27;),
+ eligible_count integer NOT NULL CHECK(eligible_count BETWEEN 1 AND 10000),
+ excluded_count integer NOT NULL DEFAULT 0 CHECK(excluded_count&gt;=0),
+ total_count integer NOT NULL CHECK(total_count BETWEEN 1 AND 10000),
+ correct_count integer, unanswered_count integer, grade text,
+ grading_rule_snapshot jsonb NOT NULL CHECK(jsonb_typeof(grading_rule_snapshot)=&#x27;object&#x27;),
+ question_type text NOT NULL DEFAULT &#x27;meaning_choice&#x27; CHECK(question_type=&#x27;meaning_choice&#x27;),
+ status text NOT NULL DEFAULT &#x27;preparing&#x27; CHECK(status IN (&#x27;preparing&#x27;,&#x27;ready&#x27;,&#x27;in_progress&#x27;,&#x27;submitted&#x27;,&#x27;abandoned&#x27;,&#x27;failed&#x27;)),
+ created_by uuid REFERENCES users(id), version integer NOT NULL DEFAULT 1 CHECK(version&gt;0),
+ created_at timestamptz NOT NULL DEFAULT now(), started_at timestamptz,
+ submitted_at timestamptz, submitted_local_date date,
+ UNIQUE(id,child_id),
+ CHECK((mode=&#x27;sample&#x27; AND requested_count IS NOT NULL AND requested_count IN (10,20,30,50)) OR (mode=&#x27;full&#x27; AND requested_count IS NULL)),
+ CHECK(jsonb_array_length(candidate_word_ids)=eligible_count),
+ CHECK((mode=&#x27;full&#x27; AND total_count=eligible_count) OR (mode=&#x27;sample&#x27; AND total_count=least(requested_count,eligible_count))),
+ CHECK((status=&#x27;submitted&#x27; AND correct_count IS NOT NULL AND unanswered_count IS NOT NULL AND grade IS NOT NULL AND submitted_at IS NOT NULL AND submitted_local_date IS NOT NULL
+ AND correct_count&gt;=0 AND unanswered_count&gt;=0 AND correct_count+unanswered_count&lt;=total_count
+ AND grade=CASE WHEN correct_count*100&gt;=total_count*90 THEN &#x27;excellent&#x27; WHEN correct_count*100&gt;=total_count*80 THEN &#x27;good&#x27; WHEN correct_count*100&gt;=total_count*60 THEN &#x27;pass&#x27; ELSE &#x27;needs_work&#x27; END)
+ OR (status&lt;&gt;&#x27;submitted&#x27; AND correct_count IS NULL AND unanswered_count IS NULL AND grade IS NULL AND submitted_at IS NULL AND submitted_local_date IS NULL))
+);</pre></section><section id="monthly_quiz_items"><h2>monthly_quiz_items</h2><p>只提交前端安全DTO；正确选项和解析在正式交卷前不可返回；选项属于本题由应用校验</p><pre>CREATE TABLE monthly_quiz_items (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), quiz_id uuid NOT NULL, child_id uuid NOT NULL, child_word_id uuid NOT NULL,
+ ordinal integer NOT NULL CHECK(ordinal BETWEEN 1 AND 10000),
+ word_snapshot jsonb NOT NULL CHECK(jsonb_typeof(word_snapshot)=&#x27;object&#x27;),
+ prompt_snapshot text, options_snapshot jsonb CHECK(options_snapshot IS NULL OR (jsonb_typeof(options_snapshot)=&#x27;array&#x27; AND jsonb_array_length(options_snapshot)=4)),
+ correct_option_id text, selected_option_id text,
+ answer_version integer NOT NULL DEFAULT 1 CHECK(answer_version&gt;0),
+ flagged boolean NOT NULL DEFAULT false, is_correct boolean, answered_at timestamptz,
+ UNIQUE(id,child_id), UNIQUE(quiz_id,ordinal), UNIQUE(quiz_id,child_word_id),
+ CHECK(num_nonnulls(prompt_snapshot,options_snapshot,correct_option_id) IN (0,3)),
+ CHECK(selected_option_id IS NULL OR correct_option_id IS NOT NULL),
+ FOREIGN KEY(quiz_id,child_id) REFERENCES monthly_quizzes(id,child_id),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id)
+);</pre></section><section id="study_session_items"><h2>study_session_items</h2><p>服务端快照复习队列；每个队列项首次提交一次，重练重新开会话；月测错题队列不限100词并分页</p><pre>CREATE TABLE study_session_items (
+session_id uuid NOT NULL, child_id uuid NOT NULL, card_id uuid NOT NULL,
+ ordinal integer NOT NULL CHECK(ordinal&gt;0), practice_only boolean NOT NULL,
+ answered_event_id uuid, added_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(session_id,card_id), UNIQUE(session_id,ordinal),
+ FOREIGN KEY(session_id,child_id) REFERENCES study_sessions(id,child_id),
+ FOREIGN KEY(card_id,child_id) REFERENCES review_cards(id,child_id),
+ FOREIGN KEY(child_id,answered_event_id) REFERENCES review_logs(child_id,event_id)
+);</pre></section><section id="mistake_events"><h2>mistake_events</h2><p>统一错题事件事实；review again与已交卷月测错误同事务写入，日历不再重复合并review_logs</p><pre>CREATE TABLE mistake_events (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL, child_word_id uuid NOT NULL,
+ source text NOT NULL CHECK(source IN (&#x27;review&#x27;,&#x27;monthly_quiz&#x27;)),
+ review_log_id uuid, quiz_item_id uuid,
+ reason text NOT NULL CHECK(reason IN (&#x27;incorrect&#x27;,&#x27;unanswered&#x27;)),
+ occurred_at timestamptz NOT NULL DEFAULT now(), local_date date NOT NULL, timezone_snapshot text NOT NULL,
+ word_snapshot jsonb NOT NULL CHECK(jsonb_typeof(word_snapshot)=&#x27;object&#x27;),
+ answer_snapshot jsonb NOT NULL CHECK(jsonb_typeof(answer_snapshot)=&#x27;object&#x27;),
+ CHECK((source=&#x27;review&#x27; AND review_log_id IS NOT NULL AND quiz_item_id IS NULL AND reason=&#x27;incorrect&#x27;) OR
+       (source=&#x27;monthly_quiz&#x27; AND quiz_item_id IS NOT NULL AND review_log_id IS NULL)),
+ FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id),
+ FOREIGN KEY(review_log_id,child_id) REFERENCES review_logs(id,child_id),
+ FOREIGN KEY(quiz_item_id,child_id) REFERENCES monthly_quiz_items(id,child_id)
+);</pre></section><section><h2>补充外键、约束及索引</h2><pre>ALTER TABLE families ADD CONSTRAINT family_owner_member_fk
+ FOREIGN KEY(id,owner_user_id) REFERENCES family_members(family_id,user_id)
+ DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE batch_items ADD FOREIGN KEY(child_word_id,child_id) REFERENCES child_words(id,child_id);
+CREATE UNIQUE INDEX one_active_session_per_child ON study_sessions(child_id) WHERE status=&#x27;active&#x27;;
+CREATE INDEX lifecycle_jobs_pending ON lifecycle_jobs(next_attempt_at) WHERE status IN (&#x27;queued&#x27;,&#x27;running&#x27;);
+CREATE INDEX members_by_user ON family_members(user_id) WHERE status=&#x27;active&#x27;;
+CREATE INDEX children_by_family ON children(family_id) WHERE archived_at IS NULL;
+CREATE INDEX wordbooks_by_child ON wordbooks(child_id,created_at,id) WHERE archived_at IS NULL;
+CREATE INDEX words_by_child ON child_words(child_id,normalized_lemma,id) WHERE archived_at IS NULL;
+CREATE INDEX invites_by_family ON family_invites(family_id,status,created_at);
+CREATE INDEX due_cards ON review_cards(child_id,due_at,id) WHERE suspended_at IS NULL;
+CREATE INDEX logs_by_child ON review_logs(child_id,reviewed_at,id);
+CREATE INDEX sentences_by_child ON sentences(child_id,created_at,id);
+CREATE INDEX jobs_to_run ON generation_jobs(run_after,id) WHERE status IN (&#x27;queued&#x27;,&#x27;partial&#x27;);
+CREATE INDEX audit_by_family ON audit_logs(family_id,created_at,id);
+CREATE UNIQUE INDEX one_active_quiz_per_child ON monthly_quizzes(child_id) WHERE status IN (&#x27;preparing&#x27;,&#x27;ready&#x27;,&#x27;in_progress&#x27;);
+ALTER TABLE study_sessions ADD COLUMN purpose text NOT NULL DEFAULT &#x27;review&#x27; CHECK(purpose IN (&#x27;review&#x27;,&#x27;quiz&#x27;));
+ALTER TABLE study_sessions ADD COLUMN review_source text NOT NULL DEFAULT &#x27;scheduled&#x27; CHECK(review_source IN (&#x27;scheduled&#x27;,&#x27;calendar&#x27;,&#x27;manual&#x27;,&#x27;quiz&#x27;));
+ALTER TABLE study_sessions ADD COLUMN source_date date;
+ALTER TABLE study_sessions ADD COLUMN quiz_id uuid;
+ALTER TABLE study_sessions ADD COLUMN lease_generation integer NOT NULL DEFAULT 1 CHECK(lease_generation&gt;0);
+ALTER TABLE study_sessions ADD FOREIGN KEY(quiz_id,child_id) REFERENCES monthly_quizzes(id,child_id);
+ALTER TABLE study_sessions ADD CHECK((purpose=&#x27;quiz&#x27; OR review_source=&#x27;quiz&#x27;)=(quiz_id IS NOT NULL));
+ALTER TABLE study_sessions ADD CHECK((review_source=&#x27;calendar&#x27;)=(source_date IS NOT NULL));
+CREATE UNIQUE INDEX mistake_once_per_review ON mistake_events(review_log_id) WHERE review_log_id IS NOT NULL;
+CREATE UNIQUE INDEX mistake_once_per_quiz_item ON mistake_events(quiz_item_id) WHERE quiz_item_id IS NOT NULL;
+CREATE INDEX annotations_by_child ON word_annotations(child_id,favorite,error_prone);
+CREATE INDEX corrections_pending ON word_corrections(child_id,child_word_id) WHERE status=&#x27;pending&#x27;;
+CREATE INDEX quizzes_by_month ON monthly_quizzes(child_id,month,created_at,id);
+CREATE INDEX mistakes_by_day ON mistake_events(child_id,local_date,child_word_id);
+CREATE INDEX mistakes_by_word ON mistake_events(child_id,child_word_id,occurred_at,id);
+CREATE INDEX daily_words_by_month ON daily_word_activity(child_id,local_date,child_word_id);</pre></section><section><h2>迁移与删除</h2><pre>psql "$WORDMATE_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/001_schema.sql</pre><p>实施时由TypeORM migration包装此初始SQL，禁止synchronize自动改表。已有数据库必须编写差异迁移和备份演练，不能重跑本文件。删除孩子必须按外键依赖顺序清理，详见技术方案；所有任务写回都应重查孩子与任务状态。</p></section><p class="muted">本地设计交付。无远程脚本、字体或数据上传；可以用浏览器打印为PDF。全部功能统一属于0.1。</p></main></html>
