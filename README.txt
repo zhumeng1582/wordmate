@@ -56,3 +56,5 @@ AppSecret未提供且不应提交仓库；服务类目、备案、合法域名�
 启动步骤、实际测试边界和未完成功能见 apps/README.txt。
 依赖安装、前后端编译与类型检查已通过；家庭与月测已由用户验收；正式发布和真机验收尚未完成。
 日历、错题集与额外复习已接入，当前状态与验收步骤见 apps/CALENDAR-REVIEW.txt。
+
+AI录词自动保存已实现：见 apps/AI-VOCABULARY.txt。默认供应商DeepSeek，保留OpenAI/千问切换；不再要求逐词确认。

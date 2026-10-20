@@ -28,8 +28,9 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='families'&&path[2]==='children')kind='child';
   else if(path[0]==='families'&&path[2]==='invites'||path[0]==='family-invites'&&path[2]==='approve')kind='empty';
   else if(path[0]==='monthly-quizzes'){kind=path[2]==='items'&&path[4]==='answer'?'quizAnswer':path[2]==='submit'?'quizSubmit':path[2]==='takeover'?'quizTakeover':['resume','abandon'].includes(path[2])?'quizVersion':'';}
+  else if(path[0]==='ai-batches'&&path[2]==='retry')kind='empty';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
-  else if(path[0]==='children')kind=({wordbooks:'book',batches:'batch','study-sessions':'session'} as Record<string,string>)[path[2]];
+  else if(path[0]==='children')kind=({wordbooks:'book',batches:'batch','ai-batches':'batch','study-sessions':'session'} as Record<string,string>)[path[2]];
   else if(path[0]==='batches'&&path[2]==='confirm')kind='confirm';
   else if(path[0]==='study-sessions'&&['heartbeat','end'].includes(path[2]))kind='lease';
   if(kind)ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');

@@ -15,15 +15,15 @@ def paras(text):return ''.join('<p>'+E(p)+'</p>' for p in text.split('\n'))
 def table(headers,rows):return '<table><thead><tr>'+''.join('<th>'+E(x)+'</th>' for x in headers)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+str(x)+'</td>' for x in row)+'</tr>' for row in rows)+'</tbody></table>'
 # 总览与覆盖矩阵
 body='<p>一套可供产品、设计、前后端共同评审的完整方案：家庭共学、系列例句、英美发音、单词管理、记忆复习、月测与错题日历、打卡分享。</p><div class="grid">'
-for title,desc,url in [('需求文档','15项需求映射；完整功能规则与验收标准。','requirements/index.html'),('页面设计','46张页面与状态图；SVG/PNG和离线可点击原型。','design/index.html'),('技术方案','技术栈、模块、AI接入、权限、并发、部署与留存。','technical/index.html'),('数据库','29张表的完整初始迁移及约束说明。','database/index.html'),('接口契约','85个操作、58个数据模型，覆盖全部需求。','api/index.html'),('验证报告','真实执行SQL及Schema校验，明确验证边界。','checks/index.html')]:body+=section(title,'<p>'+desc+'</p><a class="button" href="'+url+'">打开</a>')
+for title,desc,url in [('需求文档','15项需求映射；完整功能规则与验收标准。','requirements/index.html'),('页面设计','46张页面与状态图；SVG/PNG和离线可点击原型。','design/index.html'),('技术方案','技术栈、模块、AI接入、权限、并发、部署与留存。','technical/index.html'),('数据库','29张表的完整初始迁移及约束说明。','database/index.html'),('接口契约','89个操作、60个数据模型，覆盖全部需求。','api/index.html'),('验证报告','真实执行SQL及Schema校验，明确验证边界。','checks/index.html')]:body+=section(title,'<p>'+desc+'</p><a class="button" href="'+url+'">打开</a>')
 body+='</div><p><a class="button" href="design/prototype.html">体验离线原型</a><a class="button" href="design/overview.svg">打开设计总览图</a></p>'
 body+='<div class="notice">已补齐账号解散、持久删除任务和例句权限的评审问题；工程版本固定与供应商接入需按开工清单验证。本包不包含已部署的后端或真实微信小程序；原型使用演示数据。供应商账号、词典授权和上线配置仍需实施时提供。</div>'
-body+=section('已确定的实现方案',paras('前端：Taro + React + TypeScript + SCSS。后端：NestJS + TypeORM + PostgreSQL。任务：Redis + BullMQ，PostgreSQL持久任务表保证可恢复。记忆调度：ts-fsrs。文本生成：开发用OpenAI，可配置切换千问；英美语音：阿里云CosyVoice适配器；私有文件：阿里云OSS。\n默认月测范围为所选月学过的义项，抽样10/20/30/50或全量；优秀≥90、良好≥80、合格≥60、待加强<60。孩子的每月试卷和每次错误都保留独立事实。'))
+body+=section('已确定的实现方案',paras('前端：Taro + React + TypeScript + SCSS。后端：NestJS + TypeORM + PostgreSQL。任务：Redis + BullMQ，PostgreSQL持久任务表保证可恢复。记忆调度：ts-fsrs。文本生成：默认DeepSeek，可配置切换OpenAI或千问；英美语音：阿里云CosyVoice适配器；私有文件：阿里云OSS。\n默认月测范围为所选月学过的义项，抽样10/20/30/50或全量；优秀≥90、良好≥80、合格≥60、待加强<60。孩子的每月试卷和每次错误都保留独立事实。'))
 body+=section('需求到交付的覆盖',table(['需求','内容','页面','接口与数据库'],[(f[0],E(f[1]),E(f[5]),E(f[4])+'<br><small>'+E(f[3])+'</small>') for f in FEATURES]),'coverage')
 doc('词伴 0.1 · 完整设计交付包',body,R/'index.html')
 # PRD统一替换旧增补页，不再留互相矛盾的SQL待补齐说明。
 body='<p>文档状态：完整草案，供最终评审。下列默认值已经同步到技术方案、SQL与OpenAPI，调整时必须一并修改。</p>'
-body+=section('核心路径','<div class="flow">'+''.join('<span>'+x+'</span>' for x in ['微信登录 → 家庭审批','选择孩子 → 录词确认','关联例句 → 间隔复习','日历错词 → 再练','月测 → 四档成绩 → 自动归错'])+'</div>')
+body+=section('核心路径','<div class="flow">'+''.join('<span>'+x+'</span>' for x in ['微信登录 → 家庭审批','选择孩子 → AI录词自动保存','关联例句 → 间隔复习','日历错词 → 再练','月测 → 四档成绩 → 自动归错'])+'</div>')
 for i,(title,text) in enumerate(PRD):body+=section(title,paras(text),'monthly-quiz' if title=='按月复习测验' else 'r'+str(i))
 body+=section('F01–F15验收矩阵',table(['编号 / 需求','功能规则','验收要点'],[(f[0]+' '+E(f[1]),E(f[2]),E(f[6])) for f in FEATURES]))
 body+=section('完整交互状态表',table(['场景','展示','恢复方式'],[(E(a),E(b),E(c)) for a,b,c in [('无家庭/孩子/词','引导创建或申请，月测不可开始','按身份显示创建按钮'),('词典失败','保留输入，标明未确认条目','retry批次或跳过'),('AI部分失败','词已保存，显示未覆盖义项','只重试缺失部分'),('音频失败','当前口音与文本保留','重试，不能自动换口音'),('409版本冲突','家人已更新，展示最新版本','用户重新确认提交'),('断网','未同步，当前输入保留','同事件ID重试，成功后推进'),('租约过期/接管','当前页只读','重新取得或显式接管'),('空错题日','当天没有错误记录','切换日期'),('测验准备失败','不得出现缺题试卷','重试或放弃'),('未答交卷','展示未答数及计错规则','继续补答或确认交卷'),('满分月测','本次没有错题','返回日历或重测'),('导出过期','文件已过期','重新生成'),('账号失去家庭权限','退出该家庭视图','清除私有缓存，重新选择家庭')]]))

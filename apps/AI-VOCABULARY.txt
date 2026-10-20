@@ -1,0 +1,56 @@
+0.1 · AI 批量录词与自动保存（2026-10-20）
+
+已接通的流程
+小程序“单词本”输入 1～30 个单词和可选主题→提交持久任务→DeepSeek 批量返回英美音标、常用中文释义、词性、英文例句及译文→服务端校验→事务保存单词/词本关联/例句/目标词位置/FSRS卡→前端轮询展示。
+不再要求用户逐词确认。词本标明 AI 生成，不冒充权威词典。正常输入无需特殊测试词。
+原来的候选确认接口仅保留兼容旧数据和离线回归，小程序录词入口已改用 AI 接口。
+本轮不包括 TTS、任意句中点词查询、完整纠错编辑界面及导出分享。
+
+接口（均需家庭有效成员权限）
+POST /api/children/:id/ai-batches
+  Idempotency-Key 必填；body={wordbook_id,words:[...],theme?:string}。
+  每项最多120字符、每批最多30项，拒绝同批大小写重复项。主题最多80字符。
+  返回任务 DTO，HTTP 200，不等待模型完成。未配置供应商返回503 AI_NOT_CONFIGURED。
+GET /api/children/:id/ai-batches
+  返回最近20个任务，便于离开页面后恢复查看。
+GET /api/ai-batches/:job_id
+  返回 id,batch_id,status,attempts,max_attempts,error_code,provider,model,retryable,items。
+  items含 ordinal,input,status,word_id,reason。word_id非空表示已保存。
+POST /api/ai-batches/:job_id/retry
+  Idempotency-Key 必填，body={}；只处理未保存项，已保存单词与例句不重复生成。
+  每任务最多3次供应商调用尝试，失败显示原因，需要用户点击重试；进程中断后的过期租约自动恢复。
+GET /api/children/:id/words
+  现有词列表新增 ipa_gb,ipa_us,dictionary_source,example（最近一条例句：id,text_en,translation_zh）；仍最多展示200词。
+
+事务与任务规则
+复用现有 generation_jobs.kind=sentences，payload.flow=vocabulary_v1 区分旧例句任务；无需改表或重建库。
+领取：短事务内鉴权并锁定孩子/任务，attempts加1，租约120秒。
+生成：在数据库事务外调用模型，默认请求超时60秒，不长期锁住家庭或影响答题。
+保存：重新检查家庭成员、孩子、词本和租约/尝试编号；整批新成功项事务保存，任一步数据库错误全部回滚。
+不可识别项记为invalid，成功项照常保存；任务partial可重试未保存项。全部成功为succeeded。
+进程中断：running租约到期后重新领取，attempts到上限则failed；过期旧请求的返回不能覆盖后续尝试。
+本地幂等防止重复写入；若外部调用完成但进程在保存前退出，重新生成可能再次产生供应商费用，不能保证外部计费恰好一次。
+同孩子、同词本、相同规范化输入顺序/主题/等级复用原任务；重复点击即使换请求键也不会再建任务。每孩子同时仅一个queued/running的AI录词任务。
+单词以规范化词形、词性、规范化释义哈希区分义项；不同批次的释义措辞变化可能形成不同义项，不强行合并多义词。
+任务冻结provider/model/prompt/schema版本。重试时配置不一致明确失败，不静默换模型。
+原始输入、模型输出与密钥不写日志；错误只返回白名单代码。密钥仅后端从.env读取。
+AI输出的校验包含字段、数量、原输入对应、音标格式、中文字段、句子包含目标词；并不构成语言准确性的权威审核。
+
+月测兼容
+AI词完成日常复习后可进入当月月测。使用已保存释义作为答案、固定通用释义池作为干扰项；相同或包含关系的释义排除，选项随机。
+月测明确提问“在词本中保存的意思”，不在交卷时调用AI判分。
+仍是基础释义选择题，干扰项难度及语义质量未做系统教学评测，不代表完整AI智能出题。
+
+验证与运行
+用户已验证 DeepSeek 实际返回 airport/luggage/delay，约1.7秒，902 tokens。
+本轮新增服务端任务测试：部分成功重试、语义去重、事务回滚、过期恢复、尝试上限、调用期间不占事务、权限撤销阻止写入。
+Nest/Express 进程内路由测试使用显式注入的模拟AI，覆盖提交、轮询、任务恢复、词条/例句读取和请求校验。
+node scripts/verify-ai-flow.cjs --offline：在隔离数据库跑编译后的模型适配器→任务→持久保存→复习→月测备题，明确标记offline_mock。
+corepack pnpm test:ai:flow：同样的隔离数据库流程，使用.env真实DeepSeek；会产生少量调用费用，完成后删除测试库，不修改已有家庭。结果保存到.local/ai-flow-verification.json。
+不把离线模拟称为供应商真实调用或模拟器点击验收；本轮小程序交互仍需在微信开发者工具验收。
+
+用户操作
+旧后端 Ctrl+C，运行 node scripts/local-dev.cjs；确认标识 [0.1-ai-vocabulary]，微信开发者工具点“编译”。
+单词本中输入 airport、luggage、delay，主题“机场旅行”，点击“生成并加入词本”。无需重新安装依赖、提供密钥或清空数据库。
+看到任务全部已保存后，卡片应显示英美音标和例句；首页开始复习可看到新词（受每日新词额度限制）。
+输入明显无效词会显示单项错误；失败时点击“只重试未保存的单词”。刷新或离开后重新打开页面可继续查看任务。

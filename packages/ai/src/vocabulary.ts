@@ -24,6 +24,7 @@ export function vocabularyRequest(words:string[],theme='',level='小学英语'):
     if(typeof item.reason!=='string'||!item.reason.trim()||item.reason.length>500||fields.filter(f=>f!=='reason').some(f=>item[f]!==null))fail();
    }else if(item.status==='ok'){
     if(item.reason!==null||fields.filter(f=>f!=='reason').some(f=>typeof item[f]!=='string'||!item[f]!.trim()||item[f]!.length>1000))fail();
+    if(item.meaning_zh!.length>500)fail();
     if(item.lemma!.toLowerCase()!==inputs[i].toLowerCase()||!['noun','verb','adjective','adverb','pronoun','preposition','conjunction','interjection','determiner','article','numeral','auxiliary verb','modal verb','phrase'].includes(item.part_of_speech!))fail();
     if(!/^\/[^/\n]{1,120}\/$/u.test(item.ipa_gb!)||!/^\/[^/\n]{1,120}\/$/u.test(item.ipa_us!)||!/[\u3400-\u9fff]/u.test(item.meaning_zh!)||!/[\u3400-\u9fff]/u.test(item.sentence_zh!))fail();
     const escaped=item.lemma!.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');

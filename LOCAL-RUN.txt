@@ -19,9 +19,9 @@ node scripts/local-dev.cjs
 3. 只在本地开发时，在工具项目设置中勾选不校验合法域名。
 4. 运行：家庭与孩子 → 开发登录爸爸 → 创建家庭和孩子 → 单词本 → 建本 → 输入 apple、book → 确认 → 首页复习。
 
-当前开发模式词库只有 10 个词，账号为显式的开发身份。
+当前账号仍为显式开发身份；AI录词支持任意可识别单词，原10词测试字典只供兼容回归。
 它使用真实本地数据库保存记录；这些记录不要导入正式环境。
-本轮没有接通 AI 例句和语音播放，不会假装这些服务已生成结果。
+AI录词和例句已接通真实DeepSeek配置；语音播放尚未接通。
 
 HTTP 验收（后端 build 成功后）：
 corepack pnpm test:smoke
@@ -30,7 +30,7 @@ corepack pnpm test:smoke
 资源清单：
 本地运行：能访问 npm 的终端；微信开发者工具。现有电脑即可，不必购买其他资源。
 真实微信登录：只需在本机服务端环境填写 AppSecret，勿发在聊天中。
-真实 AI 例句：DeepSeek API Key（已写入本地 .env）、DEEPSEEK_MODEL，以及后端访问 api.deepseek.com 的网络；业务生成流程尚待接入。
+真实 AI 例句：DeepSeek API Key（已写入本地 .env）、DEEPSEEK_MODEL，以及后端访问 api.deepseek.com 的网络；业务生成及自动保存已接入。
 国内语音：阿里云百炼 CosyVoice 对应权限、API Key、工作空间配置。
 手机真机/多人联调：阿里云服务器、已备案域名、HTTPS 与微信合法域名配置；之后再安排。
 完整任意单词查询：正式词典来源及授权，或先实现用户自定义释义。
@@ -44,6 +44,8 @@ React/Babel 依赖已补全并安装；小程序实际构建与七个页面产�
 Taro 的 Rust 配置诊断在受限 macOS 环境发生 NULL object panic，构建命令使用官方 --no-check 选项跳过该诊断；仍运行 TypeScript 检查与实际编译及产物检查。
 家庭及月测流程已由用户验收；新增日历、错题集页面待模拟器验收，不以文件存在代替运行成功。
 
-按月测验入口：先完成测试词日常复习并结束会话，再从首页打开“按月测验”。本轮需重启后端，启动标识应为 [0.1-calendar-review]。详细规则和边界见 apps/MONTHLY-QUIZ.txt。
+按月测验入口：先完成测试词日常复习并结束会话，再从首页打开“按月测验”。本轮需重启后端，启动标识应为 [0.1-ai-vocabulary]。详细规则和边界见 apps/MONTHLY-QUIZ.txt。
 
 本轮新增：首页→学习日历 / 历史错题集；月测成绩→重新练习本次全部错词。重启后端后编译即可，无需安装新依赖或重建数据库。详见 apps/CALENDAR-REVIEW.txt。
+
+AI录词验收见 apps/AI-VOCABULARY.txt；完整真实隔离验收命令：corepack pnpm test:ai:flow。

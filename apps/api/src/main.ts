@@ -1,3 +1,5 @@
+import type {VocabularyProvider} from './vocabulary';
+import {vocabularyProvider} from './vocabulary';
 import 'reflect-metadata';
 import {All,Controller,Get,Module,Req,Res} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
@@ -7,7 +9,7 @@ import {Core} from './core';
 import {connect} from './database';
 import {createScheduler,DevIdentity,FixtureDictionary,UnconfiguredDictionary,WechatIdentity} from './providers';
 import {DomainError,ensure} from './errors';
-import {FixtureQuizBuilder} from './quiz';
+import {StoredMeaningQuizBuilder} from './quiz';
 import {validateBody} from './validation';
 const env=process.env,development=env.AUTH_MODE==='development';
 if(development&&env.NODE_ENV!=='development')throw Error('Development identities require NODE_ENV=development');
@@ -15,7 +17,7 @@ if(env.DICTIONARY_PROVIDER==='fixture'&&!development)throw Error('Fixture dictio
 let core:Core;
 @Controller('api')
 class ApiController {
-  @Get('health') health(){return {status:'ok',api_revision:'0.1-calendar-review',mode:development?'development':'production'};}
+  @Get('health') health(){return {status:'ok',api_revision:'0.1-ai-vocabulary',mode:development?'development':'production'};}
   @All('*path') async handle(@Req() req:Request,@Res() res:Response){
     const request_id=randomUUID();res.setHeader('Cache-Control','no-store');
     try {
@@ -28,7 +30,9 @@ class ApiController {
       if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
       const auth=req.headers.authorization;ensure(typeof auth==='string' && auth.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
       const key=String(req.headers['idempotency-key']??'');let data:any;
-      if(method==='GET'&&p.join('/')==='me')data=await core.me(actor);
+      if(p[0]==='ai-batches'&&p.length===2&&method==='GET')data=await core.vocabulary.get(actor,p[1]);
+      else if(p[0]==='ai-batches'&&p.length===3&&p[2]==='retry'&&method==='POST')data=await core.vocabulary.retry(actor,key,p[1]);
+      else if(method==='GET'&&p.join('/')==='me')data=await core.me(actor);
       else if(method==='POST'&&p.join('/')==='families')data=await core.createFamily(actor,key,b);
       else if(method==='GET'&&p[0]==='families'&&p[2]==='members'&&p.length===3)data=await core.members(actor,p[1]);
       else if(p[0]==='families'&&p[2]==='invites'&&p.length===3)data=method==='GET'?await core.invites(actor,p[1]):method==='POST'?await core.createInvite(actor,key,p[1]):undefined;
@@ -47,6 +51,7 @@ class ApiController {
         if(method==='POST'&&p.length===3&&p[2]==='abandon')data=await core.quizzes.abandon(actor,key,id,b);
       }
       else if(p[0]==='children'&&p.length===3){const id=p[1];
+        if(p[2]==='ai-batches')data=method==='GET'?await core.vocabulary.list(actor,id):method==='POST'?await core.vocabulary.create(actor,key,id,b):undefined;
         if(p[2]==='monthly-quizzes')data=method==='GET'?await core.quizzes.list(actor,id,req.query):method==='POST'?await core.quizzes.create(actor,key,id,b):undefined;
         if(method==='GET'&&p[2]==='calendar')data=await core.history.calendar(actor,id,req.query.month);
         if(method==='GET'&&p[2]==='wrong-words')data=await core.history.wrongWords(actor,id,req.query);
@@ -67,20 +72,22 @@ class ApiController {
   }
 }
 @Module({controllers:[ApiController]}) class AppModule{}
-export async function createApplication(){
+export async function createApplication(options:{vocabulary?:VocabularyProvider}={}){
   const {db,source}=await connect(env.DATABASE_URL??'');
-  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4');
+  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env));
   const app=await NestFactory.create(AppModule,{bodyParser:true,logger:['error','warn']});
   app.enableShutdownHooks();
   const close=()=>{void source.destroy();};process.once('SIGTERM',close);process.once('SIGINT',close);
   await app.init();
   let preparing=false;
-  const timer=setInterval(async()=>{if(preparing)return;preparing=true;try{await core.quizzes.prepare(development&&env.DICTIONARY_PROVIDER==='fixture'?new FixtureQuizBuilder():undefined);}catch{console.error('Quiz preparation cycle failed');}finally{preparing=false;}},2000);timer.unref();
-  return {app,dispose:async()=>{clearInterval(timer);await app.close();await source.destroy();}};
+  const timer=setInterval(async()=>{if(preparing)return;preparing=true;try{await core.quizzes.prepare(new StoredMeaningQuizBuilder());}catch{console.error('Quiz preparation cycle failed');}finally{preparing=false;}},2000);timer.unref();
+  let generation:Promise<void>|undefined;
+  const aiTimer=setInterval(()=>{if(generation)return;generation=core.vocabulary.processOne().catch(()=>{console.error('Vocabulary generation cycle failed');}).finally(()=>{generation=undefined;});},1000);aiTimer.unref();
+  return {app,dispose:async()=>{clearInterval(timer);clearInterval(aiTimer);await generation;await app.close();await source.destroy();}};
 }
 async function bootstrap(){
   const {app}=await createApplication();
   await app.listen(Number(env.PORT??3000),development?'127.0.0.1':env.HOST??'127.0.0.1');
-  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-calendar-review] (${development?'development':'production'})`);
+  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-ai-vocabulary] (${development?'development':'production'})`);
 }
 if(require.main===module)bootstrap().catch(()=>{console.error('Backend startup failed. Check database, credentials and installed dependencies.');process.exitCode=1;});

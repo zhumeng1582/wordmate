@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsc -p tsconfig.json --watch",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p ../../packages/ai/tsconfig.json && tsc -p tsconfig.json",
     "start": "node --env-file=../../.env dist/main.js",
     "migrate": "node --env-file=../../.env dist/migrate.js"
   },

@@ -6,7 +6,7 @@ export async function api<T=any>(path:string,method:'GET'|'POST'|'PUT'='GET',dat
   const pendingKey=key?`request:${token}:${path}:${JSON.stringify(data)}`:'';
   if(pendingKey){key=storage.get(pendingKey)||key;storage.set(pendingKey,key);}
   const response=await Taro.request<any>({url:API_BASE+path,method,data,timeout:15000,header:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`} :{}),...(key?{'Idempotency-Key':key}:{})}});
-  if(response.statusCode>=400){if(response.statusCode===401)Taro.removeStorageSync('access_token');if(pendingKey&&response.statusCode<500)Taro.removeStorageSync(pendingKey);throw Error(response.data?.error?.code??'请求失败');}if(pendingKey)Taro.removeStorageSync(pendingKey);return response.data.data;
+  if(response.statusCode>=400){if(response.statusCode===401)Taro.removeStorageSync('access_token');if(pendingKey&&response.statusCode<500)Taro.removeStorageSync(pendingKey);throw Object.assign(Error(response.data?.error?.code??'请求失败'),{status:response.statusCode});}if(pendingKey)Taro.removeStorageSync(pendingKey);return response.data.data;
 }
 export async function login(identity='dev-dad'){
   const code=DEV_AUTH?identity:(await Taro.login()).code;
@@ -15,6 +15,20 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  AI_NOT_CONFIGURED:'AI 尚未配置，请检查服务端密钥和模型配置并重启后端。',
+  ACTIVE_GENERATION:'孩子已有一批正在生成，请刷新并等待完成。',
+  AI_CONFIGURATION_CHANGED:'该任务的模型配置已变化，请恢复原供应商和模型配置后重试。',
+  UPSTREAM_NETWORK_OR_TIMEOUT:'AI 连接失败或超时，可以重试未保存的单词。',
+  UPSTREAM_HTTP_ERROR:'AI 服务拒绝或未完成请求，请检查账号额度、密钥及服务状态后重试。',
+  GENERATED_CONTENT_REJECTED:'AI 返回内容未通过校验，未保存本次结果，请重试。',
+  INVALID_GENERATED_JSON:'AI 返回格式不正确，请重试。',
+  INCOMPLETE_GENERATION:'AI 返回内容不完整，请重试。',
+  GENERATION_FAILED:'生成或保存未完成，未保存的单词可以重试。',
+  GENERATION_SCOPE_UNAVAILABLE:'该任务对应的家庭、孩子或单词本已不可用。',
+  GENERATION_NOT_RETRYABLE:'任务当前不能重试，请刷新状态。',
+  GENERATION_ATTEMPTS_EXHAUSTED:'任务已达到尝试上限。',
+  DUPLICATE_WORDS:'输入中有重复单词，请合并后重试。',
+
   EMPTY_REVIEW_QUEUE:'这个范围没有可练习的单词，可能已归档或暂无到期词。',
   NEW_WORD_LIMIT:'今天的新词额度已用完，请明天继续。',
   WORD_UNAVAILABLE:'选中的单词已归档或不可复习，请返回刷新错题集。',

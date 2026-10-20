@@ -22,6 +22,18 @@ export class FixtureQuizBuilder implements QuizBuilder {
   return {prompt:`“${w.lemma}”的中文意思是？`,correctId,options:shuffle([{id:correctId,text:w.meaning_zh},...distractors.map(text=>({id:randomUUID(),text}))])};
  }
 }
+// Use the saved sense for AI-created words; monthly scoring never calls an LLM.
+export class StoredMeaningQuizBuilder implements QuizBuilder {
+ build(w:Row){
+  if(w.dictionary_source==='development-fixture')return new FixtureQuizBuilder().build(w);
+  ensure(typeof w.dictionary_source==='string'&&w.dictionary_source.startsWith('ai:')&&typeof w.meaning_zh==='string'&&w.meaning_zh.trim().length>0,503,'QUIZ_QUESTION_PROVIDER_REQUIRED');
+  const pool=['苹果','机场','行李','延迟','书','阅读','猫','狗','学校','旅行','铅笔','窗户'];
+  const meanings=w.meaning_zh.split(/[；;，,、/]/).map((s:string)=>s.trim()).filter(Boolean);
+  const distractors=shuffle(pool.filter(x=>!meanings.some((m:string)=>m.includes(x)||x.includes(m)))).slice(0,3);
+  ensure(distractors.length===3,503,'QUIZ_QUESTION_PROVIDER_REQUIRED');const correctId=randomUUID();
+  return {prompt:`“${w.lemma}”在词本中保存的意思是？`,correctId,options:shuffle([{id:correctId,text:w.meaning_zh},...distractors.map(text=>({id:randomUUID(),text}))])};
+ }
+}
 export class MonthlyQuizzes {
  private a:QuizAccess;constructor(a:QuizAccess){this.a=a;}
  private async scope(q:Sql,actor:string,id:string){const initial=await one(q,'SELECT child_id FROM monthly_quizzes WHERE id=$1',[uuid(id)]);ensure(initial,404,'QUIZ_NOT_FOUND');const child=await this.a.child(q,actor,initial.child_id);const quiz=await one(q,'SELECT * FROM monthly_quizzes WHERE id=$1 FOR UPDATE',[id]);return {child,quiz};}

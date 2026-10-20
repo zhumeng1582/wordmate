@@ -3,7 +3,7 @@ Wordmate 0.1 服务端 AI/TTS 适配层
 现已实现：DeepSeek Chat Completions（默认，JSON Object）、OpenAI Responses、千问 Chat Completions（JSON Schema）、阿里云CosyVoice北京HTTP。
 统一 TextGenerator.generate 接口；TtsProvider 独立，不随大模型供应商切换。
 其他供应商必须新增并验证适配器，不能仅换base_url就假设协议兼容。
-当前是可供NestJS Worker调用的基础模块，未接业务HTTP路由、OSS、数据库任务调度或完整题目/例句语义校验。
+文本生成现已接入NestJS后台持久任务与自动保存；TTS/OSS尚未接入。业务边界见 apps/AI-VOCABULARY.txt。
 
 配置
 项目根目录.env.example复制为.env，仅服务器加载；不要提交真实密钥或放进小程序。
@@ -62,3 +62,5 @@ DeepSeek 切换（2026-10-20）
 离线测试共 12 项通过；真实调用在当前执行环境仍报网络错误，单独探测 DNS 得到 ENOTFOUND，无 HTTP 状态，不代表密钥无效。
 结果写入 .local/ai-verification.json（Git 忽略），失败退出码为 1。
 脚本验证供应商生成与校验，不调用业务数据库，不证明小程序录入或自动保存已接通。业务路由仍使用测试词库，下一阶段需接入批量生成与原子保存。
+
+最新实现：批量生成已接入小程序和业务保存。此前“尚待接入”的段落是前次验证记录，以 apps/AI-VOCABULARY.txt 为准。
