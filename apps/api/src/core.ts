@@ -1,3 +1,4 @@
+import {History,streak,validDate,pageSize} from './history.ts';
 import {MonthlyQuizzes} from './quiz.ts';
 import {createHash, randomBytes} from 'node:crypto';
 import type {Database, Sql, Identity, Dictionary, Scheduler, Row} from './ports.ts';
@@ -7,9 +8,9 @@ const stable=(v:any):string=>JSON.stringify(v===null || typeof v!=='object'?v:Ar
 const one=async(q:Sql,s:string,p:any[]=[]) => (await q.query(s,p)).rows[0];
 const childDto=(c:Row)=>({...Object.fromEntries(['id','family_id','nickname','accent','voice_id','level','timezone','daily_new_limit','daily_goal','version'].map(k=>[k,c[k]])),speech_rate:Number(c.speech_rate)});
 export class Core {
-  readonly quizzes:MonthlyQuizzes;
+  readonly quizzes:MonthlyQuizzes; readonly history:History;
   private db:Database; private identity:Identity; private dictionary:Dictionary; private scheduler:Scheduler; private appId:string; private clock:()=>Date;
-  constructor(db:Database, identity:Identity, dictionary:Dictionary, scheduler:Scheduler, appId:string, clock:()=>Date=()=>new Date()){this.db=db;this.identity=identity;this.dictionary=dictionary;this.scheduler=scheduler;this.appId=appId;this.clock=clock;this.quizzes=new MonthlyQuizzes({tx:fn=>this.tx(fn),write:(...args)=>this.write(...args),child:(...args)=>this.child(...args),now:()=>this.clock(),day:(...args)=>this.day(...args)});}
+  constructor(db:Database, identity:Identity, dictionary:Dictionary, scheduler:Scheduler, appId:string, clock:()=>Date=()=>new Date()){this.db=db;this.identity=identity;this.dictionary=dictionary;this.scheduler=scheduler;this.appId=appId;this.clock=clock;this.history=new History({tx:fn=>this.tx(fn),child:(...args)=>this.child(...args),day:(...args)=>this.day(...args)});this.quizzes=new MonthlyQuizzes({tx:fn=>this.tx(fn),write:(...args)=>this.write(...args),child:(...args)=>this.child(...args),now:()=>this.clock(),day:(...args)=>this.day(...args)});}
   private async tx<T>(fn:(q:Sql)=>Promise<T>) {return this.db.transaction(async q=>{await q.query('SET LOCAL search_path TO wordmate, public');return fn(q);});}
   async login(code:unknown) {
     const identity=await this.identity.exchange(text(code,512));
@@ -115,39 +116,54 @@ export class Core {
   async words(actor:string,child:string){return this.tx(async q=>{await this.child(q,actor,child);return {items:(await q.query('SELECT id,lemma,part_of_speech,meaning_zh,version FROM child_words WHERE child_id=$1 AND archived_at IS NULL ORDER BY created_at DESC LIMIT 200',[child])).rows};});}
   async word(actor:string,child:string,id:string){return this.tx(async q=>{await this.child(q,actor,child);const w=await one(q,'SELECT id,lemma,meaning_zh,part_of_speech FROM child_words WHERE child_id=$1 AND id=$2 AND archived_at IS NULL',[child,uuid(id)]);ensure(w,404,'WORD_NOT_FOUND');return w;});}
   private async day(q:Sql,c:Row){return String((await one(q,`SELECT to_char($1::timestamptz AT TIME ZONE $2,'YYYY-MM-DD') AS local_day`,[this.clock(),c.timezone])).local_day);}
-  private async todayDto(q:Sql,c:Row){const day=await this.day(q,c),a=await one(q,'SELECT * FROM daily_activity WHERE child_id=$1 AND local_date=$2',[c.id,day]);const active=await one(q,`SELECT s.id,s.actor_user_id,s.quiz_id,s.lease_generation,s.expires_at,u.display_name FROM study_sessions s JOIN users u ON u.id=s.actor_user_id WHERE s.child_id=$1 AND s.status='active' AND s.expires_at>$2`,[c.id,this.clock()]);return {active_session:active?JSON.parse(JSON.stringify(active)):null,child:childDto(c),completed_words:a?.distinct_words??0,new_words:a?.new_words??0,goal:a?.goal_snapshot??c.daily_goal,goal_reached:(a?.distinct_words??0)>=(a?.goal_snapshot??c.daily_goal),remaining_new_limit:Math.max(0,c.daily_new_limit-(a?.new_words??0)),due_count:Number((await one(q,`SELECT count(*) n FROM review_cards WHERE child_id=$1 AND due_at<=$2 AND suspended_at IS NULL`,[c.id,this.clock()])).n),synced_at:this.clock().toISOString()};}
+  private async todayDto(q:Sql,c:Row){const day=await this.day(q,c),a=await one(q,'SELECT * FROM daily_activity WHERE child_id=$1 AND local_date=$2',[c.id,day]);const active=await one(q,`SELECT s.id,s.actor_user_id,s.quiz_id,s.lease_generation,s.expires_at,u.display_name FROM study_sessions s JOIN users u ON u.id=s.actor_user_id WHERE s.child_id=$1 AND s.status='active' AND s.expires_at>$2`,[c.id,this.clock()]);return {...await streak(q,c.id,day),checked_in:(a?.distinct_words??0)>=(a?.goal_snapshot??c.daily_goal),active_session:active?JSON.parse(JSON.stringify(active)):null,child:childDto(c),completed_words:a?.distinct_words??0,new_words:a?.new_words??0,goal:a?.goal_snapshot??c.daily_goal,goal_reached:(a?.distinct_words??0)>=(a?.goal_snapshot??c.daily_goal),remaining_new_limit:Math.max(0,c.daily_new_limit-(a?.new_words??0)),due_count:Number((await one(q,`SELECT count(*) n FROM review_cards WHERE child_id=$1 AND due_at<=$2 AND suspended_at IS NULL`,[c.id,this.clock()])).n),synced_at:this.clock().toISOString()};}
   async today(actor:string,child:string){return this.tx(async q=>this.todayDto(q,await this.child(q,actor,child)));}
   async startSession(actor:string,key:string,child:string,body:any){return this.write(actor,key,`session:create:${child}`,body,q=>this.child(q,actor,child),async(q,c)=>{
-    ensure(body.source==='scheduled',422,'SOURCE_NOT_IMPLEMENTED');const now=this.clock();
+    ensure(['scheduled','calendar','manual','quiz'].includes(body.source),422,'INVALID_SOURCE');const now=this.clock();
+    if(body.source==='calendar')validDate(body.date);
+    if(body.source==='manual')ensure(Array.isArray(body.word_ids)&&body.word_ids.length>0&&body.word_ids.length<=100&&new Set(body.word_ids).size===body.word_ids.length,422,'INVALID_WORD_COUNT');
+    if(body.source==='manual')body.word_ids.forEach(uuid);
+    if(body.source==='quiz')ensure(await one(q,"SELECT id FROM monthly_quizzes WHERE id=$1 AND child_id=$2 AND status='submitted'",[uuid(body.quiz_id),child]),404,'QUIZ_NOT_FOUND');
     await q.query(`UPDATE study_sessions SET status='expired',ended_at=$2 WHERE child_id=$1 AND status='active' AND expires_at<=$2`,[child,now]);
     ensure(!await one(q,`SELECT 1 FROM study_sessions WHERE child_id=$1 AND status='active'`,[child]),409,'CHILD_BUSY');
-    const s=await one(q,'INSERT INTO study_sessions(child_id,actor_user_id,started_at,expires_at) VALUES($1,$2,$3,$4) RETURNING *',[child,actor,now,new Date(now.getTime()+120000)]);
     const today=await this.todayDto(q,c);
-    const cards=(await q.query(`SELECT * FROM review_cards WHERE child_id=$1 AND due_at<=$2 AND suspended_at IS NULL AND state<>'new' ORDER BY due_at,id LIMIT 100`,[child,now])).rows;
-    cards.push(...(await q.query(`SELECT * FROM review_cards WHERE child_id=$1 AND due_at<=$2 AND suspended_at IS NULL AND state='new' ORDER BY due_at,id LIMIT $3`,[child,now,Math.min(today.remaining_new_limit,100-cards.length)])).rows);
-    for(let i=0;i<cards.length;i++)await q.query('INSERT INTO study_session_items(session_id,child_id,card_id,ordinal,practice_only) VALUES($1,$2,$3,$4,false)',[s.id,child,cards[i].id,i+1]);
-    return {id:s.id,child_id:child,expires_at:s.expires_at,lease_generation:s.lease_generation,status:s.status};
+    let candidates:Row[];
+    if(body.source==='scheduled')candidates=(await q.query(`SELECT r.* FROM review_cards r JOIN child_words w ON w.id=r.child_word_id WHERE r.child_id=$1 AND r.due_at<=$2 AND r.suspended_at IS NULL AND w.archived_at IS NULL ORDER BY (r.state='new'),r.due_at,r.id LIMIT 100`,[child,now])).rows;
+    else {
+      const filter=body.source==='calendar'?`EXISTS(SELECT 1 FROM mistake_events m WHERE m.child_word_id=r.child_word_id AND m.local_date=$2::date)`:body.source==='manual'?`r.child_word_id=ANY($2::uuid[])`:`EXISTS(SELECT 1 FROM monthly_quiz_items i WHERE i.child_word_id=r.child_word_id AND i.quiz_id=$2::uuid AND i.is_correct=false)`;
+      candidates=(await q.query(`SELECT r.* FROM review_cards r JOIN child_words w ON w.id=r.child_word_id WHERE r.child_id=$1 AND r.suspended_at IS NULL AND w.archived_at IS NULL AND ${filter} ORDER BY (r.state='new'),r.due_at,r.id`,[child,body.source==='calendar'?body.date:body.source==='manual'?body.word_ids:body.quiz_id])).rows;
+      if(body.source==='manual')ensure(candidates.length===body.word_ids.length,422,'WORD_UNAVAILABLE');
+    }
+    let newRemaining=today.remaining_new_limit,excluded=0;
+    const cards=candidates.filter(card=>{if(card.state!=='new')return true;if(newRemaining>0){newRemaining--;return true;}excluded++;return false;});
+    ensure(cards.length>0,422,excluded?'NEW_WORD_LIMIT':'EMPTY_REVIEW_QUEUE');
+    const s=await one(q,`INSERT INTO study_sessions(child_id,actor_user_id,started_at,expires_at,review_source,source_date,quiz_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[child,actor,now,new Date(now.getTime()+120000),body.source,body.source==='calendar'?body.date:null,body.source==='quiz'?body.quiz_id:null]);
+    for(let i=0;i<cards.length;i++)await q.query('INSERT INTO study_session_items(session_id,child_id,card_id,ordinal,practice_only) VALUES($1,$2,$3,$4,$5)',[s.id,child,cards[i].id,i+1,body.source!=='scheduled'&&cards[i].state!=='new'&&new Date(cards[i].due_at)>now]);
+    return {id:s.id,child_id:child,expires_at:s.expires_at,lease_generation:s.lease_generation,status:s.status,source:body.source,excluded_new_words:excluded,total:cards.length};
   });}
   private async session(q:Sql,actor:string,id:string){let s=await one(q,'SELECT * FROM study_sessions WHERE id=$1',[uuid(id)]);ensure(s,404,'SESSION_NOT_FOUND');const c=await this.child(q,actor,s.child_id);s=await one(q,'SELECT * FROM study_sessions WHERE id=$1',[id]);ensure(s.actor_user_id===actor,403,'SESSION_NOT_OWNED');return {s,c};}
   private live(s:Row,generation:number){ensure(s.status==='active'&&new Date(s.expires_at)>this.clock()&&s.lease_generation===generation,409,'SESSION_EXPIRED');}
   async heartbeat(actor:string,id:string,body:any,end=false){return this.tx(async q=>{const {s}=await this.session(q,actor,id);this.live(s,integer(body.lease_generation));return one(q,end?`UPDATE study_sessions SET status='ended',ended_at=$2 WHERE id=$1 RETURNING id,status,expires_at,lease_generation`:`UPDATE study_sessions SET expires_at=$2 WHERE id=$1 RETURNING id,status,expires_at,lease_generation`,[id,end?this.clock():new Date(this.clock().getTime()+120000)]);});}
-  async cards(actor:string,id:string){return this.tx(async q=>{const {s}=await this.session(q,actor,id);this.live(s,s.lease_generation);return {items:(await q.query(`SELECT r.id,r.version,r.state,r.due_at,r.child_word_id,w.lemma,w.part_of_speech FROM study_session_items i JOIN review_cards r ON r.id=i.card_id JOIN child_words w ON w.id=r.child_word_id WHERE i.session_id=$1 AND i.answered_event_id IS NULL ORDER BY i.ordinal`,[id])).rows};});}
+  async cards(actor:string,id:string,query:any={}){return this.tx(async q=>{const {s}=await this.session(q,actor,id);this.live(s,s.lease_generation);const limit=pageSize(query.limit),cursor=query.cursor===undefined?0:Number(query.cursor);ensure(Number.isSafeInteger(cursor)&&cursor>=0,422,'INVALID_CURSOR');
+    const rows=(await q.query(`SELECT r.id,r.version,r.state,r.due_at,r.child_word_id,w.lemma,w.part_of_speech,i.practice_only,i.ordinal FROM study_session_items i JOIN review_cards r ON r.id=i.card_id JOIN child_words w ON w.id=r.child_word_id WHERE i.session_id=$1 AND i.answered_event_id IS NULL AND i.ordinal>$2 ORDER BY i.ordinal LIMIT $3`,[id,cursor,limit+1])).rows;
+    return {items:rows.slice(0,limit),next_cursor:rows.length>limit?String(rows[limit-1].ordinal):null,remaining:Number((await one(q,'SELECT count(*) n FROM study_session_items WHERE session_id=$1 AND answered_event_id IS NULL',[id])).n)};});}
+
   async review(actor:string,body:any){return this.tx(async q=>{
     const {s,c}=await this.session(q,actor,body.session_id),digest=hash(stable(body));uuid(body.event_id);uuid(body.card_id);
     const previous=await one(q,'SELECT * FROM review_logs WHERE child_id=$1 AND event_id=$2',[c.id,body.event_id]);
     if(previous){ensure(previous.actor_user_id===actor&&previous.request_hash===digest,409,'EVENT_CONFLICT');return previous.response_snapshot;}
     this.live(s,integer(body.lease_generation));ensure(['again','hard','good','easy'].includes(body.rating),422,'INVALID_RATING');
-    const card=await one(q,`SELECT r.*,i.answered_event_id FROM review_cards r JOIN study_session_items i ON i.card_id=r.id WHERE i.session_id=$1 AND r.id=$2 AND r.child_id=$3 FOR UPDATE OF r`,[s.id,body.card_id,c.id]);
+    const card=await one(q,`SELECT r.*,i.answered_event_id,i.practice_only FROM review_cards r JOIN study_session_items i ON i.card_id=r.id WHERE i.session_id=$1 AND r.id=$2 AND r.child_id=$3 FOR UPDATE OF r`,[s.id,body.card_id,c.id]);
     ensure(card&&!card.answered_event_id&&card.version===integer(body.expected_version),409,'CARD_CONFLICT');
     ensure(card.scheduler_version===this.scheduler.version&&card.parameter_version===this.scheduler.parameterVersion,409,'SCHEDULER_VERSION_MISMATCH');
     const day=await this.day(q,c),now=this.clock(),today=await this.todayDto(q,c);
     if(card.state==='new')ensure(today.remaining_new_limit>0,409,'NEW_WORD_LIMIT');
-    const next=this.scheduler.next(card.scheduler_state,body.rating,now),word=await one(q,'SELECT lemma,meaning_zh,part_of_speech FROM child_words WHERE id=$1',[card.child_word_id]);
-    await q.query('UPDATE review_cards SET scheduler_state=$2,state=$3,due_at=$4,last_review_at=$5,version=version+1 WHERE id=$1',[card.id,JSON.stringify(next.state),next.label,next.due,now]);
+    const next=card.practice_only?{state:card.scheduler_state,label:card.state,due:new Date(card.due_at)}:this.scheduler.next(card.scheduler_state,body.rating,now),version=card.version+(card.practice_only?0:1),word=await one(q,'SELECT lemma,meaning_zh,part_of_speech,sense_key,version FROM child_words WHERE id=$1',[card.child_word_id]);
+    if(!card.practice_only)await q.query('UPDATE review_cards SET scheduler_state=$2,state=$3,due_at=$4,last_review_at=$5,version=version+1 WHERE id=$1',[card.id,JSON.stringify(next.state),next.label,next.due,now]);
     await q.query('INSERT INTO daily_word_activity(child_id,local_date,card_id,child_word_id,first_review_at,was_new) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',[c.id,day,card.id,card.child_word_id,now,card.state==='new']);
     await q.query(`INSERT INTO daily_activity(child_id,local_date,distinct_words,new_words,goal_snapshot,timezone_snapshot) SELECT $1,$2,count(*)::int,count(*) FILTER(WHERE was_new)::int,$3,$4 FROM daily_word_activity WHERE child_id=$1 AND local_date=$2 ON CONFLICT(child_id,local_date) DO UPDATE SET distinct_words=excluded.distinct_words,new_words=excluded.new_words,updated_at=now()`,[c.id,day,c.daily_goal,c.timezone]);
-    const result={event_id:body.event_id,card_id:card.id,version:card.version+1,due_at:next.due.toISOString(),state:next.label,practice_only:false,today:await this.todayDto(q,c)};
-    const log=await one(q,`INSERT INTO review_logs(child_id,card_id,session_id,actor_user_id,event_id,request_hash,rating,reviewed_at,local_date,timezone_snapshot,before_version,after_version,word_snapshot,before_state,after_state,response_snapshot) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,[c.id,card.id,s.id,actor,body.event_id,digest,body.rating,now,day,c.timezone,card.version,card.version+1,JSON.stringify(word),JSON.stringify(card.scheduler_state),JSON.stringify(next.state),JSON.stringify(result)]);
+    const result={event_id:body.event_id,card_id:card.id,version,due_at:next.due.toISOString(),state:next.label,practice_only:card.practice_only,today:await this.todayDto(q,c)};
+    const log=await one(q,`INSERT INTO review_logs(child_id,card_id,session_id,actor_user_id,event_id,request_hash,rating,reviewed_at,local_date,timezone_snapshot,before_version,after_version,word_snapshot,before_state,after_state,response_snapshot,practice_only,review_source) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,[c.id,card.id,s.id,actor,body.event_id,digest,body.rating,now,day,c.timezone,card.version,version,JSON.stringify(word),JSON.stringify(card.scheduler_state),JSON.stringify(next.state),JSON.stringify(result),card.practice_only,s.review_source]);
     await q.query('UPDATE study_session_items SET answered_event_id=$3 WHERE session_id=$1 AND card_id=$2',[s.id,card.id,body.event_id]);
     if(body.rating==='again')await q.query(`INSERT INTO mistake_events(child_id,child_word_id,source,review_log_id,reason,occurred_at,local_date,timezone_snapshot,word_snapshot,answer_snapshot) VALUES($1,$2,'review',$3,'incorrect',$4,$5,$6,$7,$8)`,[c.id,card.child_word_id,log.id,now,day,c.timezone,JSON.stringify(word),JSON.stringify({rating:body.rating})]);
     return result;

@@ -1,0 +1,62 @@
+0.1 · 错题集、日历与额外复习（2026-10-20）
+
+本轮实现
+首页新增“学习日历 · 打卡记录”和“历史错题集”。
+日历沿用本地 13-calendar 设计：月份选择、每天学习/达标/错题标识、选中日摘要、月测入口。
+错题集沿用本地 14-wrong 设计：按义项去重、筛选日期/来源、错误次数、未答次数、来源和最近错误时间，选择后复习。
+不填写设计稿示例数据；没有数据时展示真实空态。导出、底部全局导航等其余功能不在本轮实现范围。
+月测成绩页可以直接重新练习本次全部错词。
+
+接口（均需 Bearer 登录及孩子所属家庭的有效成员权限）
+GET /api/children/:id/calendar?month=2026-10
+  month 可省略，默认孩子时区当前月，禁止未来月。
+  返回 month、timezone、days、streak_days、streak_through。
+  days 每日含 date、studied_words、goal（未学习为 null）、checked_in、wrong_words、mistake_count、quiz_count。
+  错题按实际发生日期统计，月测按交卷日期统计；未来日期无学习记录。
+GET /api/children/:id/wrong-words?date=2026-10-20&source=review&limit=50&cursor=...
+  date/source/quiz_id 均可省略；source 为 review 或 monthly_quiz；limit 默认 50，最大 100。
+  返回 items、next_cursor。游标为不透明字符串，按最近错误时间、义项 ID 降序。
+  每项含 word、wrong_count、last_wrong_at、last_snapshot、correct_since_last_mistake、sources、unanswered_count。
+  顶层 wrong_count 和来源/未答计数按当前筛选范围计算；记录是永久历史，不因练对删除。
+  correct_since_last_mistake 按该义项全部错误历史的最新错误判断，之后日常练对或月测答对为 true。
+  历史旧版本 review 快照可能只有 lemma/meaning_zh/part_of_speech，新复习快照补充 sense_key/version；不伪造旧快照版本。
+POST /api/children/:id/study-sessions（Idempotency-Key）
+  {"source":"scheduled"}：今日到期队列。
+  {"source":"calendar","date":"2026-10-20"}：当天全部错词。
+  {"source":"manual","word_ids":["义项UUID"]}：明确选中的 1～100 个词，不允许重复。
+  {"source":"quiz","quiz_id":"已交卷测验UUID"}：该月测全部错词，含未答。
+  不允许混搭字段；所有来源仍互斥使用孩子的同一陪学租约。
+  返回会话、source、total、excluded_new_words；无可用队列返回 EMPTY_REVIEW_QUEUE，新词额度耗尽返回 NEW_WORD_LIMIT。
+GET /api/study-sessions/:id/cards?limit=50&cursor=...
+  默认 50，最大 100；返回 items、next_cursor、remaining，每项含 practice_only 和 ordinal。
+  日历/月测来源冻结完整队列，不截断为 100 词。前端每答一题读取首批未答项，自动推进至队尾。
+POST /api/reviews
+  请求保持原契约。practice_only 只能由服务端队列决定，客户端不可指定。
+  到期词正常更新 FSRS；未到期的已学词只记录练习，不改 state/due/version/last_review_at。
+  新词遵守每日新词限额；排除数量在复习页面提示。
+
+打卡与正确性
+完成每日目标即自动打卡，不新增独立“补打卡”写入操作。
+学习词数按孩子、当地日期、义项去重；父母共享，同词多次练习只计一次。
+月测交卷不计学习打卡；交卷后的错词练习计入。
+每日目标沿用当天首条活动时冻结的值，不追溯改写历史。
+连续打卡从今天（已达标）或昨天向前计算，跨月连续计算；有间隔则归零。
+归档词仍在错题集只读展示，但不进入新队列；手动选择不可用词会拒绝并要求刷新。
+提交事件持久幂等；所有新增读写沿用家庭→孩子的权限/锁顺序。
+复习待确认答案及恢复会话按登录令牌和孩子隔离，离开页面暂停心跳；网络失败保留同一事件编号重试。
+已有库无需迁移，继续使用原数据。接口与生产就绪状态仍以 apps/README.txt 为准。
+
+验证
+corepack pnpm test:history：真实 PGlite 迁移后覆盖混合来源、权限、日期、游标、跨午夜、连续打卡、配额、归档、未到期不修改状态、到期正常推进。
+corepack pnpm test:quiz：增加 105 个错词进入队列及错题集 100+5 分页验证。
+corepack pnpm test:routes：Nest/Express 进程内覆盖日历、错题筛选、无效日期/空选项、额外练习及计数。
+前后端 TypeScript、小程序构建和七个页面产物检查通过。
+未在本轮自动操作微信模拟器；页面视觉和点击仍需用户验收。未调用外部收费服务，也没有上传设计稿或代码。
+
+用户验收
+1. 旧后端 Ctrl+C，执行 node scripts/local-dev.cjs；启动标识 [0.1-calendar-review]，然后微信开发者工具点“编译”。
+2. 首页→历史错题集：应包含已有日常和月测错题，筛选“月测”可看到未答题计数。
+3. 选择几个错词→开始复习→未到期卡显示“只练习，不改变复习计划”。答完结束，再看当天学习词数不会因重复同词增加。
+4. 首页→学习日历：选择有错题的日期→查看/复习这天错词；切换月份确认真实记录。
+5. 月测历史→成绩→重新练习本次全部错词，验证可正常完成队列。
+6. 达到每日目标时首页/日历显示已打卡；另一家长选择同一孩子能看到相同记录。

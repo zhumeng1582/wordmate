@@ -3,8 +3,8 @@
   "date": "2026-10-20",
   "files": {
     "api/examples.json": "8cbdadda7d800b5760cda674ec2ca273d4f7c28f77482ff8889b8f36fd5b5c96",
-    "api/index.html": "d287963cd11b73015fb798a8b4d99ac834dd9795b45ba74e0b840f2347bc0f59",
-    "api/openapi.json": "c8aa3aa54fcb91c048e0a20213f001f0f374f42de03027cf9db418d097baad45",
+    "api/index.html": "472655de8962c41492b9c18d9b5e5b52b265223a9fe7dad72e147763fdaef77c",
+    "api/openapi.json": "6660ffcbc8798fa46745eec5c42220d79e8e299678c61e42d25da23b7033f559",
     "build.py": "fea4c4d500eb4009eca115d37fb979fb95e87b04dbe7b1ac84365707f6c166dc",
     "checks/index.html": "4a8a26f276e4cb3b3348f780d556d56eab2c7d9035ec85e2844d44b21003cfda",
     "checks/prototype-report.json": "22cb93c369fa98f0d6ac707abb8e731ecb463bc019dc0b9562fbb03ec6a1b7a0",

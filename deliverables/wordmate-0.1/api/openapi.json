@@ -15398,6 +15398,23 @@
           },
           "correct_since_last_mistake": {
             "type": "boolean"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "review",
+                "monthly_quiz"
+              ]
+            },
+            "uniqueItems": true,
+            "description": "当前筛选范围内出现过的错误来源"
+          },
+          "unanswered_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "当前筛选范围内月测未答的次数"
           }
         },
         "required": [

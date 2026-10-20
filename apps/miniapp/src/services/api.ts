@@ -11,10 +11,15 @@ export async function api<T=any>(path:string,method:'GET'|'POST'|'PUT'='GET',dat
 export async function login(identity='dev-dad'){
   const code=DEV_AUTH?identity:(await Taro.login()).code;
   const data=await api(DEV_AUTH?'/auth/dev':'/auth/wechat','POST',{code});
-  storage.set('access_token',data.access_token);storage.set('families',data.families);Taro.removeStorageSync('child_id');Taro.removeStorageSync('review_pending');Taro.removeStorageSync('active_review_session');return data;
+  storage.set('access_token',data.access_token);storage.set('families',data.families);Taro.removeStorageSync('child_id');Taro.removeStorageSync('review_pending');Taro.removeStorageSync('active_review_session');Taro.removeStorageSync('review_source');return data;
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  EMPTY_REVIEW_QUEUE:'这个范围没有可练习的单词，可能已归档或暂无到期词。',
+  NEW_WORD_LIMIT:'今天的新词额度已用完，请明天继续。',
+  WORD_UNAVAILABLE:'选中的单词已归档或不可复习，请返回刷新错题集。',
+  INVALID_DATE:'日期无效，请重新选择。',
+  INVALID_MONTH:'月份无效，请选择当前或过去的月份。',
   ROUTE_NOT_IMPLEMENTED:'当前后端不支持此接口，请重启后端后重试。若刚创建过家庭，请勿重复创建。',
   QUIZ_DAILY_LIMIT:'今天已创建 5 次月测，请明天再试；未完成的测验可以继续。',
   QUIZ_NOT_SUBMITTED:'交卷后才能查看正确答案。',

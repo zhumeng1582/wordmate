@@ -14,7 +14,7 @@ apps/api/src/core.ts：与框架解耦的业务与权限事务。
 apps/api/src/main.ts：HTTP 入口、服务端登录、错误脱敏。
 apps/api/src/validation.ts：本轮已实现请求的严格 DTO 校验。
 apps/api/test/core.test.ts：真实 SQL 引擎的端到端业务事务测试。
-apps/miniapp：家庭、词本、复习页面；AppID 已填入 project.config.json。
+apps/miniapp：家庭、词本、复习、月测、日历和错题页面；AppID 已填入 project.config.json。
 packages/ai：既有 OpenAI/Qwen 和阿里云 CosyVoice 适配器。
 infra/compose.yaml：只绑定本机的 PostgreSQL 开发配置。
 deliverables/0.1/database/001_schema.sql：数据库的初始迁移唯一来源。
@@ -31,12 +31,12 @@ deliverables/0.1/database/001_schema.sql：数据库的初始迁移唯一来源�
 - 权限检查在幂等响应重放前执行；邀请码只存哈希（幂等响应快照保存口令，需按保留期清理）。
 
 尚未实现/未验收
-- 完整接口文档中的所有操作；当前响应是开发切片，尚未完全符合最终 OpenAPI（例如 Today 的 streak/check-in、完整 Word DTO、分页、Session actor 字段）。禁止把最终 OpenAPI 当成本次所有接口均已上线。
+- 完整接口文档中的所有操作；当前响应是开发切片，尚未完全符合最终 OpenAPI（例如通用词列表分页、部分 Session actor 字段）。禁止把最终 OpenAPI 当成本次所有接口均已上线。
 - AI 任务消费、例句校验与点词查询；TTS 音频生成/私有 OSS 缓存/播放。
 - 正式词典授权和接入。开发词库仅 10 词，不使用 AI 冒充词典。
-- 正式月测题源、错题日历、主动打卡、分享、导出、标注/纠错。
+- 正式月测题源、分享、导出、标注/纠错。日历与错题集已实现，达标自动打卡。
 - 月测开发流程已接入：抽样/全量、四档成绩、历史与本次错题；详见 MONTHLY-QUIZ.txt。
-- 复习接管、日历/手动/测验来源、设置更新、成员退出移除与账号/家庭删除。
+- 日常复习接管、设置更新、成员退出移除与账号/家庭删除。
 - 完整鉴权限流、审计与日志脱敏演练、运营监控、后台管理、线上备份恢复。
 - 小程序生产隐私配置、服务类目核验、合法域名、ICP备案和真机验收。
 - 当前词列表暂限 200 项；单卡揭示词义通过独立授权查询，不受列表截断影响。
@@ -90,4 +90,5 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 本轮未完成其余所有页面逐稿还原，也未完成新版家庭页的微信模拟器截图对比。
 后端新增家庭成员查询接口，查看新版页面前需重启本地后端。
 
-月测实现更新：见 apps/MONTHLY-QUIZ.txt。首页新增按月测验入口，所有功能仍属于0.1。家庭新版已由用户确认报错解决，月测页面仍待模拟器验收。
+月测实现更新：见 apps/MONTHLY-QUIZ.txt。首页新增按月测验入口，所有功能仍属于0.1。家庭新版已由用户确认报错解决，月测已由用户确认验收通过。
+日历与错题复习已实现，新增接口、规则及验收清单见 CALENDAR-REVIEW.txt；这一轮新页面待模拟器验收。

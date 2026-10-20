@@ -14,7 +14,7 @@ const schemas:Record<string,any>={
   login:object({code:str(512)}),family:object({name:str(40)}),child:object({nickname:str(40),accent:{enum:['en-US','en-GB']}},['nickname']),book:object({name:str(60)}),
   batch:object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:30},theme:{type:'string',maxLength:80}},['wordbook_id','words']),
   confirm:object({expected_version:positive,selections:{type:'array',minItems:1,maxItems:30,items:{oneOf:[object({item_id:id,action:{const:'select'},candidate_id:str(256)}),object({item_id:id,action:{const:'skip'}})]}}}),
-  claim:object({invite_token:str(256)}),session:object({source:{const:'scheduled'}}),lease:object({lease_generation:positive}),empty:object({}),
+  claim:object({invite_token:str(256)}),session:{oneOf:[object({source:{const:'scheduled'}}),object({source:{const:'calendar'},date:{type:'string',format:'date'}}),object({source:{const:'manual'},word_ids:{type:'array',items:id,minItems:1,maxItems:100,uniqueItems:true}}),object({source:{const:'quiz'},quiz_id:id})]},lease:object({lease_generation:positive}),empty:object({}),
   review:object({session_id:id,card_id:id,event_id:id,expected_version:positive,lease_generation:positive,rating:{enum:['again','hard','good','easy']}})
 };
 const validators=Object.fromEntries(Object.entries(schemas).map(([name,schema])=>[name,ajv.compile(schema)]));

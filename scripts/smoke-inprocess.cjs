@@ -52,6 +52,16 @@ const {createApplication}=require('../apps/api/dist/main.js');
   assert.equal(answered.answered_count,1);
   const scored=await ok(`/monthly-quizzes/${quiz.id}/submit`,{expected_version:answered.quiz_version,session_id:started.session.id,lease_generation:started.session.lease_generation,confirm_unanswered:false});assert.equal(scored.total_count,1);
   assert.equal((await ok(`/monthly-quizzes/${quiz.id}/results`)).items.length,1);
-  console.log('PASS: Nest/Express request parsing, validation, auth, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results (in process; TCP not tested)');
+  const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+  const calendar=await ok(`/children/${c.id}/calendar?month=${month}`);assert(calendar.days.find(d=>d.date===today).wrong_words>=1);
+  const wrong=await ok(`/children/${c.id}/wrong-words?date=${today}&source=review&limit=1`);assert.equal(wrong.items.length,1);
+  assert.equal((await request(`/children/${c.id}/wrong-words?date=2026-02-30`)).status,422);
+  assert.equal((await request(`/children/${c.id}/study-sessions`,{source:'manual',word_ids:[]})).status,422);
+  const extra=await ok(`/children/${c.id}/study-sessions`,{source:'calendar',date:today});
+  const queue=await ok(`/study-sessions/${extra.id}/cards?limit=1`);assert.equal(queue.items.length,1);assert.equal(queue.items[0].practice_only,true);
+  const practiced=await ok('/reviews',{session_id:extra.id,lease_generation:extra.lease_generation,card_id:queue.items[0].id,expected_version:queue.items[0].version,event_id:randomUUID(),rating:'good'});
+  assert.equal(practiced.practice_only,true);assert.equal(practiced.version,queue.items[0].version);assert.equal(practiced.today.completed_words,1);
+  await ok(`/study-sessions/${extra.id}/end`,{lease_generation:extra.lease_generation});
+  console.log('PASS: Nest/Express request parsing, validation, auth, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results, calendar, wrong words and practice (in process; TCP not tested)');
  }finally{await dispose();rmSync(resolve('.local',name),{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

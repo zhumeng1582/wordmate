@@ -14651,6 +14651,23 @@
     },
     &quot;correct_since_last_mistake&quot;: {
       &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;sources&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;enum&quot;: [
+          &quot;review&quot;,
+          &quot;monthly_quiz&quot;
+        ]
+      },
+      &quot;uniqueItems&quot;: true,
+      &quot;description&quot;: &quot;当前筛选范围内出现过的错误来源&quot;
+    },
+    &quot;unanswered_count&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0,
+      &quot;description&quot;: &quot;当前筛选范围内月测未答的次数&quot;
     }
   },
   &quot;required&quot;: [

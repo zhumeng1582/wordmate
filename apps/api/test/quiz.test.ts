@@ -93,5 +93,10 @@ test('full test keeps all 105 eligible entries, pages safely, and expired sessio
   const result=await svc.submit(dad,'submit',full.id,{expected_version:started.quiz.version,session_id:started.session.id,lease_generation:started.session.lease_generation,confirm_unanswered:true});
   assert.equal(result?.unanswered_count,105);assert.equal(result?.mistake_count,105);
   const results=await svc.items(dad,full.id,{limit:100},'results');assert.equal((results.items[0] as any).word.meaning_zh,'苹果');
+  await pg.query("UPDATE wordmate.review_cards SET state='review' WHERE child_id=$1",[c.id]);
+  const review=await core.startSession(dad,'review-errors',c.id,{source:'quiz',quiz_id:full.id});assert.equal(review.total,105);
+  const queue=await core.cards(dad,review.id,{limit:100}),queue2=await core.cards(dad,review.id,{limit:100,cursor:queue.next_cursor});assert.equal(queue.items.length,100);assert.equal(queue2.items.length,5);assert.equal(queue2.next_cursor,null);
+  const wrong=await core.history.wrongWords(dad,c.id,{limit:100}),wrong2=await core.history.wrongWords(dad,c.id,{limit:100,cursor:wrong.next_cursor});assert.equal(wrong.items.length,100);assert.equal(wrong2.items.length,5);assert.equal(wrong2.next_cursor,null);
+
  }finally{await pg.close();}
 });

@@ -15,13 +15,15 @@ if(env.DICTIONARY_PROVIDER==='fixture'&&!development)throw Error('Fixture dictio
 let core:Core;
 @Controller('api')
 class ApiController {
-  @Get('health') health(){return {status:'ok',api_revision:'0.1-monthly-quiz',mode:development?'development':'production'};}
+  @Get('health') health(){return {status:'ok',api_revision:'0.1-calendar-review',mode:development?'development':'production'};}
   @All('*path') async handle(@Req() req:Request,@Res() res:Response){
     const request_id=randomUUID();res.setHeader('Cache-Control','no-store');
     try {
       const p=req.path.replace(/^\/api/,'').split('/').filter(Boolean),b=req.body??{},method=req.method;
+      const historyRead=method==='GET'&&p[0]==='children'&&['calendar','wrong-words'].includes(p[2]);
+      const cardsRead=method==='GET'&&p[0]==='study-sessions'&&p[2]==='cards';
       const quizRead=method==='GET'&&(p[0]==='monthly-quizzes'||p[0]==='children'&&p[2]==='monthly-quizzes');
-      ensure(Object.keys(req.query).every(k=>quizRead&&['month','cursor','limit'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
+      ensure(Object.keys(req.query).every(k=>quizRead&&['month','cursor','limit'].includes(k)||historyRead&&(p[2]==='calendar'?['month']:['date','source','quiz_id','cursor','limit']).includes(k)||cardsRead&&['cursor','limit'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
       validateBody(p,method,b);
       if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
       const auth=req.headers.authorization;ensure(typeof auth==='string' && auth.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
@@ -46,6 +48,8 @@ class ApiController {
       }
       else if(p[0]==='children'&&p.length===3){const id=p[1];
         if(p[2]==='monthly-quizzes')data=method==='GET'?await core.quizzes.list(actor,id,req.query):method==='POST'?await core.quizzes.create(actor,key,id,b):undefined;
+        if(method==='GET'&&p[2]==='calendar')data=await core.history.calendar(actor,id,req.query.month);
+        if(method==='GET'&&p[2]==='wrong-words')data=await core.history.wrongWords(actor,id,req.query);
         if(method==='GET'&&p[2]==='today')data=await core.today(actor,id);
         if(p[2]==='wordbooks')data=method==='GET'?await core.wordbooks(actor,id):method==='POST'?await core.createWordbook(actor,key,id,b):undefined;
         if(method==='GET'&&p[2]==='words')data=await core.words(actor,id);
@@ -54,7 +58,7 @@ class ApiController {
       }
       else if(method==='POST'&&p[0]==='batches'&&p[2]==='confirm'&&p.length===3)data=await core.confirmBatch(actor,key,p[1],b);
       else if(p[0]==='study-sessions'&&p.length===3){
-        if(method==='GET'&&p[2]==='cards')data=await core.cards(actor,p[1]);
+        if(method==='GET'&&p[2]==='cards')data=await core.cards(actor,p[1],req.query);
         if(method==='POST'&&['heartbeat','end'].includes(p[2]))data=await core.heartbeat(actor,p[1],b,p[2]==='end');
       }
       else if(method==='POST'&&p.join('/')==='reviews')data=await core.review(actor,b);
@@ -77,6 +81,6 @@ export async function createApplication(){
 async function bootstrap(){
   const {app}=await createApplication();
   await app.listen(Number(env.PORT??3000),development?'127.0.0.1':env.HOST??'127.0.0.1');
-  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-monthly-quiz] (${development?'development':'production'})`);
+  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-calendar-review] (${development?'development':'production'})`);
 }
 if(require.main===module)bootstrap().catch(()=>{console.error('Backend startup failed. Check database, credentials and installed dependencies.');process.exitCode=1;});
