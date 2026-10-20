@@ -15,7 +15,8 @@
     "test:local-db": "node --test apps/api/test/local-database.test.cjs",
     "test:routes": "node scripts/smoke-inprocess.cjs",
     "test:quiz": "node --experimental-strip-types --test apps/api/test/quiz.test.ts",
-    "test:history": "node --experimental-strip-types --test apps/api/test/history.test.ts"
+    "test:history": "node --experimental-strip-types --test apps/api/test/history.test.ts",
+    "test:ai:live": "node --experimental-strip-types scripts/verify-ai.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

@@ -54,3 +54,11 @@ DeepSeek 切换（2026-10-20）
 最小真实连接验证返回 UPSTREAM_NETWORK_OR_TIMEOUT，未取得 HTTP 状态；尚不能确认密钥有效或模型可用。
 批量生成音标、释义与例句的业务保存流程尚待接入。本次只完成供应商适配和配置。
 官方来源：https://api-docs.deepseek.com/ 和 https://api-docs.deepseek.com/guides/json_mode/
+
+批量词汇真实验收（2026-10-20）
+运行 corepack pnpm test:ai:live。从项目根目录 .env 读取凭证，以 airport/luggage/delay 和机场旅行主题调用真实模型一次，不发送孩子资料。
+新增 src/vocabulary.ts：固定提示词版本 vocabulary-0.1-1，返回英/美音标、词性、常用中文释义、关联英文例句及译文。不要求用户逐词确认；不可识别词返回 invalid，禁止编造内容。
+校验数量、顺序、输入对应、字段集合、音标格式、中文字段、原词一致、例句包含目标词及异常项字段。格式校验不保证音标、翻译和英语教学质量，应对真实输出抽检。
+离线测试共 12 项通过；真实调用在当前执行环境仍报网络错误，单独探测 DNS 得到 ENOTFOUND，无 HTTP 状态，不代表密钥无效。
+结果写入 .local/ai-verification.json（Git 忽略），失败退出码为 1。
+脚本验证供应商生成与校验，不调用业务数据库，不证明小程序录入或自动保存已接通。业务路由仍使用测试词库，下一阶段需接入批量生成与原子保存。
