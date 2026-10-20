@@ -54,3 +54,22 @@ test('AI network calls hold no transaction; membership revoked before completion
  assert.equal((await pg.query('SELECT status FROM wordmate.generation_jobs WHERE id=$1',[j.id])).rows[0].status,'cancelled');assert.equal((await pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,0);
  }finally{await pg.close();}
 });
+
+test('Chinese list separators are split before persistence; old malformed jobs cannot incur a retry',async()=>{
+ const {splitVocabularyInput}=await import('../../miniapp/src/utils/vocabulary-input.ts');
+ assert.deepEqual(splitVocabularyInput('airport、 luggage；delay;ice cream，book\r\ncat'),['airport','luggage','delay','ice cream','book','cat']);
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};let calls=0;
+ const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',generate:async words=>{calls++;assert.deepEqual(words,['airport','luggage','delay']);return {items:words.map(result)};}};
+ const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'split',()=>new Date(),provider);
+ try{
+  const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'f',{name:'测试'}),c=await core.createChild(dad,'c',f.id,{nickname:'孩子'}),b=await core.createWordbook(dad,'b',c.id,{name:'本'});
+  const job=await core.vocabulary.create(dad,'job',c.id,{wordbook_id:b.id,words:['airport、luggage、delay']});assert.equal(job.items.length,3);
+  await core.vocabulary.processOne();assert.equal((await core.vocabulary.get(dad,job.id)).status,'succeeded');assert.equal(calls,1);
+  await assert.rejects(core.vocabulary.create(dad,'duplicates',c.id,{wordbook_id:b.id,words:['cat、Cat']}),{code:'DUPLICATE_WORDS'});
+  await assert.rejects(core.vocabulary.create(dad,'overflow',c.id,{wordbook_id:b.id,words:[Array.from({length:31},(_,i)=>String(i)).join('、')]}),{code:'INVALID_WORD_COUNT'});
+  const old=await core.vocabulary.create(dad,'old',c.id,{wordbook_id:b.id,words:['book']});
+  await pg.query("UPDATE wordmate.batch_items SET raw_text='airport、luggage、delay' WHERE batch_id=$1",[old.batch_id]);await pg.query("UPDATE wordmate.generation_jobs SET status='failed' WHERE id=$1",[old.id]);
+  await assert.rejects(core.vocabulary.retry(dad,'old-retry',old.id),{code:'INPUT_REENTRY_REQUIRED'});assert.equal(calls,1);
+ }finally{await pg.close();}
+});

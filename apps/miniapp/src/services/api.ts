@@ -15,6 +15,7 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  INPUT_REENTRY_REQUIRED:'旧任务未正确拆分单词，请重新编辑输入后提交，不要重试旧任务。',
   AI_NOT_CONFIGURED:'AI 尚未配置，请检查服务端密钥和模型配置并重启后端。',
   ACTIVE_GENERATION:'孩子已有一批正在生成，请刷新并等待完成。',
   AI_CONFIGURATION_CHANGED:'该任务的模型配置已变化，请恢复原供应商和模型配置后重试。',
