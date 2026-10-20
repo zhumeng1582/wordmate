@@ -1,3 +1,5 @@
+本地运行更新：优先参阅根目录 LOCAL-RUN.txt。新增 PGlite 持久化开发数据库和 node scripts/local-dev.cjs 一键构建启动，不再要求本地安装 Docker/PostgreSQL。持久化适配器已测试，完整编译仍等待依赖安装。
+
 单词共学 0.1 · 开发工程
 
 状态（2026-10-20）

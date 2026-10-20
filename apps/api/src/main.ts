@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import {All,Controller,Module,Req,Res} from '@nestjs/common';
+import {All,Controller,Get,Module,Req,Res} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import type {Request,Response} from 'express';
 import {randomUUID} from 'node:crypto';
@@ -14,6 +14,7 @@ if(env.DICTIONARY_PROVIDER==='fixture'&&!development)throw Error('Fixture dictio
 let core:Core;
 @Controller('api')
 class ApiController {
+  @Get('health') health(){return {status:'ok',mode:development?'development':'production'};}
   @All('*path') async handle(@Req() req:Request,@Res() res:Response){
     const request_id=randomUUID();res.setHeader('Cache-Control','no-store');
     try {
@@ -55,5 +56,6 @@ async function bootstrap(){
   app.enableShutdownHooks();
   const close=()=>{void source.destroy();};process.once('SIGTERM',close);process.once('SIGINT',close);
   await app.listen(Number(env.PORT??3000),development?'127.0.0.1':env.HOST??'127.0.0.1');
+  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health (${development?'development':'production'})`);
 }
 bootstrap().catch(()=>{console.error('Backend startup failed. Check database, credentials and installed dependencies.');process.exitCode=1;});
