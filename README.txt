@@ -33,7 +33,7 @@
 检查脚本目前使用本机firebase-tools附带的pglite-2及ajv；其他机器须通过WORDMATE_CHECK_DEPS指向含同名包的依赖目录。Swift图片生成需macOS AppKit。正式业务工程版本与lockfile按开工清单固定，不能把上述环境当作已经锁定的业务依赖。
 
 AI/TTS适配源码
-packages/ai/src/index.ts：OpenAI/千问切换及Azure Speech实现。
+packages/ai/src/index.ts：OpenAI/千问切换及国内CosyVoice实现。
 packages/ai/README.txt：配置、集成、验证边界和TTS选型来源。
 .env.example：无真实密钥的服务端配置模板。
 运行：node --experimental-strip-types --test packages/ai/test/*.test.ts

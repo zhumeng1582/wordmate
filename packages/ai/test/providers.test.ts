@@ -52,33 +52,43 @@ test('unknown providers and missing selected-provider credentials fail closed', 
   assert.throws(() => createTextGenerator({ ...env, LLM_PROVIDER: 'unknown' }), { code: 'UNSUPPORTED_LLM_PROVIDER' });
   assert.throws(() => createTextGenerator({ ...env, LLM_PROVIDER: 'qwen' }), { code: 'MISSING_QWEN_API_KEY' });
 });
-const speechEnv = { AZURE_SPEECH_KEY: 'test-speech', AZURE_SPEECH_BASE_URL: 'https://eastasia.tts.speech.microsoft.com' };
-const speech: SpeechRequest = { text: 'apple & <hello>', accent: 'en-GB', voiceId: 'en-GB-SoniaNeural', rate: 0.8 };
-const catalog = [{ ShortName: speech.voiceId, Locale: 'en-GB', VoiceType: 'Neural', Gender: 'Female', Status: 'GA' }];
-test('Azure uses live voice catalog, escapes SSML and requests MP3', async () => {
-  let catalogs = 0;
+const speechEnv = { COSYVOICE_API_KEY: 'test-speech', COSYVOICE_WORKSPACE_ID: 'test-workspace', COSYVOICE_ENABLED_VOICES: 'loongemily_v3,loongabby_v3' };
+const speech: SpeechRequest = { text: 'apple & <hello>', accent: 'en-GB', voiceId: 'loongemily_v3', rate: 0.8 };
+const synthesis = { output: { finish_reason: 'stop', audio: { url: 'http://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/test.mp3?signature=test' } } };
+test('CosyVoice Beijing sends native rate and plain text, downloads over HTTPS without credentials', async () => {
   const fetcher: Fetch = async (url, init) => {
-    if (String(url).endsWith('/voices/list')) { catalogs++; return ok(catalog); }
-    const ssml = init!.body as string;
-    assert(ssml.includes('apple &amp; &lt;hello&gt;')); assert(ssml.includes('rate="-20%"'));
-    assert.equal((init!.headers as Record<string, string>)['X-Microsoft-OutputFormat'], 'audio-24khz-48kbitrate-mono-mp3');
-    return new Response(new Uint8Array([73, 68, 51]), { headers: { 'Content-Type': 'audio/mpeg' } });
+    if (String(url).includes('/SpeechSynthesizer')) {
+      assert.equal(url, 'https://test-workspace.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer');
+      const body = JSON.parse(init!.body as string);
+      assert.equal(body.model, 'cosyvoice-v3-flash'); assert.equal(body.input.rate, 0.8);
+      assert.equal(body.input.text, speech.text); assert.equal(body.input.enable_ssml, false);
+      assert.equal(body.input.voice, 'loongemily_v3'); assert.equal(body.input.format, 'mp3');
+      return ok(synthesis);
+    }
+    assert(String(url).startsWith('https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/'));
+    assert.equal(init!.headers, undefined);
+    return new Response(new Uint8Array([73, 68, 51]), { headers: { 'Content-Type': 'application/octet-stream' } });
   };
   const tts = createTtsProvider(speechEnv, fetcher);
-  assert.equal((await tts.synthesize(speech)).bytes.length, 3);
-  await tts.listVoices(); assert.equal(catalogs, 1);
+  assert.equal((await tts.synthesize(speech)).provider, 'cosyvoice');
+  assert.equal((await tts.listVoices()).length, 2);
   await assert.rejects(tts.synthesize({ ...speech, accent: 'en-US' }), { code: 'VOICE_ACCENT_UNAVAILABLE' });
   await assert.rejects(tts.synthesize({ ...speech, rate: NaN }), { code: 'INVALID_SPEECH_REQUEST' });
 });
-test('invalid audio and unsupported endpoint cannot masquerade as valid speech', async () => {
-  const tts = createTtsProvider(speechEnv, async url => String(url).endsWith('/voices/list') ? ok(catalog) : ok({ error: 'not audio' }));
+test('failed generation, unsafe URLs, bad audio and unverified models fail closed', async () => {
+  const unsafe = { output: { finish_reason: 'stop', audio: { url: 'https://attacker.example/file' } } };
+  await assert.rejects(createTtsProvider(speechEnv, async () => ok(unsafe)).synthesize(speech), { code: 'INVALID_AUDIO_URL' });
+  await assert.rejects(createTtsProvider(speechEnv, async () => ok({ code: 'InvalidVoice' })).synthesize(speech), { code: 'TTS_SYNTHESIS_FAILED' });
+  const tts = createTtsProvider(speechEnv, async url => String(url).includes('/SpeechSynthesizer') ? ok(synthesis) : ok({ error: 'not audio' }));
   await assert.rejects(tts.synthesize(speech), { code: 'INVALID_AUDIO_RESPONSE' });
-  assert.throws(() => createTtsProvider({ ...speechEnv, AZURE_SPEECH_BASE_URL: 'https://attacker.example' }), { code: 'INVALID_SPEECH_BASE_URL' });
+  assert.throws(() => createTtsProvider({ ...speechEnv, COSYVOICE_MODEL: 'unverified' }), { code: 'UNVERIFIED_TTS_MODEL' });
+  assert.throws(() => createTtsProvider({ ...speechEnv, COSYVOICE_ENABLED_VOICES: 'fake' }), { code: 'UNVERIFIED_TTS_VOICE' });
+  assert.throws(() => createTtsProvider({ ...speechEnv, TTS_PROVIDER: 'azure' }), { code: 'UNSUPPORTED_TTS_PROVIDER' });
 });
 test('cache separates child, provider, revision and accent', () => {
-  const key = audioCacheKey('child1', 'v1', 'azure-eastasia', speech);
-  assert.notEqual(key, audioCacheKey('child2', 'v1', 'azure-eastasia', speech));
-  assert.notEqual(key, audioCacheKey('child1', 'v2', 'azure-eastasia', speech));
+  const key = audioCacheKey('child1', 'v1', 'cosyvoice-beijing-v3', speech);
+  assert.notEqual(key, audioCacheKey('child2', 'v1', 'cosyvoice-beijing-v3', speech));
+  assert.notEqual(key, audioCacheKey('child1', 'v2', 'cosyvoice-beijing-v3', speech));
   assert.notEqual(key, audioCacheKey('child1', 'v1', 'another-provider', speech));
-  assert.notEqual(key, audioCacheKey('child1', 'v1', 'azure-eastasia', { ...speech, accent: 'en-US' }));
+  assert.notEqual(key, audioCacheKey('child1', 'v1', 'cosyvoice-beijing-v3', { ...speech, accent: 'en-US' }));
 });

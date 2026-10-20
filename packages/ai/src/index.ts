@@ -96,56 +96,62 @@ export type Voice = { id: string; accent: Accent; gender: string };
 export type SpeechRequest = { text: string; accent: Accent; voiceId: string; rate: number };
 export interface TtsProvider {
   listVoices(): Promise<Voice[]>;
-  synthesize(r: SpeechRequest): Promise<{ bytes: Uint8Array; mimeType: 'audio/mpeg'; provider: 'azure' }>;
+  synthesize(r: SpeechRequest): Promise<{ bytes: Uint8Array; mimeType: 'audio/mpeg'; provider: 'cosyvoice' }>;
 }
-const xml = (s: string) => s.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c]!));
+// Official cosyvoice-v3-flash Beijing catalog. Account enablement must be verified
+// by deployment smoke tests; this is a configured allowlist, not a live account API.
+const COSY_VOICES: Voice[] = [
+  { id: 'loongemily_v3', accent: 'en-GB', gender: 'Female' },
+  { id: 'loongeric_v3', accent: 'en-GB', gender: 'Male' },
+  { id: 'loongabby_v3', accent: 'en-US', gender: 'Female' },
+  { id: 'loongandy_v3', accent: 'en-US', gender: 'Male' },
+];
 export function createTtsProvider(env: Record<string, string | undefined> = process.env, fetcher: Fetch = fetch): TtsProvider {
-  if ((env.TTS_PROVIDER || 'azure') !== 'azure') throw new ProviderError('UNSUPPORTED_TTS_PROVIDER');
-  const key = required(env, 'AZURE_SPEECH_KEY');
-  // Explicit region endpoint supports global Azure or Azure China; no silent cloud change.
-  const base = required(env, 'AZURE_SPEECH_BASE_URL').replace(/\/$/, '');
-  const url = new URL(base);
-  if (url.protocol !== 'https:' || !/^[a-z0-9]+\.tts\.speech\.(microsoft\.com|azure\.cn)$/.test(url.hostname) ||
-      url.pathname !== '/' || url.username || url.password || url.port || url.search || url.hash)
-    throw new ProviderError('INVALID_SPEECH_BASE_URL');
-  const headers = { 'Ocp-Apim-Subscription-Key': key };
-  let cached: Voice[] | undefined;
-  let cachedAt = 0;
-  const provider: TtsProvider = {
-    async listVoices() {
-      if (cached && Date.now() - cachedAt < 3600000) return cached.map(v => ({ ...v }));
-      const result = await json(await request(fetcher, `${base}/cognitiveservices/voices/list`, { headers }, 15000));
-      if (!Array.isArray(result)) throw new ProviderError('INVALID_VOICE_CATALOG', true);
-      cached = result.filter(v => ['en-GB', 'en-US'].includes(v.Locale) && v.VoiceType === 'Neural' &&
-        typeof v.ShortName === 'string' && !v.ShortName.includes(':') && !v.ShortName.includes('Multilingual') &&
-        v.Status === 'GA').map(v => ({ id: v.ShortName, accent: v.Locale, gender: v.Gender }));
-      cachedAt = Date.now();
-      return cached!.map(v => ({ ...v }));
-    },
+  if ((env.TTS_PROVIDER || 'cosyvoice') !== 'cosyvoice') throw new ProviderError('UNSUPPORTED_TTS_PROVIDER');
+  const key = required(env, 'COSYVOICE_API_KEY');
+  const workspace = required(env, 'COSYVOICE_WORKSPACE_ID');
+  if (!/^[a-zA-Z0-9-]+$/.test(workspace)) throw new ProviderError('INVALID_COSYVOICE_WORKSPACE');
+  const model = env.COSYVOICE_MODEL || 'cosyvoice-v3-flash';
+  if (model !== 'cosyvoice-v3-flash') throw new ProviderError('UNVERIFIED_TTS_MODEL');
+  const ids = required(env, 'COSYVOICE_ENABLED_VOICES').split(',').map(x => x.trim());
+  if (ids.some(id => !COSY_VOICES.some(v => v.id === id))) throw new ProviderError('UNVERIFIED_TTS_VOICE');
+  const voices = COSY_VOICES.filter(v => ids.includes(v.id));
+  const base = `https://${workspace}.cn-beijing.maas.aliyuncs.com`;
+  return {
+    async listVoices() { return voices.map(v => ({ ...v })); },
     async synthesize(r) {
       if (!['en-GB', 'en-US'].includes(r.accent) || !Number.isFinite(r.rate) || r.rate < 0.5 || r.rate > 1.5 ||
           !r.text?.trim() || r.text.length > 1000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(r.text))
         throw new ProviderError('INVALID_SPEECH_REQUEST');
-      const voices = await provider.listVoices();
       if (!voices.some(v => v.id === r.voiceId && v.accent === r.accent)) throw new ProviderError('VOICE_ACCENT_UNAVAILABLE');
-      const percent = Math.round((r.rate - 1) * 100);
-      const rate = `${percent >= 0 ? '+' : ''}${percent}%`;
-      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${r.accent}"><voice name="${xml(r.voiceId)}"><prosody rate="${rate}">${xml(r.text)}</prosody></voice></speak>`;
-      const result = await request(fetcher, `${base}/cognitiveservices/v1`, { method: 'POST', headers: {
-        ...headers, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3', 'User-Agent': 'wordmate-api',
-      }, body: ssml }, 30000);
+      const result = await json(await request(fetcher, `${base}/api/v1/services/audio/tts/SpeechSynthesizer`, {
+        method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, input: { text: r.text, voice: r.voiceId, format: 'mp3', sample_rate: 24000,
+          rate: r.rate, language_hints: ['en'], enable_ssml: false, enable_aigc_tag: true } }),
+      }, 60000));
+      if (result?.code) throw new ProviderError('TTS_SYNTHESIS_FAILED');
+      if (result?.output?.finish_reason !== 'stop') throw new ProviderError('INCOMPLETE_SYNTHESIS', true);
+      let audioUrl: URL;
+      try { audioUrl = new URL(result.output.audio.url); }
+      catch { throw new ProviderError('INVALID_AUDIO_URL'); }
+      // Only the documented Beijing result bucket; never forward the API key.
+      if (!['http:', 'https:'].includes(audioUrl.protocol) || audioUrl.hostname !== 'dashscope-result-bj.oss-cn-beijing.aliyuncs.com' ||
+          audioUrl.username || audioUrl.password || audioUrl.port || audioUrl.hash)
+        throw new ProviderError('INVALID_AUDIO_URL');
+      audioUrl.protocol = 'https:';
+      const audio = await request(fetcher, audioUrl.href, {}, 30000);
       let bytes: Uint8Array;
-      try { bytes = new Uint8Array(await result.arrayBuffer()); }
+      try { bytes = new Uint8Array(await audio.arrayBuffer()); }
       catch { throw new ProviderError('UPSTREAM_AUDIO_READ_FAILED', true); }
-      if (!bytes.length || !(result.headers.get('content-type') || '').toLowerCase().startsWith('audio/'))
-        throw new ProviderError('INVALID_AUDIO_RESPONSE', true);
-      return { bytes, mimeType: 'audio/mpeg', provider: 'azure' };
+      // OSS may use application/octet-stream. Verify MP3 ID3/frame header instead.
+      const mp3 = bytes.length >= 3 && ((bytes[0] === 73 && bytes[1] === 68 && bytes[2] === 51) || (bytes[0] === 255 && (bytes[1] & 224) === 224));
+      if (!mp3 || bytes.length > 10 * 1024 * 1024) throw new ProviderError('INVALID_AUDIO_RESPONSE', true);
+      return { bytes, mimeType: 'audio/mpeg', provider: 'cosyvoice' };
     },
   };
-  return provider;
 }
 // Caller supplies child scope (or an explicitly public dictionary scope), content version,
 // and provider/region profile. Provider changes never reuse old audio accidentally.
 export function audioCacheKey(scope: string, contentVersion: string, profile: string, r: SpeechRequest): string {
-  return createHash('sha256').update(JSON.stringify([scope, contentVersion, profile, r.text, r.accent, r.voiceId, r.rate, 'mp3-24k-48k'])).digest('hex');
+  return createHash('sha256').update(JSON.stringify([scope, contentVersion, profile, r.text, r.accent, r.voiceId, r.rate, 'mp3-24k-cosy-v1'])).digest('hex');
 }
