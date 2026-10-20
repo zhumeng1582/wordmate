@@ -1,1 +1,1 @@
-module.exports={presets:[['taro',{framework:'react',ts:true}]]};
+module.exports={presets:[['taro',{framework:'react',ts:true,compiler:'vite'}]]};

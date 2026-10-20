@@ -4,16 +4,16 @@ import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {randomUUID} from 'node:crypto';
 import {Core} from '../src/core.ts';
-import {DevIdentity,FixtureDictionary} from '../src/providers.ts';
+import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts';
 import type {Scheduler,Database} from '../src/ports.ts';
 const require=createRequire(import.meta.url);
 const {PGlite}=require(process.env.PGLITE_MODULE??'@electric-sql/pglite');
 // A deterministic scheduler double validates transaction semantics, not FSRS behavior.
 const scheduler:Scheduler={version:'test-only',parameterVersion:'test-only',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{due:new Date(now.getTime()+86400000),rating},label:'review',due:new Date(now.getTime()+86400000)})};
-test('login → isolated family → confirmed batch → durable, deduplicated review',async()=>{
+for (const [label,activeScheduler] of [['fixture',scheduler],['real FSRS',await createScheduler()]] as const) test(`${label}: login → isolated family → confirmed batch → durable, deduplicated review`,async()=>{
   const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
   const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
-  let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'test-app',()=>now);
+  let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),activeScheduler,'test-app',()=>now);
   try{
     const login=await core.login('dev-dad'),dad=await core.authenticate(login.access_token),mom=await core.login('dev-mom');
     const family=await core.createFamily(dad,'family1',{name:'测试家庭'});
@@ -21,11 +21,15 @@ test('login → isolated family → confirmed batch → durable, deduplicated re
     await assert.rejects(core.createFamily(dad,'family1',{name:'改名'}),{code:'IDEMPOTENCY_CONFLICT'});
     const child=await core.createChild(dad,'child1',family.id,{nickname:'宝宝'});
     await assert.rejects(core.today(mom.user.id,child.id),{code:'FAMILY_NOT_FOUND'});
+    await assert.rejects(core.members(mom.user.id,family.id),{code:'FAMILY_NOT_FOUND'});
+    assert.equal((await core.members(dad,family.id)).items.length,1);
     const invite=await core.createInvite(dad,'invite1',family.id);
     await core.claimInvite(mom.user.id,'claim1',{invite_token:invite.invite_token});
     await assert.rejects(core.today(mom.user.id,child.id),{code:'FAMILY_NOT_FOUND'});
     await core.approveInvite(dad,'approve1',invite.id);
     assert.equal((await core.today(mom.user.id,child.id)).child.id,child.id);
+    const sharedMembers=(await core.members(mom.user.id,family.id)).items;
+    assert.equal(sharedMembers.length,2);assert.equal(sharedMembers[0].role,'owner');
     await assert.rejects(core.createInvite(mom.user.id,'invite2',family.id),{code:'OWNER_REQUIRED'});
     const book=await core.createWordbook(dad,'book1',child.id,{name:'日常词汇'});
     const batch=await core.createBatch(dad,'batch1',child.id,{wordbook_id:book.id,words:['apple','book','unknownword']});

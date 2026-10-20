@@ -1,0 +1,44 @@
+0.1 按月复习测验 · 本地开发实现
+
+入口与验收步骤
+1. 在正在运行后端的终端 Ctrl+C，然后从根目录运行 node scripts/local-dev.cjs。
+2. 启动标识应包含 [0.1-monthly-quiz]；微信开发者工具点击编译。
+3. 选择孩子，添加测试词 apple、book、cat、dog，并实际完成一次日常复习，然后结束该复习会话。
+4. 首页 → 按月测验 → 选择月份 → 抽样或全量 → 开始月测。
+5. 答题后显示“已保存”；可以标记、清空、使用答题卡跳题、保存并稍后继续。
+6. 交卷后显示四档成绩，可查看全部答案或只看本次错题；历史成绩可重新打开。
+
+规则
+- 候选为所选月份 daily_word_activity 实际学过的义项，去重并排除已归档词；录入但未学的词不计入。
+- 时区沿用孩子的 Asia/Shanghai；不允许未来月份或空题库。
+- 抽样10/20/30/50，不足时使用全部；全量最多10000题，超过上限拒绝而非截断。
+- 每孩子每天最多创建5次，继续已有测验不占次数。
+- 创建时冻结候选ID、题目顺序、词义版本和评分规则，备题完成前不能开始。
+- 四档为优秀≥90%、良好≥80%、合格≥60%、待加强<60%。判级按整数比较，展示分数四舍五入到一位小数。
+- 未答交卷必须再次确认；未答与答错都在交卷事务中写入统一 mistake_events。
+- 月测不会调整 FSRS 卡片或增加打卡词数。
+- 120秒陪学租约、30秒心跳。暂停/切后台后可以重新取得租约继续；另一家长可明确确认接管。
+- 保存答案采用题版本和幂等键，提交采用测验版本和已交卷结果重放。
+- 未交卷不返回正确选项。已交卷才开放解析和错题接口。
+- 放弃不生成成绩或错题；备题失败明确显示失败，可放弃重建。
+
+本地题源边界
+仅在 development + fixture 模式使用 FixtureQuizBuilder，来自现有10个测试词的固定释义及互不相同的干扰项。
+正式题目供应商仍未接入；非开发配置不会偷偷使用测试题源，任务会标记失败。
+本地备题在数据库事务内执行，重启会重新扫描 preparing。没有网络调用，没有接入 Redis/BullMQ。
+后续远程题源必须使用独立租约任务消费者，不能把供应商网络调用放进本地备题事务。
+错题已进入统一事实表并可在月测成绩页查看；跨来源总错题页、日历复习和题目纠错仍待实现。
+
+接口（沿用 deliverables/0.1/api/openapi.json 的月测路径）
+GET /children/:child/monthly-quizzes/preview?month=YYYY-MM
+GET/POST /children/:child/monthly-quizzes
+GET /monthly-quizzes/:id
+POST /monthly-quizzes/:id/resume、takeover、submit、abandon
+GET /monthly-quizzes/:id/items、results、mistakes（cursor、limit分页）
+PUT /monthly-quizzes/:id/items/:item/answer
+写操作都携带 Idempotency-Key；服务端统一检查家庭权限。
+
+验证
+corepack pnpm test:quiz：阈值、当月范围、归档排除、未学习不入题、空月/未来月、跨家庭权限、选项不提前泄露、分页、题目快照、重复保存、接管与过期、交卷确认、错题去重及不改日常复习统计；105题全量验证。
+corepack pnpm test:routes：真实 Nest/Express 管道、实际备题循环、PUT保存、交卷与结果读取（进程内，不代表TCP网络测试）。
+前后端类型检查与小程序构建通过后仍需微信模拟器实际点击验收。

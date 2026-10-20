@@ -4,15 +4,17 @@
   "private": true,
   "packageManager": "pnpm@10.11.0",
   "scripts": {
-    "dev:api": "pnpm --filter @wordmate/api dev",
-    "build:api": "pnpm --filter @wordmate/api build",
-    "dev:miniapp": "pnpm --filter @wordmate/miniapp dev",
-    "build:miniapp": "pnpm --filter @wordmate/miniapp build",
+    "dev:api": "corepack pnpm --filter @wordmate/api dev",
+    "build:api": "corepack pnpm --filter @wordmate/api build",
+    "dev:miniapp": "corepack pnpm --filter @wordmate/miniapp dev",
+    "build:miniapp": "corepack pnpm --filter @wordmate/miniapp build",
     "test:core": "node --experimental-strip-types --test apps/api/test/core.test.ts",
     "test:ai": "node --experimental-strip-types --test packages/ai/test/*.test.ts",
     "local": "node scripts/local-dev.cjs",
     "test:smoke": "node scripts/smoke-local.cjs",
-    "test:local-db": "node --test apps/api/test/local-database.test.cjs"
+    "test:local-db": "node --test apps/api/test/local-database.test.cjs",
+    "test:routes": "node scripts/smoke-inprocess.cjs",
+    "test:quiz": "node --experimental-strip-types --test apps/api/test/quiz.test.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

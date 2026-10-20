@@ -1,3 +1,4 @@
+import {MonthlyQuizzes} from './quiz.ts';
 import {createHash, randomBytes} from 'node:crypto';
 import type {Database, Sql, Identity, Dictionary, Scheduler, Row} from './ports.ts';
 import {ensure, text, uuid, integer} from './errors.ts';
@@ -6,8 +7,9 @@ const stable=(v:any):string=>JSON.stringify(v===null || typeof v!=='object'?v:Ar
 const one=async(q:Sql,s:string,p:any[]=[]) => (await q.query(s,p)).rows[0];
 const childDto=(c:Row)=>({...Object.fromEntries(['id','family_id','nickname','accent','voice_id','level','timezone','daily_new_limit','daily_goal','version'].map(k=>[k,c[k]])),speech_rate:Number(c.speech_rate)});
 export class Core {
+  readonly quizzes:MonthlyQuizzes;
   private db:Database; private identity:Identity; private dictionary:Dictionary; private scheduler:Scheduler; private appId:string; private clock:()=>Date;
-  constructor(db:Database, identity:Identity, dictionary:Dictionary, scheduler:Scheduler, appId:string, clock:()=>Date=()=>new Date()){this.db=db;this.identity=identity;this.dictionary=dictionary;this.scheduler=scheduler;this.appId=appId;this.clock=clock;}
+  constructor(db:Database, identity:Identity, dictionary:Dictionary, scheduler:Scheduler, appId:string, clock:()=>Date=()=>new Date()){this.db=db;this.identity=identity;this.dictionary=dictionary;this.scheduler=scheduler;this.appId=appId;this.clock=clock;this.quizzes=new MonthlyQuizzes({tx:fn=>this.tx(fn),write:(...args)=>this.write(...args),child:(...args)=>this.child(...args),now:()=>this.clock(),day:(...args)=>this.day(...args)});}
   private async tx<T>(fn:(q:Sql)=>Promise<T>) {return this.db.transaction(async q=>{await q.query('SET LOCAL search_path TO wordmate, public');return fn(q);});}
   async login(code:unknown) {
     const identity=await this.identity.exchange(text(code,512));
@@ -47,6 +49,7 @@ export class Core {
     const f=await one(q,'INSERT INTO families(name,owner_user_id) VALUES($1,$2) RETURNING *',[text(body.name,40),actor]);
     await q.query('INSERT INTO family_members(family_id,user_id,display_name) SELECT $1,id,display_name FROM users WHERE id=$2',[f.id,actor]);return {id:f.id,name:f.name,version:f.version,role:'owner'};
   });}
+  async members(actor:string,family:string){return this.tx(async q=>{await this.family(q,actor,family);return {items:(await q.query(`SELECT m.user_id,m.display_name,CASE WHEN f.owner_user_id=m.user_id THEN 'owner' ELSE 'parent' END role FROM family_members m JOIN families f ON f.id=m.family_id WHERE m.family_id=$1 AND m.status='active' ORDER BY (f.owner_user_id=m.user_id) DESC,m.joined_at`,[family])).rows};});}
   async createInvite(actor:string,key:string,family:string){return this.write(actor,key,`invite:create:${family}`,{},q=>this.family(q,actor,family),async(q,f)=>{
     ensure(f.owner_user_id===actor,403,'OWNER_REQUIRED');const token=randomBytes(32).toString('base64url');
     const invite=await one(q,"INSERT INTO family_invites(family_id,created_by,token_hash,expires_at) VALUES($1,$2,$3,$4) RETURNING id,status,expires_at",[family,actor,hash(token),new Date(this.clock().getTime()+86400000)]);return {...invite,invite_token:token};
@@ -112,7 +115,7 @@ export class Core {
   async words(actor:string,child:string){return this.tx(async q=>{await this.child(q,actor,child);return {items:(await q.query('SELECT id,lemma,part_of_speech,meaning_zh,version FROM child_words WHERE child_id=$1 AND archived_at IS NULL ORDER BY created_at DESC LIMIT 200',[child])).rows};});}
   async word(actor:string,child:string,id:string){return this.tx(async q=>{await this.child(q,actor,child);const w=await one(q,'SELECT id,lemma,meaning_zh,part_of_speech FROM child_words WHERE child_id=$1 AND id=$2 AND archived_at IS NULL',[child,uuid(id)]);ensure(w,404,'WORD_NOT_FOUND');return w;});}
   private async day(q:Sql,c:Row){return String((await one(q,`SELECT to_char($1::timestamptz AT TIME ZONE $2,'YYYY-MM-DD') AS local_day`,[this.clock(),c.timezone])).local_day);}
-  private async todayDto(q:Sql,c:Row){const day=await this.day(q,c),a=await one(q,'SELECT * FROM daily_activity WHERE child_id=$1 AND local_date=$2',[c.id,day]);return {child:childDto(c),completed_words:a?.distinct_words??0,new_words:a?.new_words??0,goal:a?.goal_snapshot??c.daily_goal,goal_reached:(a?.distinct_words??0)>=(a?.goal_snapshot??c.daily_goal),remaining_new_limit:Math.max(0,c.daily_new_limit-(a?.new_words??0)),due_count:Number((await one(q,`SELECT count(*) n FROM review_cards WHERE child_id=$1 AND due_at<=$2 AND suspended_at IS NULL`,[c.id,this.clock()])).n),synced_at:this.clock().toISOString()};}
+  private async todayDto(q:Sql,c:Row){const day=await this.day(q,c),a=await one(q,'SELECT * FROM daily_activity WHERE child_id=$1 AND local_date=$2',[c.id,day]);const active=await one(q,`SELECT s.id,s.actor_user_id,s.quiz_id,s.lease_generation,s.expires_at,u.display_name FROM study_sessions s JOIN users u ON u.id=s.actor_user_id WHERE s.child_id=$1 AND s.status='active' AND s.expires_at>$2`,[c.id,this.clock()]);return {active_session:active?JSON.parse(JSON.stringify(active)):null,child:childDto(c),completed_words:a?.distinct_words??0,new_words:a?.new_words??0,goal:a?.goal_snapshot??c.daily_goal,goal_reached:(a?.distinct_words??0)>=(a?.goal_snapshot??c.daily_goal),remaining_new_limit:Math.max(0,c.daily_new_limit-(a?.new_words??0)),due_count:Number((await one(q,`SELECT count(*) n FROM review_cards WHERE child_id=$1 AND due_at<=$2 AND suspended_at IS NULL`,[c.id,this.clock()])).n),synced_at:this.clock().toISOString()};}
   async today(actor:string,child:string){return this.tx(async q=>this.todayDto(q,await this.child(q,actor,child)));}
   async startSession(actor:string,key:string,child:string,body:any){return this.write(actor,key,`session:create:${child}`,body,q=>this.child(q,actor,child),async(q,c)=>{
     ensure(body.source==='scheduled',422,'SOURCE_NOT_IMPLEMENTED');const now=this.clock();

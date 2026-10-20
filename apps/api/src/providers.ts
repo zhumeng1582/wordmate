@@ -34,7 +34,7 @@ export async function createScheduler(): Promise<Scheduler> {
     empty:now=>createEmptyCard(now),
     next:(saved,rating,now)=>{
       const card={...saved,due:new Date(saved.due),last_review:saved.last_review ? new Date(saved.last_review):undefined};
-      const grade={again:Rating.Again,hard:Rating.Hard,good:Rating.Good,easy:Rating.Easy}[rating];
+      const grade=({again:Rating.Again,hard:Rating.Hard,good:Rating.Good,easy:Rating.Easy} as const)[rating];
       const next=engine.repeat(card,now)[grade].card;
       return {state:next,label:labels[next.state],due:next.due};
     }};

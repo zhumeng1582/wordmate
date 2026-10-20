@@ -1,0 +1,28 @@
+.family-page{box-sizing:border-box;min-height:100vh;display:flex;flex-direction:column;padding:36px 46px calc(126px + env(safe-area-inset-bottom));background:#f7f8f2}
+.family-content{flex:1}
+.family-breadcrumb{font-size:24px;color:#67796e;line-height:1.5;margin-bottom:20px}
+.family-heading{font-size:48px;font-weight:600;line-height:1.35;margin-bottom:36px;color:#203e34}
+.member-card{background:#fff;border-radius:30px;padding:22px 30px 26px;margin-bottom:24px;min-height:140px;box-sizing:border-box}
+.member-owner{background:#e8f1e4}
+.member-title{font-size:32px;font-weight:600;line-height:1.5;color:#203e34}
+.member-description{font-size:25px;color:#3b5147;line-height:1.55;margin-top:8px;overflow-wrap:break-word}
+.member-empty .member-title{color:#527563}
+.card-chevron{float:right;color:#8b948d;font-size:36px;font-weight:400}
+.pending-card{display:flex;justify-content:space-between;gap:20px;padding:22px 26px;background:#fff2d7;border-radius:24px;color:#805b13;font-size:24px}
+.family-actions{padding-top:72px;margin-top:auto}
+.invite-button{margin:0 0 20px;min-height:92px}
+.account-links{display:flex;align-items:center;justify-content:space-around;gap:20px;color:#527563;font-size:24px;padding:12px 0}
+.dev-label{font-size:20px;color:#67796e;text-align:center;margin:12px 0 0}
+.family-tabs{position:fixed;z-index:10;left:46px;right:46px;bottom:0;display:flex;align-items:center;justify-content:space-around;border-top:2px solid #dae3d8;background:#f7f8f2;padding:20px 0 calc(20px + env(safe-area-inset-bottom));font-size:24px;color:#8b948d}
+.family-tab{width:25%;text-align:center}
+.tab-active{color:#255d48;font-weight:600}
+.tab-disabled{color:#8b948d}
+.sheet-backdrop{position:fixed;inset:0;z-index:100;background:rgba(23,45,34,.28);display:flex;align-items:flex-end}
+.family-sheet{box-sizing:border-box;width:100%;max-height:85vh;overflow-y:auto;background:#f7f8f2;border-radius:36px 36px 0 0;padding:30px 40px calc(40px + env(safe-area-inset-bottom))}
+.sheet-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.sheet-heading{font-size:36px;font-weight:600}
+.sheet-close{margin:0;padding:12px 18px;background:transparent;color:#527563;font-size:26px;line-height:1.5}
+.sheet-close::after{border:0}
+.form-label{font-size:26px;color:#3b5147;margin-top:26px}
+.sheet-empty{padding:44px 0;text-align:center;color:#67796e;font-size:28px}
+.request-row{border-bottom:2px solid #dae3d8;padding:20px 0}

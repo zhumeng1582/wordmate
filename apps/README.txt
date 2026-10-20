@@ -1,4 +1,4 @@
-本地运行更新：优先参阅根目录 LOCAL-RUN.txt。新增 PGlite 持久化开发数据库和 node scripts/local-dev.cjs 一键构建启动，不再要求本地安装 Docker/PostgreSQL。持久化适配器已测试，完整编译仍等待依赖安装。
+本地运行更新：优先参阅根目录 LOCAL-RUN.txt。新增 PGlite 持久化开发数据库和 node scripts/local-dev.cjs 一键构建启动，不再要求本地安装 Docker/PostgreSQL。持久化适配器已测试，前后端编译与类型检查已通过；真实 FSRS 及 Nest 路由测试通过，端口连接与微信模拟器操作尚待用户终端联调。
 
 单词共学 0.1 · 开发工程
 
@@ -34,7 +34,8 @@ deliverables/0.1/database/001_schema.sql：数据库的初始迁移唯一来源�
 - 完整接口文档中的所有操作；当前响应是开发切片，尚未完全符合最终 OpenAPI（例如 Today 的 streak/check-in、完整 Word DTO、分页、Session actor 字段）。禁止把最终 OpenAPI 当成本次所有接口均已上线。
 - AI 任务消费、例句校验与点词查询；TTS 音频生成/私有 OSS 缓存/播放。
 - 正式词典授权和接入。开发词库仅 10 词，不使用 AI 冒充词典。
-- 月测抽样/全量、四等级评分、错题日历、主动打卡、分享、导出、标注/纠错。
+- 正式月测题源、错题日历、主动打卡、分享、导出、标注/纠错。
+- 月测开发流程已接入：抽样/全量、四档成绩、历史与本次错题；详见 MONTHLY-QUIZ.txt。
 - 复习接管、日历/手动/测验来源、设置更新、成员退出移除与账号/家庭删除。
 - 完整鉴权限流、审计与日志脱敏演练、运营监控、后台管理、线上备份恢复。
 - 小程序生产隐私配置、服务类目核验、合法域名、ICP备案和真机验收。
@@ -42,7 +43,7 @@ deliverables/0.1/database/001_schema.sql：数据库的初始迁移唯一来源�
 
 本机启动（依赖网络恢复后）
 1. 安装受支持的 Node.js LTS 和 pnpm 10；在仓库根目录执行 pnpm install。
-   当前环境尚未完成首次安装，因此没有伪造 pnpm-lock.yaml。安装成功、验证兼容性后应提交真实锁文件。
+   依赖已完成首次安装，pnpm-lock.yaml 已生成；后续优先使用 corepack pnpm install --frozen-lockfile。
 2. 复制 .env.example 为 .env，仅在本地填写 DATABASE_URL。
    开发需 NODE_ENV=development、AUTH_MODE=development、DICTIONARY_PROVIDER=fixture。
    开发身份被限制在后端绑定 127.0.0.1；严禁修改为公网开发登录。
@@ -69,13 +70,24 @@ pnpm --filter @wordmate/miniapp typecheck
 pnpm build:miniapp
 
 当前实际验证边界
-本机 npm DNS 失败，pnpm/Docker 不可用；没有完成 Nest/Taro/ts-fsrs 安装、构建或微信真机联调。
-利用本机已有 PGlite 运行了完整迁移与核心集成测试；测试使用明确标注的调度替身，只证明事务/权限/去重，不证明真实 FSRS 输出。
+用户已安装依赖和微信开发者工具。Nest/Taro 编译与类型检查通过；当前代理环境禁止监听 TCP 端口，完整网络联调及微信模拟器/真机操作待验证。
+使用 PGlite 运行了完整迁移与核心集成测试；分别覆盖调度替身和真实 ts-fsrs，并验证家庭权限、确认回滚、事件去重、会话过期和错题入库。
 8 个模型/TTS 适配器离线测试通过；没有调用收费外部服务。
-所有新 TS/TSX 文件完成语法转译检查；这不替代安装依赖后的语义类型检查。
+后端和小程序已完成语义类型检查；Nest/Express 进程内路由验收通过，包含请求解析、DTO 校验和真实 FSRS。
 生产前必须完成上述未验收项，不得将开发身份或测试词典带到正式环境。
 
 生产凭证
 AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在服务器环境注入。
 小程序的 MINIAPP_API_BASE、MINIAPP_DEV_AUTH 是构建参数；正式包必须关闭 DEV_AUTH 并使用已备案的 HTTPS 合法域名。
 微信 AppID 是公开标识，允许入 Git。不要在聊天中粘贴 AppSecret。
+
+家庭页视觉修正（2026-10-20）
+本地参考稿：deliverables/0.1/design/screens/28-family.png。
+家庭页改为成员卡、孩子档案与底部邀请入口；表单和开发账号切换按需展开。
+成员列表由授权接口返回，设计稿示例姓名不写入真实界面。
+统一按钮使用显式 .btn 类，避免 Taro 把标签选择器转成 .h5-button 导致微信按钮样式失效。
+输入框设置明确高度、取消垂直内边距，修复文字裁切；禁用按钮保留可读文字。
+本轮未完成其余所有页面逐稿还原，也未完成新版家庭页的微信模拟器截图对比。
+后端新增家庭成员查询接口，查看新版页面前需重启本地后端。
+
+月测实现更新：见 apps/MONTHLY-QUIZ.txt。首页新增按月测验入口，所有功能仍属于0.1。家庭新版已由用户确认报错解决，月测页面仍待模拟器验收。
