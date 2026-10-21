@@ -9,7 +9,7 @@ const name=`inprocess-${randomUUID()}`;
 Object.assign(process.env,{NODE_ENV:'development',AUTH_MODE:'development',DICTIONARY_PROVIDER:'fixture',DATABASE_URL:`pglite:.local/${name}`});
 const {createApplication}=require('../apps/api/dist/main.js');
 (async()=>{
- const {app,dispose}=await createApplication({vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
+ const {app,dispose}=await createApplication({vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{if(raw==='无法识别')return {error:'NO_WORDS_FOUND',items:[]};assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
  function request(path,body,key=randomUUID(),method=body?'POST':'GET'){
   return new Promise((resolve,reject)=>{
    const chunks=[];const socket=new Duplex({read(){},write(chunk,encoding,callback){chunks.push(Buffer.from(chunk));callback();}});
@@ -69,6 +69,15 @@ const {createApplication}=require('../apps/api/dist/main.js');
   let ai=created;for(let n=0;n<30&&['queued','running'].includes(ai.status);n++){await new Promise(r=>setTimeout(r,100));ai=await ok(`/ai-batches/${created.id}`);}
   assert.equal(ai.status,'succeeded');assert(ai.items[0].word_id);
   assert.equal((await ok(`/children/${c.id}/ai-batches`)).items[0].id,ai.id);
+  const failedJob=await ok(`/children/${c.id}/ai-batches`,{...aiBody,raw_text:'无法识别'});
+  let failed=failedJob;for(let n=0;n<30&&['queued','running'].includes(failed.status);n++){await new Promise(r=>setTimeout(r,100));failed=await ok(`/ai-batches/${failed.id}`);}
+  assert.equal(failed.status,'failed');
+  const editBody={...aiBody,theme:'重新编辑',expected_attempts:failed.attempts};
+  assert.equal((await request(`/ai-batches/${failed.id}`,{...editBody,extra:true},'invalid-edit','PUT')).status,422);
+  const edited=await ok(`/ai-batches/${failed.id}`,editBody,'replace-job','PUT');assert.equal(edited.id,failed.id);assert.equal(edited.error_code,null);
+  assert.equal((await ok(`/ai-batches/${failed.id}`,editBody,'replace-job','PUT')).id,failed.id);
+  for(let n=0;n<30&&['queued','running'].includes(failed.status= (await ok(`/ai-batches/${failed.id}`)).status);n++)await new Promise(r=>setTimeout(r,100));
+  assert.equal(failed.status,'succeeded');
   const generated=(await ok(`/children/${c.id}/words`)).items.find(w=>w.id===ai.items[0].word_id);assert.equal(generated.example.text_en,'I see the pencil.');
   assert.equal((await request(`/children/${c.id}/ai-batches`,{...aiBody,unexpected:true})).status,422);
   console.log('PASS: Nest/Express request parsing, validation, auth, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results, calendar, wrong words practice and async AI batch save (in process; TCP not tested)');

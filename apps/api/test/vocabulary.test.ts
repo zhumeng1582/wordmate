@@ -87,6 +87,21 @@ test('raw text jobs preserve input, reject secrets before calls, enforce quotas 
  await assert.rejects(create('control','cat\u0000'),{code:'INVALID_RAW_TEXT'});await assert.rejects(create('length','a'.repeat(8001)),{code:'INVALID_TEXT'});
  const job=await create('raw',raw);assert.equal(job.items.length,0);assert.equal(job.raw_text,raw);await core.vocabulary.processOne();assert.equal(captured,raw);assert.equal((await core.vocabulary.get(dad,job.id)).items.length,2);assert.equal((await core.words(dad,c.id)).items.length,2);
  mode='empty';const empty=await create('empty','只有说明文字');await core.vocabulary.processOne();const failed=await core.vocabulary.get(dad,empty.id);assert.equal(failed.error_code,'NO_WORDS_FOUND');assert.equal(failed.retryable,false);assert.equal((await core.words(dad,c.id)).items.length,2);
+ // Editing replaces the failed record atomically, preserves identity and usage, and is idempotent.
+ const edit={wordbook_id:book.id,raw_text:'cat dog 新输入',source_type:'text',expected_attempts:failed.attempts};
+ const outsider=(await core.login('dev-outsider')).user.id;
+ await assert.rejects(core.vocabulary.replace(outsider,'unauthorized',empty.id,edit),{code:'FAMILY_NOT_FOUND'});
+ await assert.rejects(core.vocabulary.replace(dad,'secret-edit',empty.id,{...edit,raw_text:'sk-'+ 'x'.repeat(24)}),{code:'SENSITIVE_INPUT'});
+ assert.equal((await core.vocabulary.get(dad,empty.id)).error_code,'NO_WORDS_FOUND');
+ await assert.rejects(core.vocabulary.replace(dad,'duplicate-edit',empty.id,{...edit,raw_text:raw}),{code:'DUPLICATE_GENERATION'});
+ const edited=await core.vocabulary.replace(dad,'edit',empty.id,edit);
+ assert.equal(edited.id,empty.id);assert.equal(edited.batch_id,empty.batch_id);assert.equal(edited.error_code,null);assert.equal(edited.status,'queued');assert.equal(edited.attempts,failed.attempts);assert.equal(edited.raw_text,edit.raw_text);
+ assert.equal((await core.vocabulary.list(dad,c.id)).items.length,2);
+ assert.equal((await core.vocabulary.replace(dad,'edit',empty.id,edit)).id,empty.id);
+ await assert.rejects(core.vocabulary.replace(dad,'concurrent-edit',empty.id,edit),{code:'GENERATION_NOT_EDITABLE'});
+ mode='ok';await core.vocabulary.processOne();const completed=await core.vocabulary.get(dad,empty.id);assert.equal(completed.status,'succeeded');assert.equal(completed.attempts,2);
+ await assert.rejects(core.vocabulary.replace(dad,'saved-edit',empty.id,{...edit,expected_attempts:2}),{code:'GENERATION_NOT_EDITABLE'});
+ assert.equal((await core.words(dad,c.id)).items.length,2);
  // Simulate ten prior jobs with three attempts each, without external calls.
  await pg.query(`INSERT INTO wordmate.generation_jobs(child_id,requested_by,kind,dedupe_key,payload,status,attempts,max_attempts) SELECT $1,$2,'sentences','quota:'||n,'{"flow":"vocabulary_v1"}'::jsonb,'failed',3,3 FROM generate_series(1,10) n`,[c.id,dad]);
  const limited=await create('limit','apple');const before=calls;await core.vocabulary.processOne();assert.equal(calls,before);assert.equal((await core.vocabulary.get(dad,limited.id)).error_code,'AI_DAILY_LIMIT');

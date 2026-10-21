@@ -6,6 +6,7 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  aiReplace:object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80},expected_attempts:{type:'integer',minimum:0}},['wordbook_id','raw_text','expected_attempts']),
   aiBatch:{oneOf:[object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80}},['wordbook_id','raw_text']),object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:30},theme:{type:'string',maxLength:80}},['wordbook_id','words'])]},
   quizCreate:object({month:{type:'string',pattern:'^\\d{4}-(0[1-9]|1[0-2])$'},mode:{enum:['sample','full']},sample_count:{type:'integer',enum:[10,20,30,50]}},['month','mode']),
   quizVersion:object({expected_version:positive}),
@@ -29,6 +30,7 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='families'&&path[2]==='children')kind='child';
   else if(path[0]==='families'&&path[2]==='invites'||path[0]==='family-invites'&&path[2]==='approve')kind='empty';
   else if(path[0]==='monthly-quizzes'){kind=path[2]==='items'&&path[4]==='answer'?'quizAnswer':path[2]==='submit'?'quizSubmit':path[2]==='takeover'?'quizTakeover':['resume','abandon'].includes(path[2])?'quizVersion':'';}
+  else if(path[0]==='ai-batches'&&path.length===2&&method==='PUT')kind='aiReplace';
   else if(path[0]==='ai-batches'&&path[2]==='retry')kind='empty';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
   else if(path[0]==='children')kind=({wordbooks:'book',batches:'batch','ai-batches':'aiBatch','study-sessions':'session'} as Record<string,string>)[path[2]];

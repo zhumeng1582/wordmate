@@ -21,6 +21,8 @@ const errorMessages:Record<string,string>={
   SENSITIVE_INPUT:'输入疑似包含密钥或私钥，尚未发送给 AI，请先删除敏感信息。',
   INVALID_RAW_TEXT:'输入含不支持的控制字符，请粘贴纯文本后重试。',
   INVALID_INPUT_TYPE:'目前只支持文本；图片和表格文件上传尚未开放。',
+  GENERATION_NOT_EDITABLE:'任务状态已变化、已有保存结果或已达到尝试上限，请刷新记录。',
+  DUPLICATE_GENERATION:'相同内容已有生成记录，请查看已有任务或修改输入。',
   AI_DAILY_LIMIT:'已达到最近 24 小时的 AI 调用额度，请稍后再试。',
 
   INPUT_REENTRY_REQUIRED:'旧任务未正确拆分单词，请重新编辑输入后提交，不要重试旧任务。',

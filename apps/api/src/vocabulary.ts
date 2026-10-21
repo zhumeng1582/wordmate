@@ -23,8 +23,16 @@ export class Vocabulary {
  private a:QuizAccess;private scheduler:Scheduler;private provider?:VocabularyProvider;
  constructor(a:QuizAccess,scheduler:Scheduler,provider?:VocabularyProvider){this.a=a;this.scheduler=scheduler;this.provider=provider;}
  private async scope(q:Sql,actor:string,id:string){const job=await one(q,"SELECT * FROM generation_jobs WHERE id=$1 AND kind='sentences' AND payload->>'flow'='vocabulary_v1'",[uuid(id)]);ensure(job,404,'GENERATION_NOT_FOUND');const c=await this.a.child(q,actor,job.child_id);return {c,job:await one(q,'SELECT * FROM generation_jobs WHERE id=$1 FOR UPDATE',[id])};}
- private async dto(q:Sql,j:Row){return {id:j.id,input_type:j.payload.input_type??'words',raw_text:j.payload.raw_text??null,batch_id:j.payload.batch_id,status:j.status,attempts:j.attempts,max_attempts:j.max_attempts,error_code:j.error_code,provider:j.payload.provider,model:j.payload.model,retryable:['failed','partial'].includes(j.status)&&j.attempts<j.max_attempts&&!['NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT'].includes(j.error_code),items:(await q.query('SELECT ordinal,raw_text,status,child_word_id,candidates FROM batch_items WHERE batch_id=$1 ORDER BY ordinal',[j.payload.batch_id])).rows.map(r=>({ordinal:r.ordinal,input:r.raw_text,status:r.status,word_id:r.child_word_id,reason:r.candidates[0]?.reason??null}))};}
- async create(actor:string,key:string,child:string,b:any){return this.a.write(actor,key,`vocabulary:create:${child}`,b,q=>this.a.child(q,actor,child),async(q,c)=>{
+ private async dto(q:Sql,j:Row){return {id:j.id,input_type:j.payload.input_type??'words',raw_text:j.payload.raw_text??null,wordbook_id:j.payload.wordbook_id,theme:j.payload.theme,batch_id:j.payload.batch_id,status:j.status,attempts:j.attempts,max_attempts:j.max_attempts,error_code:j.error_code,provider:j.payload.provider,model:j.payload.model,retryable:['failed','partial'].includes(j.status)&&j.attempts<j.max_attempts&&!['NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT'].includes(j.error_code),items:(await q.query('SELECT ordinal,raw_text,status,child_word_id,candidates FROM batch_items WHERE batch_id=$1 ORDER BY ordinal',[j.payload.batch_id])).rows.map(r=>({ordinal:r.ordinal,input:r.raw_text,status:r.status,word_id:r.child_word_id,reason:r.candidates[0]?.reason??null}))};}
+ async replace(actor:string,key:string,id:string,b:any){
+  return this.create(actor,key,(await this.a.tx(q=>this.scope(q,actor,id))).job.child_id,b,id);
+ }
+ async create(actor:string,key:string,child:string,b:any,editId?:string){return this.a.write(actor,key,editId?`vocabulary:replace:${editId}`:`vocabulary:create:${child}`,b,q=>this.a.child(q,actor,child),async(q,c)=>{
+  const edited=editId?(await this.scope(q,actor,editId)).job:null;
+  if(edited){
+   ensure(edited.status==='failed'&&edited.attempts<edited.max_attempts&&edited.attempts===b.expected_attempts,409,'GENERATION_NOT_EDITABLE');
+   ensure(!await one(q,'SELECT 1 FROM batch_items WHERE batch_id=$1 AND child_word_id IS NOT NULL',[edited.payload.batch_id]),409,'GENERATION_NOT_EDITABLE');
+  }
   ensure(this.provider,503,'AI_NOT_CONFIGURED');const isRaw=b.raw_text!==undefined;
   if(isRaw){ensure(b.words===undefined&&(!b.source_type||b.source_type==='text')&&this.provider.generateRaw,422,'INVALID_INPUT_TYPE');text(b.raw_text,8000);ensure(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(b.raw_text),422,'INVALID_RAW_TEXT');ensure(!/sk-[a-zA-Z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(b.raw_text+String(b.theme??'')),422,'SENSITIVE_INPUT');}
   else ensure(Array.isArray(b.words)&&b.words.length>0&&b.words.length<=30,422,'INVALID_WORD_COUNT');
@@ -32,11 +40,17 @@ export class Vocabulary {
   ensure(!/sk-[a-zA-Z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test((isRaw?b.raw_text:words.join('\n'))+theme),422,'SENSITIVE_INPUT');
   ensure(await one(q,'SELECT 1 FROM wordbooks WHERE id=$1 AND child_id=$2 AND archived_at IS NULL',[uuid(b.wordbook_id),child]),404,'WORDBOOK_NOT_FOUND');
   const dedupe=`vocabulary:${digest({wordbook:b.wordbook_id,...(isRaw?{raw_text:b.raw_text,input_type:'text'}:{words:words.map((w:string)=>w.toLowerCase())}),theme,level:c.level})}`;
-  const existing=await one(q,"SELECT * FROM generation_jobs WHERE child_id=$1 AND kind='sentences' AND dedupe_key=$2",[child,dedupe]);if(existing)return this.dto(q,existing);
+  const existing=await one(q,"SELECT * FROM generation_jobs WHERE child_id=$1 AND kind='sentences' AND dedupe_key=$2",[child,dedupe]);if(existing&&existing.id!==editId){ensure(!editId,409,'DUPLICATE_GENERATION');return this.dto(q,existing);}
   ensure(!await one(q,"SELECT 1 FROM generation_jobs WHERE child_id=$1 AND payload->>'flow'='vocabulary_v1' AND status IN ('queued','running')",[child]),409,'ACTIVE_GENERATION');
-  const batch=await one(q,'INSERT INTO batches(child_id,wordbook_id,theme,created_by) VALUES($1,$2,$3,$4) RETURNING id',[child,b.wordbook_id,theme,actor]);
+  if(edited)await q.query('DELETE FROM batch_items WHERE batch_id=$1',[edited.payload.batch_id]);
+  const batch=edited?{id:edited.payload.batch_id}:await one(q,'INSERT INTO batches(child_id,wordbook_id,theme,created_by) VALUES($1,$2,$3,$4) RETURNING id',[child,b.wordbook_id,theme,actor]);
   for(let i=0;i<words.length;i++)await q.query("INSERT INTO batch_items(batch_id,child_id,ordinal,raw_text,status) VALUES($1,$2,$3,$4,'ready')",[batch.id,child,i+1,words[i]]);
-  const job=await one(q,"INSERT INTO generation_jobs(child_id,requested_by,kind,dedupe_key,payload,max_attempts,run_after) VALUES($1,$2,'sentences',$3,$4,3,$5) RETURNING *",[child,actor,dedupe,JSON.stringify({flow:'vocabulary_v1',batch_id:batch.id,wordbook_id:b.wordbook_id,theme,level:c.level,provider:this.provider.provider,model:this.provider.model,prompt_version:this.provider.promptVersion,schema_version:isRaw?'vocabulary-raw-0.1-1':'vocabulary-0.1-1',input_type:isRaw?'text':'words',...(isRaw?{raw_text:b.raw_text,raw_prompt_version:this.provider.rawPromptVersion}: {})}),this.a.now()]);return this.dto(q,job);
+  const payload=JSON.stringify({flow:'vocabulary_v1',batch_id:batch.id,wordbook_id:b.wordbook_id,theme,level:c.level,provider:this.provider.provider,model:this.provider.model,prompt_version:this.provider.promptVersion,schema_version:isRaw?'vocabulary-raw-0.1-1':'vocabulary-0.1-1',input_type:isRaw?'text':'words',...(isRaw?{raw_text:b.raw_text,raw_prompt_version:this.provider.rawPromptVersion}: {})});
+  if(edited){
+   await q.query("UPDATE batches SET wordbook_id=$2,theme=$3,status='draft',version=version+1 WHERE id=$1",[batch.id,b.wordbook_id,theme]);
+   return this.dto(q,await one(q,"UPDATE generation_jobs SET payload=$2,dedupe_key=$3,status='queued',error_code=NULL,lease_until=NULL,run_after=$4,updated_at=$4 WHERE id=$1 RETURNING *",[editId,payload,dedupe,this.a.now()]));
+  }
+  const job=await one(q,"INSERT INTO generation_jobs(child_id,requested_by,kind,dedupe_key,payload,max_attempts,run_after) VALUES($1,$2,'sentences',$3,$4,3,$5) RETURNING *",[child,actor,dedupe,payload,this.a.now()]);return this.dto(q,job);
  });}
  async get(actor:string,id:string){return this.a.tx(async q=>this.dto(q,(await this.scope(q,actor,id)).job));}
  async list(actor:string,child:string){return this.a.tx(async q=>{await this.a.child(q,actor,child);return {items:await Promise.all((await q.query("SELECT * FROM generation_jobs WHERE child_id=$1 AND payload->>'flow'='vocabulary_v1' ORDER BY created_at DESC,id DESC LIMIT 20",[child])).rows.map(j=>this.dto(q,j)))};});}

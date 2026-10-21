@@ -13668,6 +13668,175 @@
             }
           }
         }
+      },
+      "put": {
+        "operationId": "replaceAiBatch",
+        "summary": "修改失败的 AI 录词任务并重新生成（保留原 ID）",
+        "tags": [
+          "AI录入"
+        ],
+        "x-role": "member",
+        "description": "仅允许 failed、未保存任何词且 attempts < max_attempts 的任务。事务覆盖原文、词本与主题，清空旧错误和条目，状态变为 queued。保留累计尝试次数与请求发起人，额度不重置；expected_attempts 必须匹配。重复内容属于其他任务时返回409，不静默合并。需有效家庭成员和 Idempotency-Key。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiBatchJob"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色无权操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无访问权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、会话或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务校验未通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "超过限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "外部服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "wordbook_id",
+                  "raw_text",
+                  "expected_attempts"
+                ],
+                "properties": {
+                  "wordbook_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "source_type": {
+                    "type": "string",
+                    "enum": [
+                      "text"
+                    ]
+                  },
+                  "raw_text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000
+                  },
+                  "theme": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "expected_attempts": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/ai-batches/{job_id}/retry": {
@@ -16812,6 +16981,13 @@
               "null"
             ],
             "maxLength": 8000
+          },
+          "wordbook_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "theme": {
+            "type": "string"
           }
         },
         "required": [
