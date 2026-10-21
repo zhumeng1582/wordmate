@@ -74,3 +74,8 @@ TTS：createTtsProvider(env, fetcher, adapters) 支持注册供应商工厂；�
 存储：audio-storage.ts定义AudioObjectStorage的put/get/stat/delete协议及createAudioStorageRouter。新写入走activeProfileId，读取/删除按持久化的{profileId,key}定位旧配置。ID标识固定供应商/地域/桶/前缀，凭证可轮转；换桶需新ID。业务层必须先鉴权；不把locator直接作为客户端输入或输出。
 copyToActive按可信数据库SHA256验证源和目标，返回新locator，不改数据库、不删除源。源对象无效或复制损坏时报错；迁移任务完成数据库版本检查和原子切换后，再按宽限期清旧文件。复制不是一次TTS调用。
 目前存储仅实现接口、路由与校验复制；真实OSS/S3/COS适配器、数据库迁移任务及播放业务仍待接入。测试使用两个独立内存存储模拟切换，不代表已验证云平台。
+
+TTS真实账号验证
+在用户本机终端运行 corepack pnpm test:tts:live。脚本仅加载忽略的根目录.env，分别选择白名单中第一个英音和美音音色合成airport，最多两次、不自动重试；下载后写入.local/tts-verification/<run-id>-<accent>.mp3并检查文件回读一致，macOS使用afinfo验证可解码。报告写.local/tts-verification/report.json，包含稳定错误码，不输出密钥、Workspace URL或原始响应。
+passed=true仅代表合成、下载、本地保存流程通过，不代表OSS/小程序已集成或读音质量已人工审核。synthesis_requests_attempted表示发起尝试，不代表供应商成功受理或实际计费。
+如果ENOTFOUND且公共域名也解析失败，需要在具备外网DNS的用户终端执行；不能据此判断密钥无效。真实凭证只填.env，不填受Git跟踪的config/audio.env.example。
