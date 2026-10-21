@@ -1,3 +1,4 @@
+import {VoicePreviews} from './voice-previews.ts';
 import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile,unlink,stat,readdir} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -10,8 +11,9 @@ const hash=(s:string|Uint8Array)=>createHash('sha256').update(s).digest('hex');
 const canonical=(v:Record<string,any>)=>JSON.stringify(Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])));
 const mp3=(b:Uint8Array)=>b.length>=3&&b.length<=10*1024*1024&&((b[0]===73&&b[1]===68&&b[2]===51)||(b[0]===255&&(b[1]&224)===224));
 export class AudioService {
+ readonly previews:VoicePreviews;
  private a:QuizAccess;private runtime?:AudioRuntime;private cleanedAt=0;
- constructor(a:QuizAccess,runtime?:AudioRuntime){this.a=a;this.runtime=runtime;}
+ constructor(a:QuizAccess,runtime?:AudioRuntime){this.a=a;this.runtime=runtime;this.previews=new VoicePreviews(a,runtime);}
  async voices(accent?:unknown){ensure(accent===undefined||['en-GB','en-US'].includes(String(accent)),422,'INVALID_ACCENT');return {items:(this.runtime?.voices??[]).filter(v=>accent===undefined||v.accent===accent),available:!!this.runtime?.synthesize};}
  private async source(q:Sql,actor:string,b:any){
   ensure(await one(q,"SELECT 1 FROM users WHERE id=$1 AND status='active'",[actor]),401,'ACCOUNT_UNAVAILABLE');

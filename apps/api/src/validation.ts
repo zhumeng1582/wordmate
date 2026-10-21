@@ -6,6 +6,7 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  voicePreview:object({accent:{enum:['en-GB','en-US']},voice_id:str(100)}),
   audioSettings:object({accent:{enum:['en-GB','en-US']},voice_id:str(100),expected_version:positive}),
   audio:{oneOf:['word_id','sentence_id'].map(resource=>object({[resource]:id,content_version:positive,accent:{enum:['en-GB','en-US']},voice_id:str(100),speech_rate:{type:'number',minimum:0.5,maximum:1.5}}))},
   aiReplace:object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80},expected_attempts:{type:'integer',minimum:0}},['wordbook_id','raw_text','expected_attempts']),
@@ -26,6 +27,7 @@ export function validateBody(path:string[],method:string,body:unknown){
   if(!['POST','PUT'].includes(method))return;
   let kind='';const route=path.join('/');
   if(['auth/dev','auth/wechat'].includes(route))kind='login';
+  else if(route==='voice-previews')kind='voicePreview';
   else if(route==='me/audio-settings')kind='audioSettings';
   else if(route==='audio')kind='audio';
   else if(path[0]==='jobs'&&path[2]==='retry')kind='empty';

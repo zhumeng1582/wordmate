@@ -30,6 +30,11 @@ const {createApplication}=require('../apps/api/dist/main.js');
   assert.equal((await request('/me')).status,401);
   assert.equal((await request('/auth/dev',{code:'dev-dad',unexpected:true})).status,422);
   const login=await ok('/auth/dev',{code:'dev-dad'});token=login.access_token;
+  assert.equal((await request('/voice-previews',{accent:'en-GB',voice_id:'gb',text:'arbitrary text'})).status,422);
+  {const previewRequest=await request('/voice-previews',{accent:'en-GB',voice_id:'gb'});assert.equal(previewRequest.status,202);let preview=previewRequest.data;
+  for(let n=0;n<30&&preview.status!=='succeeded';n++){await new Promise(r=>setTimeout(r,200));preview=await ok(`/voice-previews/${preview.job_id}`);}
+  assert.equal(preview.status,'succeeded');assert.equal(await ok(preview.resource_path),'ID3-route-test');
+  assert.equal((await request('/voice-previews',{accent:'en-GB',voice_id:'gb'})).status,200);}
   const f=await ok('/families',{name:'路由验收'});
   const members=await ok(`/families/${f.id}/members`);assert.equal(members.items.length,1);assert.equal(members.items[0].role,'owner');
   const c=await ok(`/families/${f.id}/children`,{nickname:'测试',accent:'en-GB'});
@@ -49,7 +54,7 @@ const {createApplication}=require('../apps/api/dist/main.js');
   for(let n=0;n<30&&sound.status!=='succeeded';n++){await new Promise(r=>setTimeout(r,200));sound=await ok(`/jobs/${sound.job_id}`);}
   assert.equal(sound.status,'succeeded',JSON.stringify(sound));
   assert.equal(await ok(sound.resource_path),'ID3-route-test');
-  assert.equal((await request('/audio',speech)).status,200);assert.equal(audioCalls,1);
+  assert.equal((await request('/audio',speech)).status,200);assert.equal(audioCalls,2);
   const s=await ok(`/children/${c.id}/study-sessions`,{source:'scheduled'});
   const cards=await ok(`/study-sessions/${s.id}/cards`);assert.equal(cards.items.length,2);
   const event={session_id:s.id,card_id:cards.items[0].id,event_id:randomUUID(),expected_version:1,rating:'again',lease_generation:s.lease_generation};

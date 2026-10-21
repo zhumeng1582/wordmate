@@ -96,3 +96,15 @@ https://help.aliyun.com/zh/model-studio/cosyvoice-tts-http-api
 https://help.aliyun.com/en/model-studio/cosyvoice-voice-list
 https://help.aliyun.com/zh/oss/developer-reference/recommend-to-use-signature-version-4/
 https://help.aliyun.com/zh/oss/user-guide/permissions-and-access-control-overview
+
+八、发音设置试听（0.1）
+设置页新增“试听当前音色”，直接使用尚未保存的accent/voice_id。试听不调用保存偏好接口，也不写入词本、孩子或复习记录；无需先创建家庭。
+示例固定为 Hello! Let us learn something new together.，不接收客户端text、语速、URL或其他合成参数。
+POST /voice-previews {accent,voice_id} 返回200/202 VoicePreview；GET /voice-previews/:id 查询状态；GET /voice-previews/:id/content 登录后下载MP3。
+这是服务端自有公开示例，按配置指纹/口音/音色跨账号复用；用户单词/例句仍按孩子隔离。
+新增004_voice_previews.sql，运行库累计31张表。local自动增量执行；已有PostgreSQL执行migrate:audio，覆盖002/003/004。
+任务300秒租约、attempt隔离旧Worker；每种配置音色最多3次总尝试，客户端不能通过换文本绕过额度。失败只在用户再次点击试听时重试，轮询不触发合成。
+已合成未上传的音频临时存数据库pending_audio（最大10MB），上传成功即清空；上传重试及服务重启可复用，不再次TTS。耗尽次数需管理员排查；待上传固定示例不含个人数据。
+试听成功文件保存到配置存储前缀下samples目录；现有前缀GetObject/PutObject权限即可。变更存储配置需继续保留历史profile读取配置。
+切换口音/音色、退出设置或隐藏页面会停止当前试听；界面区分准备、加载、播放和失败，允许失败后再次点击。只有点击“保存设置”才修改账号偏好。
+离线测试包含未保存音色试听、缓存复用、并发去重、上传失败后重用字节、总次数限制、未建家庭的HTTP流程与任意文本拒绝。真实试听效果仍需微信端验证。

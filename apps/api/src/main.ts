@@ -31,7 +31,10 @@ class ApiController {
       if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
       const auth=req.headers.authorization;ensure(typeof auth==='string' && auth.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
       const key=String(req.headers['idempotency-key']??'');let data:any;
-      if(method==='GET'&&p.join('/')==='me/audio-settings')data=await core.audioSettings(actor);
+      if(method==='POST'&&p.join('/')==='voice-previews'){data=await core.audio.previews.create(actor,b);res.status(data.status==='succeeded'?200:202);}
+      else if(method==='GET'&&p[0]==='voice-previews'&&p.length===2)data=await core.audio.previews.get(actor,p[1]);
+      else if(method==='GET'&&p[0]==='voice-previews'&&p[2]==='content'&&p.length===3){const bytes=await core.audio.previews.content(actor,p[1]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(Buffer.from(bytes));}
+      else if(method==='GET'&&p.join('/')==='me/audio-settings')data=await core.audioSettings(actor);
       else if(method==='PUT'&&p.join('/')==='me/audio-settings')data=await core.saveAudioSettings(actor,key,b);
       else if(method==='GET'&&p.join('/')==='voices')data=await core.audio.voices(req.query.accent);
       else if(method==='POST'&&p.join('/')==='audio'){data=await core.audio.create(actor,key,b);res.status(data.status==='succeeded'?200:202);}
@@ -93,7 +96,7 @@ export async function createApplication(options:{vocabulary?:VocabularyProvider,
   let generation:Promise<void>|undefined;
   const aiTimer=setInterval(()=>{if(generation)return;generation=core.vocabulary.processOne().catch(()=>{console.error('Vocabulary generation cycle failed');}).finally(()=>{generation=undefined;});},1000);aiTimer.unref();
   let audioWork:Promise<void>|undefined;
-  const audioTimer=setInterval(()=>{if(audioWork)return;audioWork=core.audio.processOne().catch(()=>console.error('Audio generation cycle failed')).finally(()=>{audioWork=undefined;});},1000);audioTimer.unref();
+  const audioTimer=setInterval(()=>{if(audioWork)return;audioWork=core.audio.previews.processOne().then(()=>core.audio.processOne()).catch(()=>console.error('Audio generation cycle failed')).finally(()=>{audioWork=undefined;});},1000);audioTimer.unref();
   return {app,dispose:async()=>{clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);await Promise.all([generation,audioWork]);await app.close();await source.destroy();}};
 }
 async function bootstrap(){

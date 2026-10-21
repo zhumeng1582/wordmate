@@ -11,7 +11,7 @@ import type {Database} from '../src/ports.ts';
 import type {AudioRuntime} from '../src/audio-runtime.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 async function fixture(){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/004_voice_previews.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  const spoolDir=await mkdtemp(join(tmpdir(),'word-audio-'));
  const objects=new Map<string,Uint8Array>();let calls=0,uploadError=false,readError=false,gate:Promise<void>|undefined,now=new Date();
@@ -125,5 +125,37 @@ test('account audio settings sync across sessions, isolate parents and reject co
   assert.deepEqual(await f.core.saveAudioSettings(f.dad,'settings',{accent:'en-US',voice_id:'us',expected_version:original.version}),saved);
   await assert.rejects(f.core.saveAudioSettings(f.dad,'stale',{accent:'en-GB',voice_id:'gb',expected_version:original.version}),{code:'AUDIO_SETTINGS_CHANGED'});
   await assert.rejects(f.core.saveAudioSettings(f.dad,'wrong-voice',{accent:'en-US',voice_id:'gb',expected_version:saved.version}),{code:'VOICE_ACCENT_UNAVAILABLE'});
+ }finally{await f.close();}
+});
+
+test('voice preview uses unsaved choices, caches a fixed sample, and retries upload without another synthesis',async()=>{
+ const f=await fixture();try{
+  const original=await f.core.audioSettings(f.dad);
+  const preview=await f.core.audio.previews.create(f.dad,{accent:'en-US',voice_id:'us'});
+  assert.equal((await f.core.audio.previews.create(f.mom,{accent:'en-US',voice_id:'us'})).job_id,preview.job_id);
+  f.uploadFail(true);await f.core.audio.previews.processOne();
+  assert.equal((await f.core.audio.previews.get(f.dad,preview.job_id)).status,'failed');assert.equal(f.calls(),1);
+  f.uploadFail(false);await f.core.audio.previews.create(f.dad,{accent:'en-US',voice_id:'us'});await f.newCore().audio.previews.processOne();
+  assert.equal((await f.core.audio.previews.get(f.dad,preview.job_id)).status,'succeeded');assert.equal(f.calls(),1);
+  assert.deepEqual(Buffer.from(await f.core.audio.previews.content(f.mom,preview.job_id)),f.bytes);
+  assert.equal((await f.newCore().audio.previews.create(f.dad,{accent:'en-US',voice_id:'us'})).status,'succeeded');
+  assert.deepEqual(await f.core.audioSettings(f.dad),original);
+  await assert.rejects(f.core.audio.previews.create(f.dad,{accent:'en-GB',voice_id:'us'}),{code:'VOICE_ACCENT_UNAVAILABLE'});
+  const gb=await f.core.audio.previews.create(f.dad,{accent:'en-GB',voice_id:'gb'});assert.notEqual(gb.job_id,preview.job_id);
+ }finally{await f.close();}
+});
+
+test('voice preview serializes concurrent workers and caps repeated failures',async()=>{
+ const f=await fixture();try{
+  let release!:()=>void;f.gate(new Promise(r=>{release=r;}));
+  const preview=await f.core.audio.previews.create(f.dad,{accent:'en-GB',voice_id:'gb'});
+  f.uploadFail(true);const work=f.core.audio.previews.processOne();
+  for(let n=0;n<100&&f.calls()===0;n++)await new Promise(r=>setTimeout(r,5));
+  assert.equal(f.calls(),1);await f.newCore().audio.previews.processOne();assert.equal(f.calls(),1);
+  release();await work;
+  for(let i=0;i<2;i++){await f.core.audio.previews.create(f.mom,{accent:'en-GB',voice_id:'gb'});await f.core.audio.previews.processOne();}
+  const exhausted=await f.core.audio.previews.create(f.dad,{accent:'en-GB',voice_id:'gb'});
+  assert.equal(exhausted.attempts,3);assert.equal(exhausted.status,'failed');assert.equal(exhausted.retryable,false);assert.equal(f.calls(),1);
+  await assert.rejects(f.core.audio.previews.get('00000000-0000-4000-8000-000000000000',preview.job_id),{code:'ACCOUNT_UNAVAILABLE'});
  }finally{await f.close();}
 });

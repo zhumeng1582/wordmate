@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>完整 API 接口契约 · 词伴0.1</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f4f6f0;color:#203e34;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:1180px;margin:auto;padding:45px 30px 100px}h1{font-size:36px;line-height:1.3;margin:15px 0 25px}h2{font-size:25px;margin:0 0 18px}h3{font-size:18px}a{color:#23634c}section{background:white;border:1px solid #e0e6db;border-radius:19px;padding:26px;margin:22px 0}p{overflow-wrap:anywhere}small,.muted{color:#647568}.eyebrow{font-size:12px;letter-spacing:2px;color:#57795b}nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #dce4d7;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf1e5}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5ee;border-radius:12px;padding:18px;font:13px/1.65 ui-monospace,monospace}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.grid section{margin:0}.button{display:inline-block;padding:11px 17px;background:#255d48;color:white;border-radius:12px;text-decoration:none;margin:5px 5px 5px 0}.notice{border-left:4px solid #b7873c;background:#fff7e8;padding:16px 20px;margin:20px 0}.screen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}.screen-grid img{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 10px 25px #203e3415}.screen-grid h3{font-size:16px;margin:8px 0}.screen-grid p{font-size:12px;color:#67796e}.pill{font-size:12px;background:#e4eedc;padding:4px 8px;border-radius:6px}details{border:1px solid #e0e6db;border-radius:10px;padding:12px;margin:10px 0}summary{cursor:pointer;font-weight:600}input{width:100%;padding:14px;border:1px solid #d1dcc9;border-radius:10px;font:inherit}.flow{display:flex;gap:10px;flex-wrap:wrap}.flow span{background:#e8f1e4;padding:12px;border-radius:9px}@media print{body{background:white}main{max-width:none;padding:0}section{break-inside:avoid;border-color:#ccc}nav,.noprint{display:none}h1{font-size:26px}h2{font-size:20px}a{color:inherit}pre{font-size:10px}.screen-grid{grid-template-columns:repeat(3,1fr)}}</style><main><div class="eyebrow">WORDMATE / 词伴 · 0.1 · 2026-10-20</div><h1>完整 API 接口契约</h1><nav><a href="../index.html">交付总览</a><a href="../requirements/index.html">需求文档</a><a href="../design/index.html">页面设计</a><a href="../technical/index.html">技术方案</a><a href="../database/index.html">数据库</a><a href="../api/index.html">接口契约</a><a href="../checks/index.html">验证报告</a></nav><p>92个接口操作，62个Schema；OpenAPI版本3.1.1，产品版本0.1。API域名为占位，尚未部署。</p><a class="button" href="openapi.json">OpenAPI JSON</a><a class="button" href="examples.json">请求样例</a><section><h2>统一协议</h2><p>Authorization: Bearer；时间ISO8601 UTC，日期YYYY-MM-DD，月份YYYY-MM；UUID资源标识。跨家庭404，角色不足403；业务资源读写检查有效成员；删除任务仅按发起者本人鉴权，目标删除后仍可查询。</p><p>列表默认limit20，上限100，不透明cursor绑定筛选。写请求带Idempotency-Key，登录/只读POST例外；event_id持久去重。版本冲突409，过期资源410，业务校验422，限流429。</p><p>日志与月测结果响应用安全DTO；错误响应含request_id/code/message/retryable，可含details。查任务不得透传payload和未交卷题目答案。完整规则见每个operation的description。</p></section><input class="noprint" id="filter" placeholder="搜索接口用途、路径或权限"><div id="operations"><details class="operation"><summary><span class="pill">POST</span> /auth/wechat · 微信登录</summary><p>code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。<br>权限：公开</p><pre>{
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>完整 API 接口契约 · 词伴0.1</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f4f6f0;color:#203e34;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:1180px;margin:auto;padding:45px 30px 100px}h1{font-size:36px;line-height:1.3;margin:15px 0 25px}h2{font-size:25px;margin:0 0 18px}h3{font-size:18px}a{color:#23634c}section{background:white;border:1px solid #e0e6db;border-radius:19px;padding:26px;margin:22px 0}p{overflow-wrap:anywhere}small,.muted{color:#647568}.eyebrow{font-size:12px;letter-spacing:2px;color:#57795b}nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #dce4d7;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf1e5}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5ee;border-radius:12px;padding:18px;font:13px/1.65 ui-monospace,monospace}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.grid section{margin:0}.button{display:inline-block;padding:11px 17px;background:#255d48;color:white;border-radius:12px;text-decoration:none;margin:5px 5px 5px 0}.notice{border-left:4px solid #b7873c;background:#fff7e8;padding:16px 20px;margin:20px 0}.screen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}.screen-grid img{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 10px 25px #203e3415}.screen-grid h3{font-size:16px;margin:8px 0}.screen-grid p{font-size:12px;color:#67796e}.pill{font-size:12px;background:#e4eedc;padding:4px 8px;border-radius:6px}details{border:1px solid #e0e6db;border-radius:10px;padding:12px;margin:10px 0}summary{cursor:pointer;font-weight:600}input{width:100%;padding:14px;border:1px solid #d1dcc9;border-radius:10px;font:inherit}.flow{display:flex;gap:10px;flex-wrap:wrap}.flow span{background:#e8f1e4;padding:12px;border-radius:9px}@media print{body{background:white}main{max-width:none;padding:0}section{break-inside:avoid;border-color:#ccc}nav,.noprint{display:none}h1{font-size:26px}h2{font-size:20px}a{color:inherit}pre{font-size:10px}.screen-grid{grid-template-columns:repeat(3,1fr)}}</style><main><div class="eyebrow">WORDMATE / 词伴 · 0.1 · 2026-10-20</div><h1>完整 API 接口契约</h1><nav><a href="../index.html">交付总览</a><a href="../requirements/index.html">需求文档</a><a href="../design/index.html">页面设计</a><a href="../technical/index.html">技术方案</a><a href="../database/index.html">数据库</a><a href="../api/index.html">接口契约</a><a href="../checks/index.html">验证报告</a></nav><p>95个接口操作，63个Schema；OpenAPI版本3.1.1，产品版本0.1。API域名为占位，尚未部署。</p><a class="button" href="openapi.json">OpenAPI JSON</a><a class="button" href="examples.json">请求样例</a><section><h2>统一协议</h2><p>Authorization: Bearer；时间ISO8601 UTC，日期YYYY-MM-DD，月份YYYY-MM；UUID资源标识。跨家庭404，角色不足403；业务资源读写检查有效成员；删除任务仅按发起者本人鉴权，目标删除后仍可查询。</p><p>列表默认limit20，上限100，不透明cursor绑定筛选。写请求带Idempotency-Key，登录/只读POST例外；event_id持久去重。版本冲突409，过期资源410，业务校验422，限流429。</p><p>日志与月测结果响应用安全DTO；错误响应含request_id/code/message/retryable，可含details。查任务不得透传payload和未交卷题目答案。完整规则见每个operation的description。</p></section><input class="noprint" id="filter" placeholder="搜索接口用途、路径或权限"><div id="operations"><details class="operation"><summary><span class="pill">POST</span> /auth/wechat · 微信登录</summary><p>code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。<br>权限：公开</p><pre>{
   &quot;description&quot;: &quot;code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。\n权限：公开&quot;,
   &quot;x-role&quot;: &quot;公开&quot;,
   &quot;responses&quot;: {
@@ -13555,6 +13555,399 @@
       }
     }
   }
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /voice-previews · 试听未保存的音色</summary><p>已实现。只接受配置内口音/音色，服务端固定示例；不修改账号设置，不要求家庭或孩子。全局按固定文本/供应商配置/口音/音色去重缓存，失败后再次POST显式重试，最多3次总尝试。</p><pre>{
+  &quot;description&quot;: &quot;已实现。只接受配置内口音/音色，服务端固定示例；不修改账号设置，不要求家庭或孩子。全局按固定文本/供应商配置/口音/音色去重缓存，失败后再次POST显式重试，最多3次总尝试。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;description&quot;: &quot;&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/VoicePreview&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ],
+            &quot;description&quot;: &quot;&quot;
+          }
+        }
+      }
+    },
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;202&quot;: {
+      &quot;description&quot;: &quot;已排队&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;description&quot;: &quot;&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/VoicePreview&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ],
+            &quot;description&quot;: &quot;&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;parameters&quot;: [],
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;type&quot;: &quot;object&quot;,
+          &quot;additionalProperties&quot;: false,
+          &quot;properties&quot;: {
+            &quot;accent&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;enum&quot;: [
+                &quot;en-GB&quot;,
+                &quot;en-US&quot;
+              ]
+            },
+            &quot;voice_id&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;minLength&quot;: 1,
+              &quot;maxLength&quot;: 100
+            }
+          },
+          &quot;required&quot;: [
+            &quot;accent&quot;,
+            &quot;voice_id&quot;
+          ]
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /voice-previews/{preview_id} · 查询试听任务</summary><p>已实现。仅公开固定示例元数据，不包含任何用户录入内容；需登录。</p><pre>{
+  &quot;description&quot;: &quot;已实现。仅公开固定示例元数据，不包含任何用户录入内容；需登录。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;description&quot;: &quot;&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/VoicePreview&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ],
+            &quot;description&quot;: &quot;&quot;
+          }
+        }
+      }
+    },
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;preview_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    }
+  ]
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /voice-previews/{preview_id}/content · 下载试听音频</summary><p>已实现。登录鉴权下载固定示例MP3；无永久公开URL。</p><pre>{
+  &quot;description&quot;: &quot;已实现。登录鉴权下载固定示例MP3；无永久公开URL。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;MP3&quot;,
+      &quot;content&quot;: {
+        &quot;audio/mpeg&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;string&quot;,
+            &quot;format&quot;: &quot;binary&quot;
+          }
+        }
+      }
+    },
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;preview_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    }
+  ]
 }</pre></details></div><h2>数据模型</h2><details id="Error"><summary>Error</summary><pre>{
   &quot;type&quot;: &quot;object&quot;,
   &quot;additionalProperties&quot;: false,
@@ -16566,5 +16959,55 @@
     &quot;accent&quot;,
     &quot;voice_id&quot;,
     &quot;version&quot;
+  ]
+}</pre></details><details id="VoicePreview"><summary>VoicePreview</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;job_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;status&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;enum&quot;: [
+        &quot;queued&quot;,
+        &quot;running&quot;,
+        &quot;succeeded&quot;,
+        &quot;failed&quot;
+      ]
+    },
+    &quot;attempts&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0,
+      &quot;maximum&quot;: 3
+    },
+    &quot;retryable&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;error_code&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;sample_text&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;resource_path&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  },
+  &quot;required&quot;: [
+    &quot;job_id&quot;,
+    &quot;status&quot;,
+    &quot;attempts&quot;,
+    &quot;retryable&quot;,
+    &quot;error_code&quot;,
+    &quot;sample_text&quot;,
+    &quot;resource_path&quot;
   ]
 }</pre></details><script>document.getElementById("filter").addEventListener("input",e=>{const q=e.target.value.toLowerCase();document.querySelectorAll(".operation").forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?"":"none")})</script><p class="muted">本地设计交付。无远程脚本、字体或数据上传；可以用浏览器打印为PDF。全部功能统一属于0.1。</p></main></html>

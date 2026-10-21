@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Taro,{useDidHide,useDidShow} from '@tarojs/taro';
 import {api,eventId,message,storage} from './api';
-export type AudioTarget={word_id:string;content_version:number}|{sentence_id:string;content_version:number};
+export type AudioTarget={word_id:string;content_version:number}|{sentence_id:string;content_version:number}|{preview:true;accent:'en-GB'|'en-US';voice_id:string};
 export function useAudio(){
  const [active,setActive]=useState(''),[status,setStatus]=useState(''),[error,setError]=useState('');
  const [accent,setAccent]=useState<'en-GB'|'en-US'>('en-GB');
@@ -18,18 +18,23 @@ export function useAudio(){
   stop();const ticket=intent.current;const current=()=>ticket===intent.current;
   setActive(key);setStatus('正在准备音频…');setError('');
   try{
-   const preferences=await api('/me/audio-settings');if(!current())return;setAccent(preferences.accent);
-   if(!preferences.voice_id)throw Error('AUDIO_NOT_CONFIGURED');
-   let job=await api('/audio','POST',{...target,accent:preferences.accent,voice_id:preferences.voice_id,speech_rate:1},eventId());
+   const preview='preview' in target;
+   let job:any;
+   if(preview){
+    job=await api('/voice-previews','POST',{accent:target.accent,voice_id:target.voice_id});
+   }else{
+    const preferences=await api('/me/audio-settings');if(!current())return;setAccent(preferences.accent);
+    if(!preferences.voice_id)throw Error('AUDIO_NOT_CONFIGURED');
+    job=await api('/audio','POST',{...target,accent:preferences.accent,voice_id:preferences.voice_id,speech_rate:1},eventId());
+   }
    if(!current())return;
-   // A new tap is the explicit retry; polling never starts another synthesis.
-   if(job.status==='failed'&&job.retryable)job=await api(`/jobs/${job.job_id}/retry`,'POST',{},eventId());
+   if(!preview&&job.status==='failed'&&job.retryable)job=await api(`/jobs/${job.job_id}/retry`,'POST',{},eventId());
    const deadline=Date.now()+120000;
    while(current()&&['queued','running'].includes(job.status)){
     if(Date.now()>deadline)throw Error('AUDIO_WAIT_TIMEOUT');
     setStatus('音频生成中，首次播放需要稍等…');
     await new Promise(resolve=>setTimeout(resolve,2000));if(!current())return;
-    job=await api(`/jobs/${job.job_id}`);
+    job=await api(`/${preview?'voice-previews':'jobs'}/${job.job_id}`);
    }
    if(!current())return;
    if(job.status!=='succeeded')throw Error(job.attempts>=3?'AUDIO_ATTEMPTS_EXHAUSTED':job.error_code||'AUDIO_SYNTHESIS_FAILED');
