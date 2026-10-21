@@ -1,3 +1,4 @@
+import {encouragementProvider,type EncouragementProvider} from './checkin-share';
 import {audioRuntime,type AudioRuntime} from './audio-runtime';
 import type {VocabularyProvider} from './vocabulary';
 import {vocabularyProvider} from './vocabulary';
@@ -63,6 +64,7 @@ class ApiController {
         if(method==='POST'&&p.length===3&&p[2]==='abandon')data=await core.quizzes.abandon(actor,key,id,b);
       }
       else if(p[0]==='children'&&p.length===3){const id=p[1];
+        if(method==='POST'&&p[2]==='checkin-share')data=await core.checkinShare.create(actor,id,b);
         if(p[2]==='learning-goal')data=method==='GET'?await core.learningGoal(actor,id):method==='PUT'?await core.setLearningGoal(actor,key,id,b):undefined;
         if(p[2]==='ai-batches')data=method==='GET'?await core.vocabulary.list(actor,id):method==='POST'?await core.vocabulary.create(actor,key,id,b):undefined;
         if(p[2]==='monthly-quizzes')data=method==='GET'?await core.quizzes.list(actor,id,req.query):method==='POST'?await core.quizzes.create(actor,key,id,b):undefined;
@@ -85,9 +87,9 @@ class ApiController {
   }
 }
 @Module({controllers:[ApiController]}) class AppModule{}
-export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime}={}){
+export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime,encouragement?:EncouragementProvider}={}){
   const {db,source}=await connect(env.DATABASE_URL??'');
-  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env),options.audio??await audioRuntime(env));
+  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env),options.audio??await audioRuntime(env),options.encouragement??await encouragementProvider(env));
   const app=await NestFactory.create(AppModule,{bodyParser:true,logger:['error','warn']});
   await app.init();
   let preparation:Promise<void>|undefined;

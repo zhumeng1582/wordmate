@@ -15,6 +15,7 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  NO_LEARNING_TO_SHARE:'这一天还没有学习记录，学习后再来分享吧。',
   LEARNING_GOAL_CHANGED:'学习目标已被另一位家长更新，请重新选择。',
   INVALID_LEARNING_GOAL:'请输入 1 到 500 之间的整数。',
   QUERY_NOT_IMPLEMENTED:'当前服务暂不支持此筛选，请更新服务后重试。',

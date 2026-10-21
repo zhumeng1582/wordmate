@@ -1,11 +1,26 @@
-import {useRef,useState} from 'react';
-import {View,Text,Button,Picker} from '@tarojs/components';
-import Taro,{useDidShow} from '@tarojs/taro';
+import {CheckinSharePreview} from '../../components/CheckinSharePreview';
+import {renderSharePoster,type ShareRecord} from '../../services/share-poster';
+import {useEffect,useRef,useState} from 'react';
+import {View,Text,Button,Picker,Canvas} from '@tarojs/components';
+import Taro,{useDidShow,useDidHide,useShareAppMessage} from '@tarojs/taro';
 import {api,storage,go,message} from '../../services/api';
 import './index.css';
 const localToday=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
 export default function Calendar(){
  const [month,setMonth]=useState(localToday().slice(0,7)),[selected,setSelected]=useState(localToday()),[data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);const serial=useRef(0),loadedScope=useRef('');
+ const [shareOpen,setShareOpen]=useState(false),[shareData,setShareData]=useState<ShareRecord|null>(null),[poster,setPoster]=useState(''),[cover,setCover]=useState(''),[shareBusy,setShareBusy]=useState(false),[shareError,setShareError]=useState(''),[albumDenied,setAlbumDenied]=useState(false),[quoteIndex,setQuoteIndex]=useState(0);
+ const shareSerial=useRef(0),shareLock=useRef(false),drawing=useRef<Promise<void>>(Promise.resolve());
+ useShareAppMessage(({from})=>from==='button'&&shareOpen&&cover&&!shareBusy?{title:`${shareData?.date} · ${shareData?.checked_in?'打卡成功':'学习记录'}`,path:'/pages/home/index',imageUrl:cover}:{title:'每天一点，记得更牢',path:'/pages/home/index',imageUrl:'/assets/invite-cover.png'});
+ useEffect(()=>()=>{shareSerial.current++;},[]);
+ useDidHide(()=>{shareSerial.current++;if(shareLock.current&&!poster)setShareError('成果卡准备已暂停，请重试。');shareLock.current=false;setShareBusy(false);});
+ const closeShare=()=>{shareSerial.current++;shareLock.current=false;setShareBusy(false);setShareOpen(false);};
+ const draw=async(record:ShareRecord,index:number,ticket:number)=>{
+  // A second preview must never overwrite a canvas that is still exporting.
+  const work=drawing.current.catch(()=>{}).then(async()=>{if(ticket!==shareSerial.current)return;await new Promise<void>(resolve=>Taro.nextTick(resolve));const p=await renderSharePoster('checkinPoster',record,record.quotes[index]);const c=await renderSharePoster('checkinCover',record,record.quotes[index],true);if(ticket!==shareSerial.current)return;setPoster(p);setCover(c);});drawing.current=work;await work;
+ };
+ const openShare=async()=>{if(shareLock.current)return;shareLock.current=true;const ticket=++shareSerial.current;setShareOpen(true);setShareBusy(true);setShareError('');setAlbumDenied(false);setShareData(null);setPoster('');setCover('');setQuoteIndex(0);try{const record=await api<ShareRecord>(`/children/${storage.get('child_id')}/checkin-share`,'POST',{date:selected});if(ticket!==shareSerial.current)return;setShareData(record);await draw(record,0,ticket);}catch(e){if(ticket===shareSerial.current)setShareError(e instanceof Error?message(e):'成果卡生成失败，请重试。');}finally{if(ticket===shareSerial.current){shareLock.current=false;setShareBusy(false);}}};
+ const nextQuote=async()=>{if(shareLock.current||!shareData)return;shareLock.current=true;const ticket=++shareSerial.current;setShareBusy(true);setShareError('');try{const next=(quoteIndex+1)%shareData.quotes.length;await draw(shareData,next,ticket);if(ticket===shareSerial.current)setQuoteIndex(next);}catch{if(ticket===shareSerial.current)setShareError('图片生成失败，请重试。');}finally{if(ticket===shareSerial.current){shareLock.current=false;setShareBusy(false);}}};
+ const savePoster=async()=>{if(!poster||shareLock.current)return;shareLock.current=true;const ticket=++shareSerial.current;setShareBusy(true);setShareError('');setAlbumDenied(false);try{const permission=await Taro.getSetting();if(permission.authSetting['scope.writePhotosAlbum']===false){setAlbumDenied(true);setShareError('需要允许保存到相册，才能保存图片。');return;}await Taro.saveImageToPhotosAlbum({filePath:poster});Taro.showToast({title:'已保存到相册',icon:'success'});}catch(e){const msg=String((e as any)?.errMsg||'');if(/auth deny|auth denied|authorize|permission/i.test(msg)){setAlbumDenied(true);setShareError('未获得相册权限，可以打开设置后重试。');}else if(!/cancel/i.test(msg))setShareError('图片保存失败，请重试。');}finally{if(ticket===shareSerial.current){shareLock.current=false;setShareBusy(false);}}};
  const load=async(m=month)=>{const n=++serial.current;setBusy(true);setError('');const key=`${storage.get('access_token')}:${storage.get('child_id')}:${m}`;if(loadedScope.current!==key)setData(null);try{const value=await api(`/children/${storage.get('child_id')}/calendar?month=${m}`);if(n===serial.current){setData(value);loadedScope.current=key;}}catch(e){if(n===serial.current)setError(message(e));}finally{if(n===serial.current)setBusy(false);}};
  useDidShow(()=>{void load();});
  const change=(m:string)=>{setMonth(m);setSelected(`${m}-01`);void load(m);};
@@ -16,6 +31,8 @@ export default function Calendar(){
  {data&&<><View className='calendar-grid card'>{['一','二','三','四','五','六','日'].map(x=><View key={x} className='calendar-week'>{x}</View>)}{Array.from({length:offset},(_,i)=><View key={`blank${i}`}/>)}{data.days.map((d:any)=><View key={d.date} className={`calendar-day ${d.date===selected?'selected':''} ${d.checked_in?'checked':''}`} onClick={()=>setSelected(d.date)}><Text>{Number(d.date.slice(8))}</Text><View className='day-marker'>{d.checked_in?'✓':d.studied_words?'·':''}{d.wrong_words?' !':''}</View></View>)}</View>
  <View className='muted small'>✓ 已打卡　· 有学习　! 有错题</View>{day&&<View className='card history-highlight'><View className='history-name'>{selected.slice(5).replace('-',' 月 ')} 日 · {day.checked_in?'已打卡':day.studied_words?'学习中':'未打卡'}</View><View>学习 {day.studied_words} 词{day.goal?` / 目标 ${day.goal} 词`:''} · 错词 {day.wrong_words} 个 / 错误 {day.mistake_count} 次</View><View className='muted'>已提交月测 {day.quiz_count} 次 · 月测不计入打卡</View></View>}
  <View className='muted'>当前连续打卡 {data.streak_days} 天{data.streak_through?` · 截至 ${data.streak_through}`:''}</View>
- <View className='history-actions'><Button className='btn primary' disabled={!day?.wrong_words} onClick={()=>Taro.navigateTo({url:`/pages/wrong/index?date=${selected}`})}>查看这天错词</Button><Button className='btn' onClick={()=>go('wrong')}>全部历史错题</Button></View></>}
+ <View className='history-actions'><Button className='btn primary' disabled={busy||!day?.studied_words} onClick={openShare}>{day?.checked_in?'分享打卡':'分享学习记录'}</Button><Button className='btn primary' disabled={!day?.wrong_words} onClick={()=>Taro.navigateTo({url:`/pages/wrong/index?date=${selected}`})}>查看这天错词</Button><Button className='btn' onClick={()=>go('wrong')}>全部历史错题</Button></View></>}
+ <Canvas canvasId='checkinPoster' className='share-canvas' style={{width:'600px',height:'800px'}}/><Canvas canvasId='checkinCover' className='share-canvas' style={{width:'600px',height:'480px'}}/>
+ {shareOpen&&<CheckinSharePreview data={shareData} image={poster} busy={shareBusy} error={shareError} albumDenied={albumDenied} onClose={closeShare} onNext={nextQuote} onRetry={openShare} onSave={savePoster} onSettings={()=>{void Taro.openSetting().then(r=>{if(r.authSetting['scope.writePhotosAlbum']){setAlbumDenied(false);setShareError('');}}).catch(()=>setShareError('无法打开设置，请稍后重试。'));}}/>}
  </View>;
 }

@@ -20,6 +20,7 @@ assert.notEqual(theme.light.pageBackground,theme.dark.pageBackground);
 assert.match(fs.readFileSync(path.join(root,'app-origin.wxss'),'utf8'),/prefers-color-scheme:\s*dark/);
 
 assert.match(fs.readFileSync(path.join(root,'pages/family/index.js'),'utf8'),/enableShareAppMessage\s*=\s*(true|!0)/);
+assert.match(fs.readFileSync(path.join(root,'pages/calendar/index.js'),'utf8'),/enableShareAppMessage\s*=\s*(true|!0)/);
 assert.equal(fs.readFileSync(path.join(root,'assets/invite-cover.png')).subarray(0,8).toString('hex'),'89504e470d0a1a0a');
 for(const page of app.pages)for(const ext of ['.js','.json','.wxml'])assert(fs.statSync(path.join(root,page+ext)).size>0,`${page}${ext}`);
 assert(fs.statSync(path.join(root,'app.js')).size>0);

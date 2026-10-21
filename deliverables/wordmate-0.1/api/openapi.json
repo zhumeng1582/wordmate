@@ -14702,6 +14702,164 @@
           }
         ]
       }
+    },
+    "/children/{child_id}/checkin-share": {
+      "post": {
+        "operationId": "post_children_child_id_checkin_share",
+        "summary": "生成学习成果分享数据与双语鼓励语",
+        "tags": [
+          "日历"
+        ],
+        "x-role": "member",
+        "description": "家庭有效成员可用；只接收日期，服务端读取学习数、目标及截至该日期的连续打卡。无学习记录不可分享。每孩子每天缓存一组3句文案；换一句仅在客户端切换，不重复调用AI。AI失败返回精选鼓励语。响应不含孩子姓名、家庭ID或访问口令；分享链接固定进入首页。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CheckinShare"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "description": ""
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、租约或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "资源已过期或被删除",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "date"
+                ],
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -17850,6 +18008,78 @@
           "sample_text",
           "resource_path"
         ]
+      },
+      "CheckinShare": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "studied_words",
+          "goal",
+          "checked_in",
+          "streak_days",
+          "streak_through",
+          "quotes",
+          "copy_source"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "studied_words": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "goal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "checked_in": {
+            "type": "boolean"
+          },
+          "streak_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "streak_through": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "copy_source": {
+            "type": "string",
+            "enum": [
+              "ai",
+              "curated"
+            ]
+          },
+          "quotes": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "en",
+                "zh"
+              ],
+              "properties": {
+                "en": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "zh": {
+                  "type": "string",
+                  "maxLength": 60
+                }
+              }
+            }
+          }
+        }
       }
     }
   },

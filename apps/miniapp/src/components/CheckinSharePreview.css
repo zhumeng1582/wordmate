@@ -1,0 +1,10 @@
+.share-backdrop{position:fixed;inset:0;z-index:1000;background:var(--overlay);display:flex;align-items:flex-end}
+.share-sheet{width:100%;box-sizing:border-box;max-height:92vh;overflow-y:auto;background:var(--surface);border-radius:32px 32px 0 0;padding:12px 28px calc(20px + env(safe-area-inset-bottom))}
+.share-heading{display:flex;justify-content:space-between;align-items:center;font-size:32px;font-weight:600}
+.share-heading .text-action{margin:0}
+.share-preview{height:48vh;min-height:360px;display:flex;align-items:center;justify-content:center;background:var(--field);border-radius:16px;overflow:hidden}
+.share-poster{height:100%;width:100%}
+.share-hint{min-height:72px;padding-top:12px;line-height:1.5}
+.share-sheet .text-action{margin:0}
+.share-sheet .btn[disabled]{background:var(--disabled-bg);color:var(--disabled-text)}
+.share-canvas{position:fixed;left:-10000px;top:0;pointer-events:none}

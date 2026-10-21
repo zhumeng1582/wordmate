@@ -11,7 +11,7 @@ const {createApplication}=require('../apps/api/dist/main.js');
 (async()=>{
  const audioObjects=new Map();let audioCalls=0;
  const audio={profile:{provider:'mock',model:'mock'},voices:[{id:'gb',accent:'en-GB',gender:'Female'}],synthesize:async()=>{audioCalls++;return {bytes:Buffer.from('ID3-route-test')};},storageProfile:'mock',stores:{mock:{put:async(k,b)=>{audioObjects.set(k,b);},get:async k=>audioObjects.get(k),stat:async k=>audioObjects.has(k)?{size:audioObjects.get(k).length}:null}},spoolDir:resolve('.local',name+'-spool'),childDaily:20,userDaily:40};
- const {app,dispose}=await createApplication({audio,vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{if(raw==='无法识别')return {error:'NO_WORDS_FOUND',items:[]};assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
+ const {app,dispose}=await createApplication({audio,encouragement:async()=>[{en:'Keep learning, and let your curiosity grow.',zh:'坚持学习，让好奇心不断生长。'},{en:'Small steps can lead to wonderful discoveries.',zh:'小小的脚步，也能走向美好的发现。'},{en:'Every word you learn is a small step forward.',zh:'每学会一个单词，都是向前迈出的一小步。'}],vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{if(raw==='无法识别')return {error:'NO_WORDS_FOUND',items:[]};assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
  function request(path,body,key=randomUUID(),method=body?'POST':'GET'){
   return new Promise((resolve,reject)=>{
    const chunks=[];const socket=new Duplex({read(){},write(chunk,encoding,callback){chunks.push(Buffer.from(chunk));callback();}});
@@ -79,6 +79,9 @@ const {createApplication}=require('../apps/api/dist/main.js');
   assert.equal((await ok(`/monthly-quizzes/${quiz.id}/results`)).items.length,1);
   const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
   const calendar=await ok(`/children/${c.id}/calendar?month=${month}`);assert(calendar.days.find(d=>d.date===today).wrong_words>=1);
+  const share=await ok(`/children/${c.id}/checkin-share`,{date:today});assert.equal(share.studied_words,1);assert.equal(share.quotes.length,3);assert.equal(share.copy_source,'ai');assert.equal('child_id' in share,false);
+  assert.deepEqual(await ok(`/children/${c.id}/checkin-share`,{date:today}),share);
+  assert.equal((await request(`/children/${c.id}/checkin-share`,{date:today,nickname:'private'})).status,422);
   const wrong=await ok(`/children/${c.id}/wrong-words?date=${today}&source=review&limit=1`);assert.equal(wrong.items.length,1);
   assert.equal((await request(`/children/${c.id}/wrong-words?date=2026-02-30`)).status,422);
   const rangedWrong=await ok(`/children/${c.id}/wrong-words?date_from=${today}&date_to=${today}&source=review&limit=1`);assert.equal(rangedWrong.items.length,1);
