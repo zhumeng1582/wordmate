@@ -67,3 +67,10 @@ DeepSeek 切换（2026-10-20）
 
 0.1缓存优先实施补充（2026-10-21）
 参见deliverables/0.1/technical/audio-pipeline.txt与config/audio.env.example。当前audioCacheKey支持显式scope；公共词条只有受信来源及发音身份验证后才能共享。AI/用户输入与个性化例句默认私有。音频业务/OSS/播放仍待接入，不能把适配器测试当作完整缓存流程验收。
+
+音频平台解耦（0.1，2026-10-21）
+TTS：createTtsProvider(env, fetcher, adapters) 支持注册供应商工厂；默认内置CosyVoice。TtsProvider返回通用provider字符串及SpeechProfile(provider/region/model/revision/format/sampleRate)。新增供应商实现listVoices/synthesize，再由服务端可信代码注册；未知厂商拒绝，不悄悄降级。其他真实TTS厂商目前尚未实现。
+缓存：新调用传audioCacheKey的结构化SpeechProfile，并传pronunciationKey区别同形异音。旧字符串签名保持原哈希兼容。存储平台不参与音频内容键，搬迁文件不引发重新合成。
+存储：audio-storage.ts定义AudioObjectStorage的put/get/stat/delete协议及createAudioStorageRouter。新写入走activeProfileId，读取/删除按持久化的{profileId,key}定位旧配置。ID标识固定供应商/地域/桶/前缀，凭证可轮转；换桶需新ID。业务层必须先鉴权；不把locator直接作为客户端输入或输出。
+copyToActive按可信数据库SHA256验证源和目标，返回新locator，不改数据库、不删除源。源对象无效或复制损坏时报错；迁移任务完成数据库版本检查和原子切换后，再按宽限期清旧文件。复制不是一次TTS调用。
+目前存储仅实现接口、路由与校验复制；真实OSS/S3/COS适配器、数据库迁移任务及播放业务仍待接入。测试使用两个独立内存存储模拟切换，不代表已验证云平台。

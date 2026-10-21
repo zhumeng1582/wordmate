@@ -96,9 +96,15 @@ export function createTextGenerator(env: Record<string, string | undefined> = pr
 export type Accent = 'en-GB' | 'en-US';
 export type Voice = { id: string; accent: Accent; gender: string };
 export type SpeechRequest = { text: string; accent: Accent; voiceId: string; rate: number };
+export type SpeechProfile = Readonly<{
+  provider: string; region: string; model: string; revision: string;
+  format: 'mp3'; sampleRate: number;
+}>;
+export type TtsFactory = (env: Record<string,string|undefined>, fetcher: Fetch) => TtsProvider;
 export interface TtsProvider {
+  readonly profile: SpeechProfile;
   listVoices(): Promise<Voice[]>;
-  synthesize(r: SpeechRequest): Promise<{ bytes: Uint8Array; mimeType: 'audio/mpeg'; provider: 'cosyvoice' }>;
+  synthesize(r: SpeechRequest): Promise<{ bytes: Uint8Array; mimeType: 'audio/mpeg'; provider: string }>;
 }
 // Official cosyvoice-v3-flash Beijing catalog. Account enablement must be verified
 // by deployment smoke tests; this is a configured allowlist, not a live account API.
@@ -108,8 +114,16 @@ const COSY_VOICES: Voice[] = [
   { id: 'loongabby_v3', accent: 'en-US', gender: 'Female' },
   { id: 'loongandy_v3', accent: 'en-US', gender: 'Male' },
 ];
-export function createTtsProvider(env: Record<string, string | undefined> = process.env, fetcher: Fetch = fetch): TtsProvider {
-  if ((env.TTS_PROVIDER || 'cosyvoice') !== 'cosyvoice') throw new ProviderError('UNSUPPORTED_TTS_PROVIDER');
+// Adapters are registered by trusted server code, never loaded from request URLs.
+export function createTtsProvider(env: Record<string, string | undefined> = process.env, fetcher: Fetch = fetch, adapters: Readonly<Record<string,TtsFactory>> = {}): TtsProvider {
+  const selected=env.TTS_PROVIDER||'cosyvoice';
+  const factory=selected==='cosyvoice'?createCosyVoiceProvider:Object.hasOwn(adapters,selected)?adapters[selected]:undefined;
+  if(!factory)throw new ProviderError('UNSUPPORTED_TTS_PROVIDER');
+  const provider=factory(env,fetcher);
+  if(provider.profile.provider!==selected)throw new ProviderError('TTS_PROFILE_MISMATCH');
+  return provider;
+}
+export function createCosyVoiceProvider(env: Record<string, string | undefined>, fetcher: Fetch = fetch): TtsProvider {
   const key = required(env, 'COSYVOICE_API_KEY');
   const workspace = required(env, 'COSYVOICE_WORKSPACE_ID');
   if (!/^[a-zA-Z0-9-]+$/.test(workspace)) throw new ProviderError('INVALID_COSYVOICE_WORKSPACE');
@@ -120,6 +134,7 @@ export function createTtsProvider(env: Record<string, string | undefined> = proc
   const voices = COSY_VOICES.filter(v => ids.includes(v.id));
   const base = `https://${workspace}.cn-beijing.maas.aliyuncs.com`;
   return {
+    profile: Object.freeze({provider:'cosyvoice',region:'cn-beijing',model,revision:'cosy-http-plain-aigc-v1',format:'mp3',sampleRate:24000}),
     async listVoices() { return voices.map(v => ({ ...v })); },
     async synthesize(r) {
       if (!['en-GB', 'en-US'].includes(r.accent) || !Number.isFinite(r.rate) || r.rate < 0.5 || r.rate > 1.5 ||
@@ -154,6 +169,11 @@ export function createTtsProvider(env: Record<string, string | undefined> = proc
 }
 // Caller supplies child scope (or an explicitly public dictionary scope), content version,
 // and provider/region profile. Provider changes never reuse old audio accidentally.
-export function audioCacheKey(scope: string, contentVersion: string, profile: string, r: SpeechRequest): string {
+export function audioCacheKey(scope: string, contentVersion: string, profile: string | SpeechProfile, r: SpeechRequest, pronunciationKey = ''): string {
+  if(typeof profile!=='string')return createHash('sha256').update(JSON.stringify(['audio-v2',scope,contentVersion,pronunciationKey,profile.provider,profile.region,profile.model,profile.revision,profile.format,profile.sampleRate,r.text.normalize('NFC').trim(),r.accent,r.voiceId,r.rate])).digest('hex');
+  // Legacy keys remain stable; new integrations must use the structured profile.
   return createHash('sha256').update(JSON.stringify([scope, contentVersion, profile, r.text, r.accent, r.voiceId, r.rate, 'mp3-24k-cosy-v1'])).digest('hex');
 }
+
+export { createAudioStorageRouter, AudioStorageError } from './audio-storage.ts';
+export type { AudioObjectStorage, AudioObjectLocation } from './audio-storage.ts';

@@ -3,7 +3,7 @@
 
 实现边界
 已有：packages/ai 的 CosyVoice 北京 HTTP 合成适配器、音色白名单、音频格式校验、audioCacheKey；初始数据库 audio_assets 表；OpenAPI 音频与任务接口契约。
-待实现：音频业务 Worker、OSS 适配与鉴权下载、小程序播放控制、公共标准词条缓存及增量迁移。本文件是实施规格，不代表上述流程已经运行。真实合成、音质与手机播放须在账号配置后验收。
+本轮新增代码：可注册TTS工厂、结构化合成配置指纹、独立对象存储接口/多配置路由/校验复制；离线测试验证平台切换。待实现：音频业务 Worker、实际云存储适配与鉴权下载、小程序播放控制、公共标准词条缓存及增量迁移。本文件是实施规格，不代表上述流程已经运行。真实合成、音质与手机播放须在账号配置后验收。
 
 一、用户流程
 点击词条或例句的播放按钮 → 校验家庭成员与内容版本 → 计算音频键 → 查询可用音频。
@@ -24,7 +24,7 @@ AI录入或用户自定义词默认私有，不能只凭“看起来是英文”
 
 三、数据与迁移方案（未执行）
 保留 audio_assets 的孩子/词条/句子授权绑定，不把 child_id 改成可空。
-新增 audio_cache_objects：唯一 cache_key；scope(public_dictionary/child)、scope_id；合成参数快照；状态、attempts、next_run_at、lease_until、fencing_token；storage_key、sha256、size_bytes、mime_type；错误码、创建/访问时间。
+新增 audio_cache_objects：唯一 cache_key；scope(public_dictionary/child)、scope_id；合成参数快照；状态、attempts、next_run_at、lease_until、fencing_token；storage_profile_id、storage_key、sha256、size_bytes、mime_type；错误码、创建/访问时间。
 audio_assets 增加 cache_object_id 外键和内容版本绑定。标准公共词的多个孩子绑定可引用同一对象；私有内容只能引用同孩子对象。此条件在事务服务校验，不能由客户端提供 cache_object_id。
 新增 audio_usage_events：实际外呼前按尝试追加事件，记录发起账号、孩子、缓存对象、合成字符数、尝试ID、时间和供应商请求ID（如有）。事件不存原文或密钥；重试不会重置额度，按事件时间统计而非覆盖job时间。
 generation_jobs 保持家庭范围的任务句柄；并发等待者依缓存对象完成，不消耗新的合成次数。不向其他家庭暴露对象所有者或原始任务payload。
@@ -78,6 +78,19 @@ F. 可选偏好：男/女声、默认英音/美音。若不调整，保留孩子
 Worker崩溃与租约过期后旧Worker不能覆盖新结果；累计调用额度不因重试重置；不可恢复错误不会自动扣费循环。
 真实账号至少试听airport、luggage、delay、read/record等易混词及两条例句；同形异音不可靠时改用经过授权的词典发音或明确标记，不把TTS猜测当权威发音。
 真机验证下载、切换停止、弱网重试、两位家长、失去权限后的播放；记录实际命中率、首播时延、TTS次数、存储与流量费用，不虚报实测数据。
+
+九、供应商独立切换与迁移（本节优先于阿里云默认示例）
+业务依赖TtsProvider和AudioObjectStorage，不依赖CosyVoice响应字段、OSS SDK、桶域名或签名算法。阿里云只是首个部署选项；TTS、存储、文本大模型三者可以分别切换。
+TTS通过可信服务器代码注册工厂，配置TTS_PROVIDER选择已实现的适配器。每个适配器转换厂商请求/响应、鉴权、音色目录、速率和音频格式，统一稳定错误码；不能把任意厂家仅改base_url当作兼容。未知平台启动失败，不自动跨平台兜底收费。
+合成任务保存完整SpeechProfile与实际voice_id快照。换平台只影响新任务；队列和重试沿用原快照，原适配器/凭证已撤销则明确失败，不把新厂商声音写进旧缓存键。新厂商同名音色不视为相同声音。
+前端选项使用逻辑标签（如英音女声），服务端按当前平台的经验证音色映射到实际ID。尚不支持的口音/音色明确禁用；不能拿中文/美音代替英音。现有具体voice_id设置需迁移或用户重新选择，不能静默猜测映射。
+TTS切换后新内容键区分provider/region/model/revision/format/sampleRate；旧音频ID仍可在合法权限和版本内播放，但不得冒充新厂商的同参数缓存命中。无需立即重新生成所有历史音频。存储供应商不进入内容键。
+每个文件保存不可变storage_profile_id与object_key，不存永久URL作资源身份。服务端配置表把profile ID映射到供应商、地域、桶/容器、前缀及凭证引用；客户端看不到这些信息。凭证轮换不改ID，更换目标桶/前缀/平台创建新ID。
+新写走AUDIO_STORAGE_PROFILE，旧读根据记录中的profile ID路由。因此从OSS切换到其他对象存储后，原平台只读配置仍需保留。即使新写平台故障，已存旧平台的音频也不应被整体阻断；启动时逐项检查配置，运行时各读写错误独立。
+可选迁移：读取旧对象→按数据库SHA256核对→写新平台的内容哈希路径→读回校验→事务检查资源版本及旧locator未变化→更新引用→保留旧文件宽限期→无引用后删除。中断可恢复；已复制的字节不重新合成、不重复计TTS额度。校验失败不切换引用。移除旧平台凭证前检查所有旧引用和未完成任务均已迁移。
+存储适配器stat只有真实不存在才返回null；403/网络故障必须抛出错误，不能误触发TTS。删除只供授权清理Worker，迁移复制接口本身不删除源文件。
+数据库增量迁移需加入storage_profile_id并回填现有对象，API资源ID保持稳定；此数据库变更尚未执行。现阶段真实TTS仅内置CosyVoice；真实存储适配器尚未接入，后续目标厂商确定后实现并做同一套契约测试。
+验收补充：替换TTS注册工厂不改变业务请求；相同文本不同TTS配置键不同；旧字符串缓存键兼容；换存储后新写新平台旧读旧平台；校验迁移成功保留源、损坏不切换；缺失旧profile明确错误而不是去新桶猜路径。
 
 官方核查（2026-10-21）
 CosyVoice HTTP/北京Workspace与同地域Key：https://help.aliyun.com/zh/model-studio/cosyvoice-tts-http-api
