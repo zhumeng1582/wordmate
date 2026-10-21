@@ -53,3 +53,19 @@ input,textarea{caret-color:var(--primary)}
 .text-action{display:flex;align-items:center;justify-content:center;min-height:88px;padding:16px;margin:8px 0;background:transparent;color:var(--primary);font-size:26px;line-height:1.5}
 .text-action::after{border:none}
 .text-action[disabled]{background:transparent;color:var(--disabled-text)}
+
+/* Fixed-size speaker: activity never changes the text row height. */
+.audio-icon{position:relative;display:inline-block;flex-shrink:0;width:32px;height:32px;color:var(--muted);align-self:center;margin-right:4px}
+.audio-icon-box{position:absolute;left:3px;top:12px;width:7px;height:10px;border-radius:2px;background:currentColor}
+.audio-icon-cone{position:absolute;left:6px;top:7px;width:0;height:0;border-top:10px solid transparent;border-bottom:10px solid transparent;border-right:11px solid currentColor}
+.audio-wave{position:absolute;border:2px solid currentColor;border-top-color:transparent;border-bottom-color:transparent;border-left-color:transparent;border-radius:50%}
+.audio-wave-near{left:13px;top:9px;width:9px;height:16px}
+.audio-wave-far{left:12px;top:4px;width:17px;height:26px}
+.audio-icon-playing,.audio-icon-loading{color:var(--primary)}
+.audio-icon-playing .audio-wave{animation:audio-wave-pulse 1s ease-in-out infinite}
+.audio-icon-playing .audio-wave-far{animation-delay:.22s}
+.audio-icon-loading .audio-wave{opacity:0}
+.audio-icon-ring{position:absolute;inset:-5px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:audio-ring-turn .8s linear infinite}
+@keyframes audio-wave-pulse{0%,100%{opacity:.2}50%{opacity:1}}
+@keyframes audio-ring-turn{to{transform:rotate(360deg)}}
+.text-action .audio-icon{margin-right:12px}
