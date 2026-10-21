@@ -120,3 +120,10 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 - 会话入口验证：node --experimental-strip-types --test apps/miniapp/test/review-entry.test.ts
 - 验收：首页加载/失败不显示新建家庭引导；试听与保存；家庭邀请与选孩子；
   单词录入与生成记录；月测答题卡和全对成绩；日历到错词复习；微信深浅主题。
+
+错题日期范围（0.1）
+- 日期入口打开月历弹层，第一次点击选开始，第二次选结束（逆序自动排序），第三次重新开始。
+- 可跨月、同日选择；确定应用，取消/点遮罩不修改，全部日期清除筛选。
+- GET /children/{id}/wrong-words 新增 date_from、date_to，均为 YYYY-MM-DD，包含首尾日期。
+  必须成对提供且开始不晚于结束；与旧 date 参数互斥；source 与 cursor 分页可组合。
+- 旧 date 单日接口仍兼容；多日结果通过选中单词发起复习，单日保留整日复习入口。

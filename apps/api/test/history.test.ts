@@ -11,6 +11,8 @@ const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pgl
 const scheduler:Scheduler={version:'test',parameterVersion:'test',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{rating,due:new Date(now.getTime()+86400000)},label:'review',due:new Date(now.getTime()+86400000)})};
 test('calendar, mixed-source mistakes, practice scheduling, quota, timezone and family isolation',async()=>{
  const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ // Keep database-created timestamps aligned with this fixture's fixed clock.
+ await pg.exec("ALTER TABLE wordmate.idempotency_keys ALTER COLUMN created_at SET DEFAULT '2026-10-19T15:59:00Z'::timestamptz");
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date('2026-10-19T15:59:00Z');const core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'test',()=>now);
  try{
@@ -29,6 +31,14 @@ test('calendar, mixed-source mistakes, practice scheduling, quota, timezone and 
  await assert.rejects(core.history.wrongWords(dad,c.id,{date:'2026-02-30'}),{code:'INVALID_DATE'});
  await assert.rejects(core.history.calendar(dad,c.id,'2026-11'),{code:'INVALID_MONTH'});
  const page=await core.history.wrongWords(dad,c.id,{limit:1});assert.equal(page.items.length,1);assert(page.next_cursor);const page2=await core.history.wrongWords(dad,c.id,{limit:1,cursor:page.next_cursor});assert.equal(page2.items.length,1);assert.notEqual(page.items[0].word.id,page2.items[0].word.id);assert.equal(page2.next_cursor,null);
+ const ranged=await core.history.wrongWords(dad,c.id,{date_from:'2026-10-18',date_to:'2026-10-19',limit:1});assert.equal(ranged.items.length,1);assert(ranged.next_cursor);
+ assert.equal((await core.history.wrongWords(dad,c.id,{date_from:'2026-10-18',date_to:'2026-10-19',limit:1,cursor:ranged.next_cursor})).items.length,1);
+ assert.equal((await core.history.wrongWords(dad,c.id,{date_from:'2026-10-19',date_to:'2026-10-20'})).items.length,2);
+ assert.equal((await core.history.wrongWords(dad,c.id,{date_from:'2026-10-20',date_to:'2026-10-21'})).items.length,0);
+ assert.equal((await core.history.wrongWords(dad,c.id,{date_from:'2026-10-19',date_to:'2026-10-19',source:'monthly_quiz'})).items.length,0);
+ await assert.rejects(core.history.wrongWords(dad,c.id,{date_from:'2026-10-20',date_to:'2026-10-19'}),{code:'INVALID_DATE_RANGE'});
+ await assert.rejects(core.history.wrongWords(dad,c.id,{date_from:'2026-10-19'}),{code:'INVALID_DATE'});
+ await assert.rejects(core.history.wrongWords(dad,c.id,{date:'2026-10-19',date_from:'2026-10-19',date_to:'2026-10-20'}),{code:'INVALID_DATE_RANGE'});
  const before=(await pg.query('SELECT * FROM wordmate.review_cards ORDER BY id')).rows;
  session=await core.startSession(dad,'calendar',c.id,{source:'calendar',date:'2026-10-19'});let practice=(await core.cards(dad,session.id)).items;assert(practice.every((x:any)=>x.practice_only));
  now=new Date('2026-10-19T15:59:30Z');for(const card of practice){const result=await answer(card,'good');assert.equal(result.practice_only,true);assert.equal(result.version,card.version);assert.equal(result.today.completed_words,2);}
