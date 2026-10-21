@@ -19,7 +19,8 @@
     "test:ai:live": "node --experimental-strip-types scripts/verify-ai.cjs",
     "test:vocabulary": "node --experimental-strip-types --test apps/api/test/vocabulary.test.ts",
     "test:ai:flow": "corepack pnpm build:api && node scripts/verify-ai-flow.cjs",
-    "test:tts:live": "node --experimental-strip-types scripts/verify-tts.cjs"
+    "test:tts:live": "node --experimental-strip-types scripts/verify-tts.cjs",
+    "test:oss:live": "node --experimental-strip-types scripts/verify-oss.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

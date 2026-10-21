@@ -79,3 +79,9 @@ TTS真实账号验证
 在用户本机终端运行 corepack pnpm test:tts:live。脚本仅加载忽略的根目录.env，分别选择白名单中第一个英音和美音音色合成airport，最多两次、不自动重试；下载后写入.local/tts-verification/<run-id>-<accent>.mp3并检查文件回读一致，macOS使用afinfo验证可解码。报告写.local/tts-verification/report.json，包含稳定错误码，不输出密钥、Workspace URL或原始响应。
 passed=true仅代表合成、下载、本地保存流程通过，不代表OSS/小程序已集成或读音质量已人工审核。synthesis_requests_attempted表示发起尝试，不代表供应商成功受理或实际计费。
 如果ENOTFOUND且公共域名也解析失败，需要在具备外网DNS的用户终端执行；不能据此判断密钥无效。真实凭证只填.env，不填受Git跟踪的config/audio.env.example。
+
+OSS配置联调（诊断脚本，不等于业务适配器接通）
+corepack pnpm test:oss:live 从根目录.env加载配置，复用上次test:tts:live成功报告中的合成测试音频，不新增TTS调用。用随机verification对象执行PUT、带签名GET及SHA256回读校验，再检查匿名GET被拒绝。成功后保留一个小测试对象，不覆盖/删除已有对象，不需要给RAM用户添加DeleteObject权限。
+本机支持OSS_CREDENTIAL_MODE=ram_access_key（ID+Secret，Token为空）或sts（三项临时凭证）；ECS角色自动取凭证不在这个诊断脚本范围内。Endpoint严格限定配置地域的官方HTTPS外网端点，禁止跳转，不把凭证发送到自定义URL。
+无SDK依赖的诊断V4签名实现在scripts/lib/oss-probe.cjs，规范化请求已通过官方参考哈希校验。正式业务云存储适配器仍待实现；脚本不验证服务端音频缓存或小程序播放。报告.local/oss-verification.json不输出密钥、签名或原始OSS响应，ENOTFOUND不能当作权限失败。
+签名参考：https://help.aliyun.com/zh/oss/developer-reference/recommend-to-use-signature-version-4/
