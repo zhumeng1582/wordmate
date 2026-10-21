@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>完整 API 接口契约 · 词伴0.1</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f4f6f0;color:#203e34;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:1180px;margin:auto;padding:45px 30px 100px}h1{font-size:36px;line-height:1.3;margin:15px 0 25px}h2{font-size:25px;margin:0 0 18px}h3{font-size:18px}a{color:#23634c}section{background:white;border:1px solid #e0e6db;border-radius:19px;padding:26px;margin:22px 0}p{overflow-wrap:anywhere}small,.muted{color:#647568}.eyebrow{font-size:12px;letter-spacing:2px;color:#57795b}nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #dce4d7;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf1e5}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5ee;border-radius:12px;padding:18px;font:13px/1.65 ui-monospace,monospace}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.grid section{margin:0}.button{display:inline-block;padding:11px 17px;background:#255d48;color:white;border-radius:12px;text-decoration:none;margin:5px 5px 5px 0}.notice{border-left:4px solid #b7873c;background:#fff7e8;padding:16px 20px;margin:20px 0}.screen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}.screen-grid img{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 10px 25px #203e3415}.screen-grid h3{font-size:16px;margin:8px 0}.screen-grid p{font-size:12px;color:#67796e}.pill{font-size:12px;background:#e4eedc;padding:4px 8px;border-radius:6px}details{border:1px solid #e0e6db;border-radius:10px;padding:12px;margin:10px 0}summary{cursor:pointer;font-weight:600}input{width:100%;padding:14px;border:1px solid #d1dcc9;border-radius:10px;font:inherit}.flow{display:flex;gap:10px;flex-wrap:wrap}.flow span{background:#e8f1e4;padding:12px;border-radius:9px}@media print{body{background:white}main{max-width:none;padding:0}section{break-inside:avoid;border-color:#ccc}nav,.noprint{display:none}h1{font-size:26px}h2{font-size:20px}a{color:inherit}pre{font-size:10px}.screen-grid{grid-template-columns:repeat(3,1fr)}}</style><main><div class="eyebrow">WORDMATE / 词伴 · 0.1 · 2026-10-20</div><h1>完整 API 接口契约</h1><nav><a href="../index.html">交付总览</a><a href="../requirements/index.html">需求文档</a><a href="../design/index.html">页面设计</a><a href="../technical/index.html">技术方案</a><a href="../database/index.html">数据库</a><a href="../api/index.html">接口契约</a><a href="../checks/index.html">验证报告</a></nav><p>90个接口操作，60个Schema；OpenAPI版本3.1.1，产品版本0.1。API域名为占位，尚未部署。</p><a class="button" href="openapi.json">OpenAPI JSON</a><a class="button" href="examples.json">请求样例</a><section><h2>统一协议</h2><p>Authorization: Bearer；时间ISO8601 UTC，日期YYYY-MM-DD，月份YYYY-MM；UUID资源标识。跨家庭404，角色不足403；业务资源读写检查有效成员；删除任务仅按发起者本人鉴权，目标删除后仍可查询。</p><p>列表默认limit20，上限100，不透明cursor绑定筛选。写请求带Idempotency-Key，登录/只读POST例外；event_id持久去重。版本冲突409，过期资源410，业务校验422，限流429。</p><p>日志与月测结果响应用安全DTO；错误响应含request_id/code/message/retryable，可含details。查任务不得透传payload和未交卷题目答案。完整规则见每个operation的description。</p></section><input class="noprint" id="filter" placeholder="搜索接口用途、路径或权限"><div id="operations"><details class="operation"><summary><span class="pill">POST</span> /auth/wechat · 微信登录</summary><p>code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。<br>权限：公开</p><pre>{
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>完整 API 接口契约 · 词伴0.1</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f4f6f0;color:#203e34;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:1180px;margin:auto;padding:45px 30px 100px}h1{font-size:36px;line-height:1.3;margin:15px 0 25px}h2{font-size:25px;margin:0 0 18px}h3{font-size:18px}a{color:#23634c}section{background:white;border:1px solid #e0e6db;border-radius:19px;padding:26px;margin:22px 0}p{overflow-wrap:anywhere}small,.muted{color:#647568}.eyebrow{font-size:12px;letter-spacing:2px;color:#57795b}nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #dce4d7;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf1e5}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5ee;border-radius:12px;padding:18px;font:13px/1.65 ui-monospace,monospace}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.grid section{margin:0}.button{display:inline-block;padding:11px 17px;background:#255d48;color:white;border-radius:12px;text-decoration:none;margin:5px 5px 5px 0}.notice{border-left:4px solid #b7873c;background:#fff7e8;padding:16px 20px;margin:20px 0}.screen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}.screen-grid img{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 10px 25px #203e3415}.screen-grid h3{font-size:16px;margin:8px 0}.screen-grid p{font-size:12px;color:#67796e}.pill{font-size:12px;background:#e4eedc;padding:4px 8px;border-radius:6px}details{border:1px solid #e0e6db;border-radius:10px;padding:12px;margin:10px 0}summary{cursor:pointer;font-weight:600}input{width:100%;padding:14px;border:1px solid #d1dcc9;border-radius:10px;font:inherit}.flow{display:flex;gap:10px;flex-wrap:wrap}.flow span{background:#e8f1e4;padding:12px;border-radius:9px}@media print{body{background:white}main{max-width:none;padding:0}section{break-inside:avoid;border-color:#ccc}nav,.noprint{display:none}h1{font-size:26px}h2{font-size:20px}a{color:inherit}pre{font-size:10px}.screen-grid{grid-template-columns:repeat(3,1fr)}}</style><main><div class="eyebrow">WORDMATE / 词伴 · 0.1 · 2026-10-20</div><h1>完整 API 接口契约</h1><nav><a href="../index.html">交付总览</a><a href="../requirements/index.html">需求文档</a><a href="../design/index.html">页面设计</a><a href="../technical/index.html">技术方案</a><a href="../database/index.html">数据库</a><a href="../api/index.html">接口契约</a><a href="../checks/index.html">验证报告</a></nav><p>90个接口操作，61个Schema；OpenAPI版本3.1.1，产品版本0.1。API域名为占位，尚未部署。</p><a class="button" href="openapi.json">OpenAPI JSON</a><a class="button" href="examples.json">请求样例</a><section><h2>统一协议</h2><p>Authorization: Bearer；时间ISO8601 UTC，日期YYYY-MM-DD，月份YYYY-MM；UUID资源标识。跨家庭404，角色不足403；业务资源读写检查有效成员；删除任务仅按发起者本人鉴权，目标删除后仍可查询。</p><p>列表默认limit20，上限100，不透明cursor绑定筛选。写请求带Idempotency-Key，登录/只读POST例外；event_id持久去重。版本冲突409，过期资源410，业务校验422，限流429。</p><p>日志与月测结果响应用安全DTO；错误响应含request_id/code/message/retryable，可含details。查任务不得透传payload和未交卷题目答案。完整规则见每个operation的description。</p></section><input class="noprint" id="filter" placeholder="搜索接口用途、路径或权限"><div id="operations"><details class="operation"><summary><span class="pill">POST</span> /auth/wechat · 微信登录</summary><p>code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。<br>权限：公开</p><pre>{
   &quot;description&quot;: &quot;code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。\n权限：公开&quot;,
   &quot;x-role&quot;: &quot;公开&quot;,
   &quot;responses&quot;: {
@@ -4834,8 +4834,8 @@
       }
     }
   }
-}</pre></details><details class="operation"><summary><span class="pill">GET</span> /jobs/{job_id} · 查询任务</summary><p><br>权限：member</p><pre>{
-  &quot;description&quot;: &quot;\n权限：member&quot;,
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /jobs/{job_id} · 查询任务</summary><p><br>权限：member<br>当前运行时仅接入audio_0.1任务，返回AudioJob；其他任务类型保留为设计契约。音频总尝试上限3，失败且attempts&lt;3才可重试，耗尽409；重试保留已合成临时文件并沿用任务ID。</p><pre>{
+  &quot;description&quot;: &quot;\n权限：member\n当前运行时仅接入audio_0.1任务，返回AudioJob；其他任务类型保留为设计契约。音频总尝试上限3，失败且attempts&lt;3才可重试，耗尽409；重试保留已合成临时文件并沿用任务ID。&quot;,
   &quot;x-role&quot;: &quot;member&quot;,
   &quot;responses&quot;: {
     &quot;200&quot;: {
@@ -4851,7 +4851,14 @@
                 &quot;description&quot;: &quot;&quot;
               },
               &quot;data&quot;: {
-                &quot;$ref&quot;: &quot;#/components/schemas/Job&quot;
+                &quot;oneOf&quot;: [
+                  {
+                    &quot;$ref&quot;: &quot;#/components/schemas/Job&quot;
+                  },
+                  {
+                    &quot;$ref&quot;: &quot;#/components/schemas/AudioJob&quot;
+                  }
+                ]
               }
             },
             &quot;required&quot;: [
@@ -4956,8 +4963,8 @@
       }
     }
   ]
-}</pre></details><details class="operation"><summary><span class="pill">POST</span> /jobs/{job_id}/retry · 重试任务</summary><p>只重试failed/partial未完成项。quiz_prepare仅对应failed月测，锁孩子保证无其他活动月测，再恢复preparing，沿用已冻结词义与题目ID。max_attempts=2耗尽422，可放弃后新建。</p><pre>{
-  &quot;description&quot;: &quot;只重试failed/partial未完成项。quiz_prepare仅对应failed月测，锁孩子保证无其他活动月测，再恢复preparing，沿用已冻结词义与题目ID。max_attempts=2耗尽422，可放弃后新建。&quot;,
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /jobs/{job_id}/retry · 重试任务</summary><p>只重试failed/partial未完成项。quiz_prepare仅对应failed月测，锁孩子保证无其他活动月测，再恢复preparing，沿用已冻结词义与题目ID。max_attempts=2耗尽422，可放弃后新建。<br>当前运行时仅接入audio_0.1任务，返回AudioJob；其他任务类型保留为设计契约。音频总尝试上限3，失败且attempts&lt;3才可重试，耗尽409；重试保留已合成临时文件并沿用任务ID。</p><pre>{
+  &quot;description&quot;: &quot;只重试failed/partial未完成项。quiz_prepare仅对应failed月测，锁孩子保证无其他活动月测，再恢复preparing，沿用已冻结词义与题目ID。max_attempts=2耗尽422，可放弃后新建。\n当前运行时仅接入audio_0.1任务，返回AudioJob；其他任务类型保留为设计契约。音频总尝试上限3，失败且attempts&lt;3才可重试，耗尽409；重试保留已合成临时文件并沿用任务ID。&quot;,
   &quot;x-role&quot;: &quot;member&quot;,
   &quot;responses&quot;: {
     &quot;202&quot;: {
@@ -4973,7 +4980,14 @@
                 &quot;description&quot;: &quot;&quot;
               },
               &quot;data&quot;: {
-                &quot;$ref&quot;: &quot;#/components/schemas/JobAccepted&quot;
+                &quot;oneOf&quot;: [
+                  {
+                    &quot;$ref&quot;: &quot;#/components/schemas/JobAccepted&quot;
+                  },
+                  {
+                    &quot;$ref&quot;: &quot;#/components/schemas/AudioJob&quot;
+                  }
+                ]
               }
             },
             &quot;required&quot;: [
@@ -5080,7 +5094,18 @@
     {
       &quot;$ref&quot;: &quot;#/components/parameters/IdempotencyKey&quot;
     }
-  ]
+  ],
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;type&quot;: &quot;object&quot;,
+          &quot;additionalProperties&quot;: false
+        }
+      }
+    }
+  }
 }</pre></details><details class="operation"><summary><span class="pill">GET</span> /voices · 可用音色</summary><p><br>权限：authenticated</p><pre>{
   &quot;description&quot;: &quot;\n权限：authenticated&quot;,
   &quot;x-role&quot;: &quot;authenticated&quot;,
@@ -5106,10 +5131,15 @@
                     &quot;items&quot;: {
                       &quot;$ref&quot;: &quot;#/components/schemas/Voice&quot;
                     }
+                  },
+                  &quot;available&quot;: {
+                    &quot;type&quot;: &quot;boolean&quot;,
+                    &quot;description&quot;: &quot;是否配置可用的合成适配器；false不代表历史缓存不可读。&quot;
                   }
                 },
                 &quot;required&quot;: [
-                  &quot;items&quot;
+                  &quot;items&quot;,
+                  &quot;available&quot;
                 ],
                 &quot;description&quot;: &quot;&quot;
               }
@@ -5218,8 +5248,8 @@
       }
     }
   ]
-}</pre></details><details class="operation"><summary><span class="pill">POST</span> /audio · 获取或生成音频</summary><p>命中返回 200，未命中 202；必须匹配当前内容版本。<br>权限：member</p><pre>{
-  &quot;description&quot;: &quot;命中返回 200，未命中 202；必须匹配当前内容版本。\n权限：member&quot;,
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /audio · 获取或生成音频</summary><p>已接入0.1。完成返回200，其他状态返回202，统一AudioJob；幂等重放可能为旧状态，继续GET任务刷新。仅接受已保存资源ID和当前内容版本。</p><pre>{
+  &quot;description&quot;: &quot;已接入0.1。完成返回200，其他状态返回202，统一AudioJob；幂等重放可能为旧状态，继续GET任务刷新。仅接受已保存资源ID和当前内容版本。&quot;,
   &quot;x-role&quot;: &quot;member&quot;,
   &quot;responses&quot;: {
     &quot;200&quot;: {
@@ -5235,7 +5265,7 @@
                 &quot;description&quot;: &quot;&quot;
               },
               &quot;data&quot;: {
-                &quot;$ref&quot;: &quot;#/components/schemas/Audio&quot;
+                &quot;$ref&quot;: &quot;#/components/schemas/AudioJob&quot;
               }
             },
             &quot;required&quot;: [
@@ -5340,7 +5370,7 @@
                 &quot;description&quot;: &quot;&quot;
               },
               &quot;data&quot;: {
-                &quot;$ref&quot;: &quot;#/components/schemas/JobAccepted&quot;
+                &quot;$ref&quot;: &quot;#/components/schemas/AudioJob&quot;
               }
             },
             &quot;required&quot;: [
@@ -14024,8 +14054,7 @@
   &quot;additionalProperties&quot;: false,
   &quot;properties&quot;: {
     &quot;id&quot;: {
-      &quot;type&quot;: &quot;string&quot;,
-      &quot;description&quot;: &quot;&quot;
+      &quot;type&quot;: &quot;string&quot;
     },
     &quot;accent&quot;: {
       &quot;type&quot;: &quot;string&quot;,
@@ -14034,29 +14063,16 @@
         &quot;en-US&quot;
       ]
     },
-    &quot;label&quot;: {
-      &quot;type&quot;: &quot;string&quot;,
-      &quot;description&quot;: &quot;&quot;
-    },
-    &quot;sample_resource_path&quot;: {
-      &quot;type&quot;: &quot;string&quot;,
-      &quot;description&quot;: &quot;&quot;
-    },
-    &quot;supported_rates&quot;: {
-      &quot;type&quot;: &quot;array&quot;,
-      &quot;items&quot;: {
-        &quot;type&quot;: &quot;number&quot;
-      }
+    &quot;gender&quot;: {
+      &quot;type&quot;: &quot;string&quot;
     }
   },
   &quot;required&quot;: [
     &quot;id&quot;,
     &quot;accent&quot;,
-    &quot;label&quot;,
-    &quot;sample_resource_path&quot;,
-    &quot;supported_rates&quot;
+    &quot;gender&quot;
   ],
-  &quot;description&quot;: &quot;&quot;
+  &quot;description&quot;: &quot;配置白名单；男声需先通过真实账号验证再启用，接口本身不验证音质。&quot;
 }</pre></details><details id="StudySession"><summary>StudySession</summary><pre>{
   &quot;type&quot;: &quot;object&quot;,
   &quot;additionalProperties&quot;: false,
@@ -14681,7 +14697,9 @@
     },
     &quot;voice_id&quot;: {
       &quot;type&quot;: &quot;string&quot;,
-      &quot;description&quot;: &quot;&quot;
+      &quot;description&quot;: &quot;&quot;,
+      &quot;minLength&quot;: 1,
+      &quot;maxLength&quot;: 100
     },
     &quot;speech_rate&quot;: {
       &quot;type&quot;: &quot;number&quot;,
@@ -16204,5 +16222,62 @@
     &quot;items&quot;,
     &quot;input_type&quot;,
     &quot;raw_text&quot;
+  ]
+}</pre></details><details id="AudioJob"><summary>AudioJob</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;job_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;status&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;enum&quot;: [
+        &quot;queued&quot;,
+        &quot;running&quot;,
+        &quot;succeeded&quot;,
+        &quot;failed&quot;,
+        &quot;cancelled&quot;
+      ]
+    },
+    &quot;attempts&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;retryable&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;error_code&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;poll_after_ms&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;const&quot;: 2000
+    },
+    &quot;audio_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;resource_path&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;description&quot;: &quot;成功时为同源鉴权下载路径，不含 OSS URL 或密钥。&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;job_id&quot;,
+    &quot;status&quot;,
+    &quot;attempts&quot;,
+    &quot;retryable&quot;,
+    &quot;error_code&quot;,
+    &quot;poll_after_ms&quot;,
+    &quot;audio_id&quot;,
+    &quot;resource_path&quot;
   ]
 }</pre></details><script>document.getElementById("filter").addEventListener("input",e=>{const q=e.target.value.toLowerCase();document.querySelectorAll(".operation").forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?"":"none")})</script><p class="muted">本地设计交付。无远程脚本、字体或数据上传；可以用浏览器打印为PDF。全部功能统一属于0.1。</p></main></html>

@@ -1,3 +1,4 @@
+import {boundedAudio} from './oss-storage.ts';
 import { createHash } from 'node:crypto';
 
 export type Provider = 'openai' | 'qwen' | 'deepseek';
@@ -114,6 +115,11 @@ const COSY_VOICES: Voice[] = [
   { id: 'loongabby_v3', accent: 'en-US', gender: 'Female' },
   { id: 'loongandy_v3', accent: 'en-US', gender: 'Male' },
 ];
+export function configuredCosyVoices(env:Record<string,string|undefined>):Voice[] {
+  const ids=required(env,'COSYVOICE_ENABLED_VOICES').split(',').map(x=>x.trim());
+  if(ids.some(id=>!COSY_VOICES.some(v=>v.id===id)))throw new ProviderError('UNVERIFIED_TTS_VOICE');
+  return COSY_VOICES.filter(v=>ids.includes(v.id)).map(v=>({...v}));
+}
 // Adapters are registered by trusted server code, never loaded from request URLs.
 export function createTtsProvider(env: Record<string, string | undefined> = process.env, fetcher: Fetch = fetch, adapters: Readonly<Record<string,TtsFactory>> = {}): TtsProvider {
   const selected=env.TTS_PROVIDER||'cosyvoice';
@@ -129,9 +135,7 @@ export function createCosyVoiceProvider(env: Record<string, string | undefined>,
   if (!/^[a-zA-Z0-9-]+$/.test(workspace)) throw new ProviderError('INVALID_COSYVOICE_WORKSPACE');
   const model = env.COSYVOICE_MODEL || 'cosyvoice-v3-flash';
   if (model !== 'cosyvoice-v3-flash') throw new ProviderError('UNVERIFIED_TTS_MODEL');
-  const ids = required(env, 'COSYVOICE_ENABLED_VOICES').split(',').map(x => x.trim());
-  if (ids.some(id => !COSY_VOICES.some(v => v.id === id))) throw new ProviderError('UNVERIFIED_TTS_VOICE');
-  const voices = COSY_VOICES.filter(v => ids.includes(v.id));
+  const voices = configuredCosyVoices(env);
   const base = `https://${workspace}.cn-beijing.maas.aliyuncs.com`;
   return {
     profile: Object.freeze({provider:'cosyvoice',region:'cn-beijing',model,revision:'cosy-http-plain-aigc-v1',format:'mp3',sampleRate:24000}),
@@ -158,7 +162,7 @@ export function createCosyVoiceProvider(env: Record<string, string | undefined>,
       audioUrl.protocol = 'https:';
       const audio = await request(fetcher, audioUrl.href, {}, 30000);
       let bytes: Uint8Array;
-      try { bytes = new Uint8Array(await audio.arrayBuffer()); }
+      try { bytes = await boundedAudio(audio); }
       catch { throw new ProviderError('UPSTREAM_AUDIO_READ_FAILED', true); }
       // OSS may use application/octet-stream. Verify MP3 ID3/frame header instead.
       const mp3 = bytes.length >= 3 && ((bytes[0] === 73 && bytes[1] === 68 && bytes[2] === 51) || (bytes[0] === 255 && (bytes[1] & 224) === 224));
@@ -177,3 +181,4 @@ export function audioCacheKey(scope: string, contentVersion: string, profile: st
 
 export { createAudioStorageRouter, AudioStorageError } from './audio-storage.ts';
 export type { AudioObjectStorage, AudioObjectLocation } from './audio-storage.ts';
+export {createOssStorage} from './oss-storage.ts';

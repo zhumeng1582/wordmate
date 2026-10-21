@@ -27,3 +27,18 @@ test('embedded development DB initializes once, persists after reopen and reject
   process.env.NODE_ENV='production';await assert.rejects(connect(url),/only enabled for local development/);
  }finally{if(connection)await connection.source.destroy();fs.rmSync(directory,{recursive:true,force:true});}
 });
+test('audio migration upgrades an existing 001 database without removing learning records',async()=>{
+ const {PGlite}=require('@electric-sql/pglite'),name='audio-upgrade-'+randomUUID(),directory=path.resolve('.local',name);
+ process.env.NODE_ENV='development';process.env.AUTH_MODE='development';
+ let connection;const pg=new PGlite(directory);
+ try{
+  await pg.exec(fs.readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+  await pg.query("INSERT INTO wordmate.users(wx_app_id,wx_open_id,display_name) VALUES('old','old','保留')");
+ }finally{await pg.close();}
+ try{
+  connection=await connect('pglite:.local/'+name);
+  assert.equal((await connection.db.query("SELECT display_name FROM wordmate.users WHERE wx_app_id='old'")).rows[0].display_name,'保留');
+  assert.equal((await connection.db.query("SELECT count(*)::int n FROM information_schema.columns WHERE table_schema='wordmate' AND table_name='audio_assets' AND column_name IN ('sha256','size_bytes','storage_profile_id')")).rows[0].n,3);
+  assert.equal((await connection.db.query("SELECT count(*)::int n FROM wordmate.audio_usage_events")).rows[0].n,0);
+ }finally{if(connection)await connection.source.destroy();fs.rmSync(directory,{recursive:true,force:true});}
+});

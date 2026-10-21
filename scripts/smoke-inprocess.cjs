@@ -9,7 +9,9 @@ const name=`inprocess-${randomUUID()}`;
 Object.assign(process.env,{NODE_ENV:'development',AUTH_MODE:'development',DICTIONARY_PROVIDER:'fixture',DATABASE_URL:`pglite:.local/${name}`});
 const {createApplication}=require('../apps/api/dist/main.js');
 (async()=>{
- const {app,dispose}=await createApplication({vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{if(raw==='无法识别')return {error:'NO_WORDS_FOUND',items:[]};assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
+ const audioObjects=new Map();let audioCalls=0;
+ const audio={profile:{provider:'mock',model:'mock'},voices:[{id:'gb',accent:'en-GB',gender:'Female'}],synthesize:async()=>{audioCalls++;return {bytes:Buffer.from('ID3-route-test')};},storageProfile:'mock',stores:{mock:{put:async(k,b)=>{audioObjects.set(k,b);},get:async k=>audioObjects.get(k),stat:async k=>audioObjects.has(k)?{size:audioObjects.get(k).length}:null}},spoolDir:resolve('.local',name+'-spool'),childDaily:20,userDaily:40};
+ const {app,dispose}=await createApplication({audio,vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{if(raw==='无法识别')return {error:'NO_WORDS_FOUND',items:[]};assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
  function request(path,body,key=randomUUID(),method=body?'POST':'GET'){
   return new Promise((resolve,reject)=>{
    const chunks=[];const socket=new Duplex({read(){},write(chunk,encoding,callback){chunks.push(Buffer.from(chunk));callback();}});
@@ -18,7 +20,7 @@ const {createApplication}=require('../apps/api/dist/main.js');
    req.headers={host:'127.0.0.1','content-type':'application/json',authorization:`Bearer ${token}`,'idempotency-key':key,...(content?{'content-length':String(content.length)}:{})};
    const res=new ServerResponse(req);res.assignSocket(socket);
    const timeout=setTimeout(()=>reject(Error('handler timed out: '+path+' '+Buffer.concat(chunks).toString())),10000);
-   res.on('finish',()=>{clearTimeout(timeout);const raw=Buffer.concat(chunks).toString();try{const data=JSON.parse(raw.slice(raw.indexOf('\r\n\r\n')+4));resolve({status:res.statusCode,...data});}catch(e){reject(e);}finally{socket.destroy();}});
+   res.on('finish',()=>{clearTimeout(timeout);const raw=Buffer.concat(chunks).toString();try{const body=raw.slice(raw.indexOf('\r\n\r\n')+4);const data=String(res.getHeader('Content-Type')).startsWith('audio/mpeg')?{data:body}:JSON.parse(body);resolve({status:res.statusCode,...data});}catch(e){reject(e);}finally{socket.destroy();}});
    app.getHttpAdapter().getInstance()(req,res);
    req.complete=true;req._destroy=(error,callback)=>callback(error);if(content)req.push(content);req.push(null);
   });
@@ -34,6 +36,16 @@ const {createApplication}=require('../apps/api/dist/main.js');
   const book=await ok(`/children/${c.id}/wordbooks`,{name:'词本'});
   const batch=await ok(`/children/${c.id}/batches`,{wordbook_id:book.id,words:['apple','book']});
   await ok(`/batches/${batch.id}/confirm`,{expected_version:1,selections:batch.items.map(i=>({item_id:i.id,action:'select',candidate_id:i.candidates[0].candidate_id}))});
+  assert.equal((await ok('/voices')).items[0].id,'gb');
+  const audioWord=(await ok(`/children/${c.id}/words`)).items[0];
+  const speech={word_id:audioWord.id,content_version:audioWord.version,accent:'en-GB',voice_id:'gb',speech_rate:1};
+  assert.equal((await request('/audio',{...speech,text:'untrusted'})).status,422);
+  assert.equal((await request('/audio',{...speech,sentence_id:audioWord.id})).status,422);
+  const queued=await request('/audio',speech);assert.equal(queued.status,202);let sound=queued.data;
+  for(let n=0;n<30&&sound.status!=='succeeded';n++){await new Promise(r=>setTimeout(r,200));sound=await ok(`/jobs/${sound.job_id}`);}
+  assert.equal(sound.status,'succeeded',JSON.stringify(sound));
+  assert.equal(await ok(sound.resource_path),'ID3-route-test');
+  assert.equal((await request('/audio',speech)).status,200);assert.equal(audioCalls,1);
   const s=await ok(`/children/${c.id}/study-sessions`,{source:'scheduled'});
   const cards=await ok(`/study-sessions/${s.id}/cards`);assert.equal(cards.items.length,2);
   const event={session_id:s.id,card_id:cards.items[0].id,event_id:randomUUID(),expected_version:1,rating:'again',lease_generation:s.lease_generation};
@@ -80,6 +92,6 @@ const {createApplication}=require('../apps/api/dist/main.js');
   assert.equal(failed.status,'succeeded');
   const generated=(await ok(`/children/${c.id}/words`)).items.find(w=>w.id===ai.items[0].word_id);assert.equal(generated.example.text_en,'I see the pencil.');
   assert.equal((await request(`/children/${c.id}/ai-batches`,{...aiBody,unexpected:true})).status,422);
-  console.log('PASS: Nest/Express request parsing, validation, auth, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results, calendar, wrong words practice and async AI batch save (in process; TCP not tested)');
- }finally{await dispose();rmSync(resolve('.local',name),{recursive:true,force:true});}
+  console.log('PASS: Nest/Express request parsing, validation, auth, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results, calendar, wrong words practice async AI batch save, audio worker/cache/authorized binary download (in process; TCP not tested)');
+ }finally{await dispose();rmSync(resolve('.local',name),{recursive:true,force:true});rmSync(resolve('.local',name+'-spool'),{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

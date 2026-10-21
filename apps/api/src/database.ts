@@ -14,6 +14,7 @@ export async function connect(url:string):Promise<{db:Database;source:{destroy()
     const pg=new PGlite(directory);await pg.waitReady;
     const exists=await pg.query("SELECT 1 FROM information_schema.schemata WHERE schema_name='wordmate'");
     if(!exists.rows.length)await pg.exec(readFileSync(resolve(__dirname,'../../../deliverables/0.1/database/001_schema.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/002_audio.sql'),'utf8'));
     const db:Database={query:async(s,p)=>({rows:(await pg.query(s,p)).rows as any}),transaction:fn=>pg.transaction(tx=>fn({query:async(s,p)=>({rows:(await tx.query(s,p)).rows as any})}))};
     return {db,source:{destroy:()=>pg.close()}};
   }

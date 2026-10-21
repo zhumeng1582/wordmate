@@ -1,3 +1,4 @@
+import {audioRuntime,type AudioRuntime} from './audio-runtime';
 import type {VocabularyProvider} from './vocabulary';
 import {vocabularyProvider} from './vocabulary';
 import 'reflect-metadata';
@@ -17,7 +18,7 @@ if(env.DICTIONARY_PROVIDER==='fixture'&&!development)throw Error('Fixture dictio
 let core:Core;
 @Controller('api')
 class ApiController {
-  @Get('health') health(){return {status:'ok',api_revision:'0.1-ai-vocabulary',mode:development?'development':'production'};}
+  @Get('health') health(){return {status:'ok',api_revision:'0.1-audio',mode:development?'development':'production'};}
   @All('*path') async handle(@Req() req:Request,@Res() res:Response){
     const request_id=randomUUID();res.setHeader('Cache-Control','no-store');
     try {
@@ -25,12 +26,17 @@ class ApiController {
       const historyRead=method==='GET'&&p[0]==='children'&&['calendar','wrong-words'].includes(p[2]);
       const cardsRead=method==='GET'&&p[0]==='study-sessions'&&p[2]==='cards';
       const quizRead=method==='GET'&&(p[0]==='monthly-quizzes'||p[0]==='children'&&p[2]==='monthly-quizzes');
-      ensure(Object.keys(req.query).every(k=>quizRead&&['month','cursor','limit'].includes(k)||historyRead&&(p[2]==='calendar'?['month']:['date','source','quiz_id','cursor','limit']).includes(k)||cardsRead&&['cursor','limit'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
+      ensure(Object.keys(req.query).every(k=>method==='GET'&&p.join('/')==='voices'&&k==='accent'||quizRead&&['month','cursor','limit'].includes(k)||historyRead&&(p[2]==='calendar'?['month']:['date','source','quiz_id','cursor','limit']).includes(k)||cardsRead&&['cursor','limit'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
       validateBody(p,method,b);
       if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
       const auth=req.headers.authorization;ensure(typeof auth==='string' && auth.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
       const key=String(req.headers['idempotency-key']??'');let data:any;
-      if(p[0]==='ai-batches'&&p.length===2&&method==='PUT')data=await core.vocabulary.replace(actor,key,p[1],b);
+      if(method==='GET'&&p.join('/')==='voices')data=await core.audio.voices(req.query.accent);
+      else if(method==='POST'&&p.join('/')==='audio'){data=await core.audio.create(actor,key,b);res.status(data.status==='succeeded'?200:202);}
+      else if(method==='GET'&&p[0]==='jobs'&&p.length===2)data=await core.audio.get(actor,p[1]);
+      else if(method==='POST'&&p[0]==='jobs'&&p[2]==='retry'&&p.length===3){data=await core.audio.retry(actor,key,p[1]);res.status(202);}
+      else if(method==='GET'&&p[0]==='audio'&&p[2]==='content'&&p.length===3){const bytes=await core.audio.content(actor,p[1]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(Buffer.from(bytes));}
+      else if(p[0]==='ai-batches'&&p.length===2&&method==='PUT')data=await core.vocabulary.replace(actor,key,p[1],b);
       else if(p[0]==='ai-batches'&&p.length===2&&method==='GET')data=await core.vocabulary.get(actor,p[1]);
       else if(p[0]==='ai-batches'&&p.length===3&&p[2]==='retry'&&method==='POST')data=await core.vocabulary.retry(actor,key,p[1]);
       else if(method==='GET'&&p.join('/')==='me')data=await core.me(actor);
@@ -73,9 +79,9 @@ class ApiController {
   }
 }
 @Module({controllers:[ApiController]}) class AppModule{}
-export async function createApplication(options:{vocabulary?:VocabularyProvider}={}){
+export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime}={}){
   const {db,source}=await connect(env.DATABASE_URL??'');
-  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env));
+  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env),options.audio??await audioRuntime(env));
   const app=await NestFactory.create(AppModule,{bodyParser:true,logger:['error','warn']});
   app.enableShutdownHooks();
   const close=()=>{void source.destroy();};process.once('SIGTERM',close);process.once('SIGINT',close);
@@ -84,11 +90,13 @@ export async function createApplication(options:{vocabulary?:VocabularyProvider}
   const timer=setInterval(async()=>{if(preparing)return;preparing=true;try{await core.quizzes.prepare(new StoredMeaningQuizBuilder());}catch{console.error('Quiz preparation cycle failed');}finally{preparing=false;}},2000);timer.unref();
   let generation:Promise<void>|undefined;
   const aiTimer=setInterval(()=>{if(generation)return;generation=core.vocabulary.processOne().catch(()=>{console.error('Vocabulary generation cycle failed');}).finally(()=>{generation=undefined;});},1000);aiTimer.unref();
-  return {app,dispose:async()=>{clearInterval(timer);clearInterval(aiTimer);await generation;await app.close();await source.destroy();}};
+  let audioWork:Promise<void>|undefined;
+  const audioTimer=setInterval(()=>{if(audioWork)return;audioWork=core.audio.processOne().catch(()=>console.error('Audio generation cycle failed')).finally(()=>{audioWork=undefined;});},1000);audioTimer.unref();
+  return {app,dispose:async()=>{clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);await Promise.all([generation,audioWork]);await app.close();await source.destroy();}};
 }
 async function bootstrap(){
   const {app}=await createApplication();
   await app.listen(Number(env.PORT??3000),development?'127.0.0.1':env.HOST??'127.0.0.1');
-  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-ai-vocabulary] (${development?'development':'production'})`);
+  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-audio] (${development?'development':'production'})`);
 }
 if(require.main===module)bootstrap().catch(()=>{console.error('Backend startup failed. Check database, credentials and installed dependencies.');process.exitCode=1;});

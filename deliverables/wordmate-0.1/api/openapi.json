@@ -5126,7 +5126,7 @@
         "tags": [
           "AI"
         ],
-        "description": "\n权限：member",
+        "description": "\n权限：member\n当前运行时仅接入audio_0.1任务，返回AudioJob；其他任务类型保留为设计契约。音频总尝试上限3，失败且attempts<3才可重试，耗尽409；重试保留已合成临时文件并沿用任务ID。",
         "x-role": "member",
         "responses": {
           "200": {
@@ -5142,7 +5142,14 @@
                       "description": ""
                     },
                     "data": {
-                      "$ref": "#/components/schemas/Job"
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/Job"
+                        },
+                        {
+                          "$ref": "#/components/schemas/AudioJob"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -5256,7 +5263,7 @@
         "tags": [
           "AI"
         ],
-        "description": "只重试failed/partial未完成项。quiz_prepare仅对应failed月测，锁孩子保证无其他活动月测，再恢复preparing，沿用已冻结词义与题目ID。max_attempts=2耗尽422，可放弃后新建。",
+        "description": "只重试failed/partial未完成项。quiz_prepare仅对应failed月测，锁孩子保证无其他活动月测，再恢复preparing，沿用已冻结词义与题目ID。max_attempts=2耗尽422，可放弃后新建。\n当前运行时仅接入audio_0.1任务，返回AudioJob；其他任务类型保留为设计契约。音频总尝试上限3，失败且attempts<3才可重试，耗尽409；重试保留已合成临时文件并沿用任务ID。",
         "x-role": "member",
         "responses": {
           "202": {
@@ -5272,7 +5279,14 @@
                       "description": ""
                     },
                     "data": {
-                      "$ref": "#/components/schemas/JobAccepted"
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/JobAccepted"
+                        },
+                        {
+                          "$ref": "#/components/schemas/AudioJob"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -5379,7 +5393,18 @@
           {
             "$ref": "#/components/parameters/IdempotencyKey"
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        }
       }
     },
     "/voices": {
@@ -5413,10 +5438,15 @@
                           "items": {
                             "$ref": "#/components/schemas/Voice"
                           }
+                        },
+                        "available": {
+                          "type": "boolean",
+                          "description": "是否配置可用的合成适配器；false不代表历史缓存不可读。"
                         }
                       },
                       "required": [
-                        "items"
+                        "items",
+                        "available"
                       ],
                       "description": ""
                     }
@@ -5534,7 +5564,7 @@
         "tags": [
           "音频"
         ],
-        "description": "命中返回 200，未命中 202；必须匹配当前内容版本。\n权限：member",
+        "description": "已接入0.1。完成返回200，其他状态返回202，统一AudioJob；幂等重放可能为旧状态，继续GET任务刷新。仅接受已保存资源ID和当前内容版本。",
         "x-role": "member",
         "responses": {
           "200": {
@@ -5550,7 +5580,7 @@
                       "description": ""
                     },
                     "data": {
-                      "$ref": "#/components/schemas/Audio"
+                      "$ref": "#/components/schemas/AudioJob"
                     }
                   },
                   "required": [
@@ -5655,7 +5685,7 @@
                       "description": ""
                     },
                     "data": {
-                      "$ref": "#/components/schemas/JobAccepted"
+                      "$ref": "#/components/schemas/AudioJob"
                     }
                   },
                   "required": [
@@ -14780,8 +14810,7 @@
         "additionalProperties": false,
         "properties": {
           "id": {
-            "type": "string",
-            "description": ""
+            "type": "string"
           },
           "accent": {
             "type": "string",
@@ -14790,29 +14819,16 @@
               "en-US"
             ]
           },
-          "label": {
-            "type": "string",
-            "description": ""
-          },
-          "sample_resource_path": {
-            "type": "string",
-            "description": ""
-          },
-          "supported_rates": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
+          "gender": {
+            "type": "string"
           }
         },
         "required": [
           "id",
           "accent",
-          "label",
-          "sample_resource_path",
-          "supported_rates"
+          "gender"
         ],
-        "description": ""
+        "description": "配置白名单；男声需先通过真实账号验证再启用，接口本身不验证音质。"
       },
       "StudySession": {
         "type": "object",
@@ -15452,7 +15468,9 @@
           },
           "voice_id": {
             "type": "string",
-            "description": ""
+            "description": "",
+            "minLength": 1,
+            "maxLength": 100
           },
           "speech_rate": {
             "type": "number",
@@ -17003,6 +17021,64 @@
           "items",
           "input_type",
           "raw_text"
+        ]
+      },
+      "AudioJob": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "poll_after_ms": {
+            "type": "integer",
+            "const": 2000
+          },
+          "audio_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resource_path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "成功时为同源鉴权下载路径，不含 OSS URL 或密钥。"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "attempts",
+          "retryable",
+          "error_code",
+          "poll_after_ms",
+          "audio_id",
+          "resource_path"
         ]
       }
     }

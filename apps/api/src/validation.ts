@@ -6,6 +6,7 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  audio:{oneOf:['word_id','sentence_id'].map(resource=>object({[resource]:id,content_version:positive,accent:{enum:['en-GB','en-US']},voice_id:str(100),speech_rate:{type:'number',minimum:0.5,maximum:1.5}}))},
   aiReplace:object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80},expected_attempts:{type:'integer',minimum:0}},['wordbook_id','raw_text','expected_attempts']),
   aiBatch:{oneOf:[object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80}},['wordbook_id','raw_text']),object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:30},theme:{type:'string',maxLength:80}},['wordbook_id','words'])]},
   quizCreate:object({month:{type:'string',pattern:'^\\d{4}-(0[1-9]|1[0-2])$'},mode:{enum:['sample','full']},sample_count:{type:'integer',enum:[10,20,30,50]}},['month','mode']),
@@ -24,6 +25,8 @@ export function validateBody(path:string[],method:string,body:unknown){
   if(!['POST','PUT'].includes(method))return;
   let kind='';const route=path.join('/');
   if(['auth/dev','auth/wechat'].includes(route))kind='login';
+  else if(route==='audio')kind='audio';
+  else if(path[0]==='jobs'&&path[2]==='retry')kind='empty';
   else if(route==='families')kind='family';
   else if(route==='reviews')kind='review';
   else if(route==='family-invites/claim')kind='claim';

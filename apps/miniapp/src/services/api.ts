@@ -15,6 +15,22 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  VOICE_ACCENT_UNAVAILABLE:'当前声音未开通此口音，请切换声音或联系管理员。',
+  AUDIO_NOT_CONFIGURED:'语音尚未配置，请检查后端 TTS 和存储配置并重启。',
+  AUDIO_DAILY_LIMIT:'已达到最近 24 小时的新音频生成额度。已缓存音频仍可播放。',
+  AUDIO_WAIT_TIMEOUT:'音频仍在后台准备，可以稍后再次点击播放。',
+  AUDIO_CONTENT_CHANGED:'单词或例句已更新，请刷新页面后播放。',
+  AUDIO_DOWNLOAD_FAILED:'音频加载失败，请再次点击播放；若持续失败，请检查服务器存储权限。',
+  AUDIO_STORAGE_ACCESS_DENIED:'音频存储权限不足，请检查 OSS 配置后重试。',
+  AUDIO_STORAGE_UNAVAILABLE:'音频存储暂不可用，请稍后重试。',
+  AUDIO_STORAGE_PROFILE_UNAVAILABLE:'这条音频的存储配置不可用，请联系管理员恢复配置。',
+  AUDIO_TTS_CONFIGURATION_CHANGED:'任务使用的语音配置已变化，请恢复原配置后重试。',
+  AUDIO_SYNTHESIS_FAILED:'语音生成失败，可再次点击重试（最多尝试 3 次）。',
+  INVALID_AUDIO_RESPONSE:'语音服务返回的音频无效，请再次点击重试。',
+  AUDIO_INTEGRITY_FAILED:'音频完整性校验失败，请再次点击重试。',
+  AUDIO_ATTEMPTS_EXHAUSTED:'此音频已达到尝试上限，请联系管理员检查失败原因。',
+  AUDIO_NOT_RETRYABLE:'此音频当前无法重试，请刷新状态。',
+
   INVITE_NOT_FOUND:'邀请不存在，请向邀请人索取新卡片或口令。',
   INVITE_UNAVAILABLE:'邀请已过期或已被领取，请向邀请人索取新邀请。',
   ALREADY_MEMBER:'你已是该家庭成员，无需再次加入。',

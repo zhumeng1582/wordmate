@@ -51,3 +51,8 @@ Taro 的 Rust 配置诊断在受限 macOS 环境发生 NULL object panic，构�
 AI录词验收见 apps/AI-VOCABULARY.txt；完整真实隔离验收命令：corepack pnpm test:ai:flow。
 
 整段输入更新：现在可直接粘贴编号、混合格式或表格文本，由AI识别；图片/表格文件上传尚未开放。重启后端并编译后生效，安全限制见 apps/AI-VOCABULARY.txt。
+
+2026-10-21 音频业务接入
+先 corepack pnpm test:audio:flow 在本机终端验收，预计3次TTS调用及少量OSS测试文件；重复播放和数据库重启不增加合成次数。
+随后停止旧后端，corepack pnpm local，再在微信开发者工具编译。增量迁移自动保留已有本地学习数据。单词本/例句/复习卡片已有英美音按钮；声音选项由服务端白名单控制。
+本轮离线业务和HTTP测试通过；执行环境真实调用遇到DNS ENOTFOUND，不能据此判定用户云配置错误。完整云链路及微信实际播放仍须验收。
