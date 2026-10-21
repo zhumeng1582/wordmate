@@ -2,6 +2,14 @@ const {spawnSync}=require('node:child_process');
 const {resolve}=require('node:path');
 const root=resolve(__dirname,'..');
 const env={...process.env,NODE_ENV:'development',AUTH_MODE:'development',DICTIONARY_PROVIDER:'fixture',DATABASE_URL:'pglite:.local/dev-db',WECHAT_APP_ID:'wxcf7d28bc513949d4',MINIAPP_DEV_AUTH:'true',MINIAPP_API_BASE:'http://127.0.0.1:3000/api',PORT:'3000'};
+// Fail before building or opening the embedded database when an old server still owns the port.
+const portOwner=spawnSync('lsof',['-nP','-t','-iTCP:3000','-sTCP:LISTEN'],{encoding:'utf8'});
+const owners=(portOwner.stdout||'').trim().split(/\s+/).filter(pid=>/^\d+$/.test(pid));
+if(owners.length){
+ console.error('3000 端口仍被进程占用，PID：'+[...new Set(owners)].join(', '));
+ console.error('请先在旧后端终端按 Ctrl+C；确认进程退出、端口释放后再运行。此次未构建，也未打开数据库。');
+ process.exit(1);
+}
 function run(args){const r=spawnSync('corepack',['pnpm',...args],{cwd:root,env,stdio:'inherit'});if(r.error){console.error(r.error.message);process.exit(1);}if(r.status!==0)process.exit(r.status??1);}
 run(['--filter','@wordmate/api','build']);
 run(['--filter','@wordmate/miniapp','typecheck']);

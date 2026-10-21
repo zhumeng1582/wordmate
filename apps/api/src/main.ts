@@ -88,20 +88,32 @@ export async function createApplication(options:{vocabulary?:VocabularyProvider,
   const {db,source}=await connect(env.DATABASE_URL??'');
   core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env),options.audio??await audioRuntime(env));
   const app=await NestFactory.create(AppModule,{bodyParser:true,logger:['error','warn']});
-  app.enableShutdownHooks();
-  const close=()=>{void source.destroy();};process.once('SIGTERM',close);process.once('SIGINT',close);
   await app.init();
-  let preparing=false;
-  const timer=setInterval(async()=>{if(preparing)return;preparing=true;try{await core.quizzes.prepare(new StoredMeaningQuizBuilder());}catch{console.error('Quiz preparation cycle failed');}finally{preparing=false;}},2000);timer.unref();
+  let preparation:Promise<void>|undefined;
+  const timer=setInterval(()=>{if(preparation)return;preparation=core.quizzes.prepare(new StoredMeaningQuizBuilder()).then(()=>{}).catch(()=>console.error('Quiz preparation cycle failed')).finally(()=>{preparation=undefined;});},2000);timer.unref();
   let generation:Promise<void>|undefined;
   const aiTimer=setInterval(()=>{if(generation)return;generation=core.vocabulary.processOne().catch(()=>{console.error('Vocabulary generation cycle failed');}).finally(()=>{generation=undefined;});},1000);aiTimer.unref();
   let audioWork:Promise<void>|undefined;
   const audioTimer=setInterval(()=>{if(audioWork)return;audioWork=core.audio.previews.processOne().then(()=>core.audio.processOne()).catch(()=>console.error('Audio generation cycle failed')).finally(()=>{audioWork=undefined;});},1000);audioTimer.unref();
-  return {app,dispose:async()=>{clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);await Promise.all([generation,audioWork]);await app.close();await source.destroy();}};
+  let disposing:Promise<void>|undefined;
+  const dispose=()=>disposing??= (async()=>{
+   clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);
+   // Stop accepting requests, finish outstanding jobs, then close the database exactly once.
+   await app.close();await Promise.all([preparation,generation,audioWork]);await source.destroy();
+  })();
+  return {app,dispose};
 }
 async function bootstrap(){
-  const {app}=await createApplication();
-  await app.listen(Number(env.PORT??3000),development?'127.0.0.1':env.HOST??'127.0.0.1');
-  console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-audio] (${development?'development':'production'})`);
+  const {app,dispose}=await createApplication();
+  let shuttingDown=false;
+  const shutdown=()=>{if(shuttingDown)return;shuttingDown=true;console.log('Stopping API; waiting for active work to finish…');void dispose().then(()=>process.exit(0),()=>process.exit(1));};
+  process.once('SIGINT',shutdown);process.once('SIGTERM',shutdown);
+  try{
+   await app.listen(Number(env.PORT??3000),development?'127.0.0.1':env.HOST??'127.0.0.1');
+   console.log(`API ready at http://127.0.0.1:${env.PORT??3000}/api/health [0.1-audio] (${development?'development':'production'})`);
+  }catch(e){process.removeListener('SIGINT',shutdown);process.removeListener('SIGTERM',shutdown);await dispose();throw e;}
 }
-if(require.main===module)bootstrap().catch(()=>{console.error('Backend startup failed. Check database, credentials and installed dependencies.');process.exitCode=1;});
+if(require.main===module)bootstrap().catch(e=>{
+ console.error(e?.code==='EADDRINUSE'?'Backend startup failed: port '+(env.PORT??3000)+' is already occupied. Stop the old server before restarting.':'Backend startup failed. Check database, credentials and installed dependencies.');
+ process.exitCode=1;
+});
