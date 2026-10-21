@@ -22,3 +22,8 @@
 .answer-chip{background:var(--field);color:var(--secondary-text);font-size:24px;padding:12px;margin:0;min-width:84px;line-height:1.4;border:2px solid transparent;border-radius:12px}
 .answer-chip::after{border:0}
 .answer-chip.current{border-color:var(--primary);background:var(--soft);color:var(--primary)}
+
+/* Explicit classes keep native disabled buttons legible despite variant styles. */
+.quiz-page .btn.is-disabled,.quiz-page .answer-chip.is-disabled{background:var(--disabled-bg);color:var(--disabled-text);border-color:var(--border);opacity:1}
+.quiz-page .btn.is-disabled .option-letter{color:var(--disabled-text)}
+.quiz-save{height:40px;line-height:40px}
