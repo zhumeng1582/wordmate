@@ -15,6 +15,7 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  QUERY_NOT_IMPLEMENTED:'当前服务暂不支持此筛选，请更新服务后重试。',
   INVALID_DATE_RANGE:'请选择有效的开始和结束日期。',
   AUDIO_SETTINGS_CHANGED:'设置已在其他设备更新，已刷新，请重新选择并保存。',
   VOICE_ACCENT_UNAVAILABLE:'当前音色不可用，请到“我的 → 发音设置”重新选择。',
