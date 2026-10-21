@@ -1,11 +1,10 @@
-import {AudioPreferences} from '../../components/AudioPreferences';
 import {useRef,useState} from 'react';
 import {View,Button,Input,Picker,Text} from '@tarojs/components';
 import Taro,{useDidShow,useShareAppMessage} from '@tarojs/taro';
 import {api,storage,login,eventId,message} from '../../services/api';
 import './index.css';
 const inviteCover='/assets/invite-cover.png';
-type Panel=''|'account'|'family'|'child'|'join'|'invites'|'share'|'audio';
+type Panel=''|'account'|'family'|'child'|'join'|'invites'|'share';
 export default function Family(){
   const [family,setFamily]=useState<any>(null),[families,setFamilies]=useState<any[]>([]),[members,setMembers]=useState<any[]>([]),[children,setChildren]=useState<any[]>([]);
   const [name,setName]=useState(''),[nickname,setNickname]=useState(''),[token,setToken]=useState(''),[invites,setInvites]=useState<any[]>([]);
@@ -42,14 +41,13 @@ export default function Family(){
     </View>
     <View className='family-actions'>
       {family&&<Button className='btn primary invite-button' disabled={busy} onClick={()=>family.role==='owner'?run(async()=>{if(!shareReady){const invite=await api(`/families/${family.id}/invites`,'POST',{},eventId());setShareInvite({...invite,family_id:family.id});}open('share');}):open('child')}>{family.role==='owner'?'邀请另一位家长':'选择孩子，开始陪学'}</Button>}
-      <View className='account-links'><Text onClick={()=>open('child')}>孩子档案</Text>{family?.role==='owner'&&<Text onClick={()=>run(async()=>{await refresh();open('invites');})}>邀请与审批{pending.length?` · ${pending.length}`:''}</Text>}{signedIn&&<Text onClick={()=>open('audio')}>发音设置</Text>}<Text onClick={()=>open('account')}>账号管理</Text></View>
+      <View className='account-links'><Text onClick={()=>open('child')}>孩子档案</Text>{family?.role==='owner'&&<Text onClick={()=>run(async()=>{await refresh();open('invites');})}>邀请与审批{pending.length?` · ${pending.length}`:''}</Text>}<Text onClick={()=>navigate('settings')}>设置</Text><Text onClick={()=>open('account')}>账号管理</Text></View>
       {DEV_AUTH&&<View className='dev-label'>本地体验 · 测试身份与词库</View>}
     </View>
-    <View className='family-tabs'><View className='family-tab' onClick={()=>navigate('home')}>今日</View><View className='family-tab' onClick={()=>navigate('words')}>单词本</View><View className='family-tab tab-disabled' onClick={()=>Taro.showToast({title:'日历复习尚在开发中',icon:'none'})}>日历</View><View className='family-tab tab-active'>我的</View></View>
+
     {!!panel&&<View className='sheet-backdrop' onClick={()=>!busy&&setPanel('')}><View className='family-sheet' onClick={e=>e.stopPropagation()}>
-      <View className='sheet-top'><View className='sheet-heading'>{{audio:'发音设置',account:'账号与家庭',family:'创建家庭',child:'孩子档案',join:'加入家庭',invites:'邀请与审批',share:'邀请另一位家长'}[panel]}</View><Button className='sheet-close' disabled={busy} onClick={()=>setPanel('')}>关闭</Button></View>
+      <View className='sheet-top'><View className='sheet-heading'>{{account:'账号与家庭',family:'创建家庭',child:'孩子档案',join:'加入家庭',invites:'邀请与审批',share:'邀请另一位家长'}[panel]}</View><Button className='sheet-close' disabled={busy} onClick={()=>setPanel('')}>关闭</Button></View>
       {error&&<View className='error'>{error}</View>}
-      {panel==='audio'&&<AudioPreferences/>}
       {panel==='share'&&<><View className='muted'>邀请有效期 24 小时，仅供一位家长领取；加入前需要你批准。</View>{shareReady?<><Button className='btn primary' openType='share' disabled={busy}>分享邀请卡片给朋友</Button><Button className='btn secondary' disabled={busy} onClick={()=>run(async()=>{if(new Date(shareInvite.expires_at).getTime()<=Date.now())throw Error('INVITE_UNAVAILABLE');await Taro.setClipboardData({data:shareInvite.invite_token});})}>复制邀请口令</Button><View className='muted'>如果口令已被领取，请为下一位家长生成新邀请。</View></>:<View className='notice'>邀请已过期或家庭已切换，请生成新邀请。</View>}<Button className='btn secondary' disabled={busy||family?.role!=='owner'} onClick={()=>run(async()=>{const invite=await api(`/families/${family.id}/invites`,'POST',{},eventId());setShareInvite({...invite,family_id:family.id});})}>生成新邀请</Button></>}
       {panel==='account'&&<>
         {DEV_AUTH&&<><View className='muted'>测试身份切换仅用于本地联调</View><View className='row'><Button className='btn secondary' disabled={busy} onClick={()=>run(()=>signIn('dev-dad'))}>切换为爸爸</Button><Button className='btn secondary' disabled={busy} onClick={()=>run(()=>signIn('dev-mom'))}>切换为妈妈</Button></View></>}

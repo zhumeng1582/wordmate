@@ -1,0 +1,10 @@
+.settings-page{padding-bottom:calc(48px + env(safe-area-inset-bottom))}
+.settings-menu{padding:0 30px;overflow:hidden}
+.settings-entry{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%;margin:0;padding:28px 0;min-height:112px;background:transparent;color:var(--text);font-size:30px;line-height:1.6;text-align:left;border-radius:0;border-bottom:2px solid var(--border)}
+.settings-entry:last-child{border-bottom:0}
+.settings-entry::after{border:none}
+.settings-entry[disabled]{background:transparent;color:var(--disabled-text);opacity:.65}
+.settings-entry-copy{flex:1}
+.settings-entry-title{font-weight:500}
+.settings-chevron{font-size:38px;color:var(--muted)}
+.settings-hint{margin-top:16px}

@@ -14,7 +14,7 @@ apps/api/src/core.ts：与框架解耦的业务与权限事务。
 apps/api/src/main.ts：HTTP 入口、服务端登录、错误脱敏。
 apps/api/src/validation.ts：本轮已实现请求的严格 DTO 校验。
 apps/api/test/core.test.ts：真实 SQL 引擎的端到端业务事务测试。
-apps/miniapp：家庭、词本、复习、月测、日历和错题页面；AppID 已填入 project.config.json。
+apps/miniapp：首页、设置、家庭、词本、复习、月测、日历和错题等10个页面；AppID 已填入 project.config.json。
 packages/ai：DeepSeek（默认）/OpenAI/Qwen 和阿里云 CosyVoice 适配器。
 infra/compose.yaml：只绑定本机的 PostgreSQL 开发配置。
 deliverables/0.1/database/001_schema.sql：数据库的初始迁移唯一来源。
@@ -105,3 +105,5 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 音频缓存优先流程（0.1，实施规格）
 完整流程和账号资料清单：deliverables/0.1/technical/audio-pipeline.txt。配置模板：config/audio.env.example。OSS最小权限模板：config/oss-audio-policy.template.json（替换桶名后交给RAM身份；不授权删除或列举整个桶）。
 当前仅TTS适配器可用，业务Worker/OSS/小程序播放尚未接入；模板中的OSS与限额字段暂不生效。没有执行数据库迁移或收费调用。
+
+0.1 界面更新：五个学习管理入口及发音设置集中到“设置”页；首页保留今日学习和设置入口。全应用支持微信自动浅/深色主题，无手动主题开关。详见 LOCAL-RUN.txt 的验收步骤。
