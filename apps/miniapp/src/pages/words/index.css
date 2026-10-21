@@ -1,0 +1,9 @@
+.wordbook-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.wordbook-heading .title{font-size:42px}
+.wordbook-heading .text-action{flex-shrink:0;padding:16px 0}
+.wordbook-list{background:var(--surface);border-radius:28px;padding:0 28px;overflow:hidden}
+.wordbook-item{padding:18px 0;border-bottom:2px solid var(--border)}
+.wordbook-item:last-child{border-bottom:0}
+.wordbook-summary{display:flex;align-items:center;justify-content:space-between;min-height:76px;gap:20px}
+.wordbook-lemma{font-size:36px;font-weight:600;overflow-wrap:anywhere}
+.wordbook-detail{padding:12px 0 20px}

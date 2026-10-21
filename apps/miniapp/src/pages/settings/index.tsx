@@ -5,7 +5,7 @@ import {go,storage} from '../../services/api';
 import {AudioPreferences} from '../../components/AudioPreferences';
 import './index.css';
 const entries=[
- {page:'words',title:'单词本 · 添加单词',needsChild:true},
+ {page:'words',title:'单词本',needsChild:true},
  {page:'family',title:'家庭与孩子',needsChild:false},
  {page:'quiz',title:'按月测验',needsChild:true},
  {page:'calendar',title:'学习日历',needsChild:true},
