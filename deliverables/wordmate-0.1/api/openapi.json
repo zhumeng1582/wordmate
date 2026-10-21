@@ -7066,7 +7066,7 @@
         "tags": [
           "数据管理"
         ],
-        "description": "owner完整数据JSON导出；生成任务payload.scope=child_archive；内容仅家庭数据，不含凭证/密钥/邀请令牌；24小时过期。",
+        "description": "尚未实现的原设计；当前单词导出请用 /children/{child_id}/word-exports。owner完整数据JSON导出；生成任务payload.scope=child_archive；内容仅家庭数据，不含凭证/密钥/邀请令牌；24小时过期。",
         "x-role": "owner",
         "responses": {
           "202": {
@@ -7189,7 +7189,8 @@
           {
             "$ref": "#/components/parameters/IdempotencyKey"
           }
-        ]
+        ],
+        "x-implementation": "planned"
       }
     },
     "/exports/{job_id}/content": {
@@ -7199,7 +7200,7 @@
         "tags": [
           "数据管理"
         ],
-        "description": "每次校验活跃家庭成员及任务child_id。word_list允许member，child_archive仅owner；仅succeeded且未过期，过期410；attachment文件名不含孩子真实姓名。",
+        "description": "尚未实现的原设计；当前单词导出请用 /children/{child_id}/word-exports。每次校验活跃家庭成员及任务child_id。word_list允许member，child_archive仅owner；仅succeeded且未过期，过期410；attachment文件名不含孩子真实姓名。",
         "x-role": "scope_dependent",
         "responses": {
           "200": {
@@ -7311,7 +7312,8 @@
               "format": "uuid"
             }
           }
-        ]
+        ],
+        "x-implementation": "planned"
       }
     },
     "/study-sessions/{session_id}/cards": {
@@ -7937,12 +7939,12 @@
     "/children/{child_id}/words": {
       "get": {
         "operationId": "get_children_child_id_words",
-        "summary": "词库搜索与标注筛选",
+        "summary": "孩子词本分页列表",
         "tags": [
           "单词"
         ],
         "x-role": "member",
-        "description": "默认不含归档；英文规范化和中文包含查询；多个marks取AND，逗号分隔。wrong_count为全部来源历史次数。\n权限：member",
+        "description": "已实现：按创建时间和ID倒序，cursor为上页最后单词ID，limit默认50且最大100，返回total。当前不支持q、wordbook_id、marks、include_archived；搜索和标注筛选仍待开发。",
         "parameters": [
           {
             "in": "path",
@@ -7970,52 +7972,6 @@
               "minimum": 1,
               "maximum": 100
             }
-          },
-          {
-            "in": "query",
-            "name": "q",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 120
-            }
-          },
-          {
-            "in": "query",
-            "name": "wordbook_id",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "in": "query",
-            "name": "marks",
-            "required": false,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "easy",
-                  "error_prone",
-                  "favorite",
-                  "needs_correction"
-                ]
-              },
-              "uniqueItems": true
-            },
-            "style": "form",
-            "explode": false
-          },
-          {
-            "in": "query",
-            "name": "include_archived",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
           }
         ],
         "responses": {
@@ -8037,25 +7993,103 @@
                         "items": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/Word"
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "lemma": {
+                                "type": "string"
+                              },
+                              "part_of_speech": {
+                                "type": "string"
+                              },
+                              "meaning_zh": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "integer"
+                              },
+                              "ipa_gb": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "ipa_us": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "dictionary_source": {
+                                "type": "string"
+                              },
+                              "example": {
+                                "oneOf": [
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "content_version": {
+                                        "type": "integer"
+                                      },
+                                      "text_en": {
+                                        "type": "string"
+                                      },
+                                      "translation_zh": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "content_version",
+                                      "text_en",
+                                      "translation_zh"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "lemma",
+                              "part_of_speech",
+                              "meaning_zh",
+                              "version",
+                              "ipa_gb",
+                              "ipa_us",
+                              "dictionary_source",
+                              "example"
+                            ]
                           }
                         },
                         "next_cursor": {
-                          "oneOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
+                        },
+                        "total": {
+                          "type": "integer"
                         }
                       },
                       "required": [
                         "items",
-                        "next_cursor"
-                      ],
-                      "description": ""
+                        "next_cursor",
+                        "total"
+                      ]
                     }
                   },
                   "required": [
@@ -8157,7 +8191,8 @@
               }
             }
           }
-        }
+        },
+        "x-implementation": "implemented"
       }
     },
     "/batches/{batch_id}/retry": {
@@ -9916,12 +9951,12 @@
     "/children/{child_id}/word-exports": {
       "post": {
         "operationId": "post_children_child_id_word_exports",
-        "summary": "导出单词清单",
+        "summary": "导出所选单词为CSV",
         "tags": [
-          "导出"
+          "单词"
         ],
         "x-role": "member",
-        "description": "筛选交集，服务端冻结ID和字段快照，1–10000义项；UTF-8 BOM CSV并防公式注入；文件24小时过期。所有家庭成员允许，含归档仅显式word_ids。\n权限：member",
+        "description": "当前已实现同步导出，替代原异步任务方案。家庭成员权限；显式word_ids或all:true加excluded_ids，二选一。最多10000词，排除归档；任一所选/排除ID越权或已归档则整单拒绝。UTF-8 BOM/CRLF/防公式注入；含释义、双音标、例句翻译和内容来源。服务器不留导出文件，不产生任务实体；客户端在用户主动操作后调用微信文件转发，完成/取消后清除本机临时CSV。",
         "parameters": [
           {
             "in": "path",
@@ -9931,13 +9966,10 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
           }
         ],
         "responses": {
-          "202": {
+          "200": {
             "description": "成功",
             "content": {
               "application/json": {
@@ -9949,7 +9981,24 @@
                       "type": "string"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/JobAccepted"
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "filename": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer"
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "count",
+                        "content"
+                      ]
                     }
                   },
                   "required": [
@@ -10057,33 +10106,53 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "format": {
-                    "type": "string",
-                    "enum": [
-                      "csv",
-                      "json"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "word_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 10000,
+                        "uniqueItems": true,
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "word_ids"
                     ]
                   },
-                  "filter": {
-                    "$ref": "#/components/schemas/WordExportFilter"
-                  },
-                  "include_sentences": {
-                    "type": "boolean"
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "all": {
+                        "const": true
+                      },
+                      "excluded_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 10000,
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "all"
+                    ]
                   }
-                },
-                "required": [
-                  "format",
-                  "filter",
-                  "include_sentences"
-                ],
-                "description": ""
+                ]
               }
             }
           }
-        }
+        },
+        "x-implementation": "implemented"
       }
     },
     "/children/{child_id}/share-summary": {
@@ -14859,6 +14928,187 @@
             }
           }
         }
+      }
+    },
+    "/children/{child_id}/import-file": {
+      "post": {
+        "operationId": "post_children_child_id_import_file",
+        "summary": "提取图片或文档中的文字",
+        "tags": [
+          "单词"
+        ],
+        "x-role": "member",
+        "description": "家庭成员权限；单文件最大4 MiB，base64 JSON请求最大6 MiB。支持JPG/PNG/TXT/CSV/TSV/XLSX/DOCX，UTF-8文本。Office压缩包最多256条目/展开8MiB/单条目2MiB，拒绝宏、嵌入对象、DTD和公式。结果最多8000字符，超限不截断。图片独立OCR，30次/账号/24小时，每相同图片最多3次失败；成功结果按账号/孩子/模型/摘要复用24小时。原文件不落盘，文字缓存按小时清理。返回文字供原AI录词接口使用，不直接创建单词。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "text": {
+                          "type": "string",
+                          "maxLength": 8000
+                        },
+                        "source": {
+                          "enum": [
+                            "file",
+                            "image"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "source"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "description": ""
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、租约或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "资源已过期或被删除",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "请求或业务错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "base64": {
+                    "type": "string",
+                    "maxLength": 5592408
+                  }
+                },
+                "required": [
+                  "name",
+                  "base64"
+                ]
+              }
+            }
+          }
+        },
+        "x-implementation": "implemented"
       }
     }
   },

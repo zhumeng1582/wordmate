@@ -25,7 +25,7 @@ export default function Settings(){
  {hasChild&&<><View className='subtitle'>学习目标</View><View className='card'><LearningGoal key={account+':'+visit+':'+storage.get('child_id')}/></View></>}
  {signedIn&&<><View className='subtitle'>发音设置</View><View className='card'><AudioPreferences key={account+':'+visit}/></View></>}
  <Button className='text-action' onClick={()=>setPrivacyOpen(open=>!open)}>隐私说明 {privacyOpen?'▴':'›'}</Button>
- {privacyOpen&&<View className='card'><View className='settings-entry-title'>AI 内容与数据使用</View><View className='muted'>提交的词汇或文本会发送给配置的 AI 服务，用于识别单词并生成音标、释义、翻译和例句。这些内容由 AI 生成，可能存在错误，仅供学习参考。</View><View className='muted'>播放发音时，待朗读的单词或句子可能发送给语音合成服务；生成的音频会存储并复用。</View><View className='muted'>生成分享鼓励语时，仅向 AI 发送学习目标是否达成，不发送孩子姓名或具体学习内容。分享图片在本机绘制，点击保存图片时才申请相册权限。</View><View className='muted'>请勿在录入内容中包含密码、密钥或与学习无关的个人敏感信息。</View></View>}
+ {privacyOpen&&<View className='card'><View className='settings-entry-title'>AI 内容与数据使用</View><View className='muted'>提交的词汇或文本会发送给配置的 AI 服务，用于识别单词并生成音标、释义、翻译和例句。这些内容由 AI 生成，可能存在错误，仅供学习参考。</View><View className='muted'>仅在你选择图片或拍照时读取该图片，并发送给图片识别服务提取文字；原文件不长期保存。文档由服务器提取文字，识别文字可能缓存最多约 25 小时用于失败重试。选择导出后生成本机文件，由你决定是否转发。</View><View className='muted'>播放发音时，待朗读的单词或句子可能发送给语音合成服务；生成的音频会存储并复用。</View><View className='muted'>生成分享鼓励语时，仅向 AI 发送学习目标是否达成，不发送孩子姓名或具体学习内容。分享图片在本机绘制，点击保存图片时才申请相册权限。</View><View className='muted'>请勿在录入内容中包含密码、密钥或与学习无关的个人敏感信息。</View></View>}
  <View className='muted small'>外观跟随微信</View>{DEV_AUTH&&<View className='muted small'>开发环境 · 测试身份与正式数据分开，AI 生成使用真实额度。</View>}
  </View>;
 }

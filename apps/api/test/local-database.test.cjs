@@ -40,5 +40,6 @@ test('audio migration upgrades an existing 001 database without removing learnin
   assert.equal((await connection.db.query("SELECT display_name FROM wordmate.users WHERE wx_app_id='old'")).rows[0].display_name,'保留');
   assert.equal((await connection.db.query("SELECT count(*)::int n FROM information_schema.columns WHERE table_schema='wordmate' AND table_name='audio_assets' AND column_name IN ('sha256','size_bytes','storage_profile_id')")).rows[0].n,3);
   assert.equal((await connection.db.query("SELECT count(*)::int n FROM wordmate.audio_usage_events")).rows[0].n,0);
+  assert.equal((await connection.db.query("SELECT count(*)::int n FROM wordmate.import_attempts")).rows[0].n,0);
  }finally{if(connection)await connection.source.destroy();fs.rmSync(directory,{recursive:true,force:true});}
 });

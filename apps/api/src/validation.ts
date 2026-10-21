@@ -6,6 +6,8 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  importFile:object({name:str(120),base64:str(5592408)}),
+  exportWords:{oneOf:[object({word_ids:{type:'array',items:id,minItems:1,maxItems:10000,uniqueItems:true}}),object({all:{const:true},excluded_ids:{type:'array',items:id,maxItems:10000,uniqueItems:true}},['all'])]},
   checkinShare:object({date:{type:'string',format:'date'}}),
   learningGoal:object({daily_goal:{type:'integer',minimum:1,maximum:500},expected_version:positive}),
   voicePreview:object({accent:{enum:['en-GB','en-US']},voice_id:str(100)}),
@@ -42,7 +44,7 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='ai-batches'&&path.length===2&&method==='PUT')kind='aiReplace';
   else if(path[0]==='ai-batches'&&path[2]==='retry')kind='empty';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
-  else if(path[0]==='children')kind=({'checkin-share':'checkinShare','learning-goal':'learningGoal',wordbooks:'book',batches:'batch','ai-batches':'aiBatch','study-sessions':'session'} as Record<string,string>)[path[2]];
+  else if(path[0]==='children')kind=({'import-file':'importFile','word-exports':'exportWords','checkin-share':'checkinShare','learning-goal':'learningGoal',wordbooks:'book',batches:'batch','ai-batches':'aiBatch','study-sessions':'session'} as Record<string,string>)[path[2]];
   else if(path[0]==='batches'&&path[2]==='confirm')kind='confirm';
   else if(path[0]==='study-sessions'&&['heartbeat','end'].includes(path[2]))kind='lease';
   if(kind)ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');

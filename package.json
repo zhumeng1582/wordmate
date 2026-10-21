@@ -22,7 +22,10 @@
     "test:tts:live": "node --experimental-strip-types scripts/verify-tts.cjs",
     "test:oss:live": "node --experimental-strip-types scripts/verify-oss.cjs",
     "test:audio": "node --experimental-strip-types --test apps/api/test/audio.test.ts",
-    "test:audio:flow": "corepack pnpm build:api && node scripts/verify-audio-flow.cjs"
+    "test:audio:flow": "corepack pnpm build:api && node scripts/verify-audio-flow.cjs",
+    "test:import-export": "node --experimental-strip-types --test apps/api/test/import-export.test.ts",
+    "test:ocr:live": "corepack pnpm build:api && node scripts/verify-ocr.cjs",
+    "build:release": "node scripts/build-release.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

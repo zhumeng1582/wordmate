@@ -1,0 +1,45 @@
+单词共学 0.1 · 图片、文件导入与单词导出（已实现，真实图片服务和微信端待验收）
+
+交互
+添加单词页面保留一个输入框，在上方提供“拍照 / 选图片 / 选文件”。导入成功追加到原输入，用户可编辑，然后点击原有“生成并加入词本”。不增加文件任务页面，不要求逐个确认词义。解析失败/超限保持原输入不变；取消选择不报错。
+图片从手机相册或相机选择；微信文件接口从聊天会话选择，手机文件可先发送到文件传输助手。没有宣称能够访问手机任意目录。
+支持：JPG、PNG、UTF-8 TXT、CSV、TSV、普通 XLSX、DOCX。一次一个文件，最大 4 MiB，图片不超过 2000 万像素，提取文字不超过 8000 字符，AI 单次仍最多 30 词。
+XLSX读取所有sheet的文本/数值，支持共享字符串、富文本字符串和inlineStr；拒绝公式、宏、嵌入对象。DOCX读取正文和表格中的段落文字；嵌入图片不做二次OCR。PDF、旧XLS/DOC、加密文档不支持，先转换成上述格式或拍照。没有悄悄截取前30词/前8000字符。
+词本显示总数并分页加载；点“选择导出”进入勾选模式，可跨页勾选、全选全部未归档词或排除部分词。导出CSV包含单词、词性、释义、双音标、英文例句、例句翻译、内容来源。Excel可直接打开。导出后通过微信原生文件转发面板由用户选择接收方，也可发给自己的文件传输助手下载。
+
+接口（均要求Bearer登录和有效家庭成员权限）
+POST /api/children/:child_id/import-file
+  {name: string, base64: string} -> {text, source: file|image}
+  图片识别请求超时35秒；小程序等待60秒。服务端只接受文件字节，不接受外部URL，无任意URL抓取。
+GET /api/children/:child_id/words?limit=100&cursor=<最后一个ID>
+  {items,next_cursor,total}，按created_at、id倒序；默认limit50，最大100。
+POST /api/children/:child_id/word-exports
+  {word_ids:[...]} 或 {all:true,excluded_ids:[...]} -> {filename,count,content}
+  同步生成，不产生后台任务或公共文件URL；all在请求时读取当前词库。上限10000词，超限整单拒绝；所选/排除ID必须全部属于该孩子且未归档。所有CSV单元格转义双引号；危险公式前缀加单引号；UTF-8 BOM与CRLF。
+提取文字后沿用 POST /children/:child_id/ai-batches，复用既有AI校验、队列、限额、幂等保存及复习计划。
+
+安全与数据生命周期
+原图/文档仅在请求内存中处理，不写OSS、不写业务文件夹、不把原文件或密钥记入日志。ZIP只读取白名单XML内容，不解压到文件系统；最多256项、总声明展开8MiB、单项2MiB，实际inflate也限2MiB；禁止路径穿越、重复路径、加密、宏、外部实体。
+图片识别适配器与文本LLM独立，当前实现qwen。固定北京百炼workspace域名，禁止重定向；上游输出读取限制128KB，格式、长度及敏感密钥样式再次校验。提示词把图片作为不可信材料，不执行图片中的指令；这些限制不是完整内容审核服务。
+新增迁移007_import_attempts，记录actor/child/内容摘要/状态/提取文字/时间，不保存图片。图片调用前后均复核成员权限；每账号同一时间只允许一个识别任务，24小时最多30次调用，同图最多3次失败；同账号、孩子、模型和图片的成功结果复用24小时。启动及每小时清理超过24小时的记录（运行正常时最多约25小时；停机时下一次启动清理）。识别服务错误不返回供应商详情/密钥。
+客户端导出临时文件在文件转发完成或取消后删除。强退可能留下该固定沙盒路径，下一次导出覆盖；没有后台上传或自动向他人发送。
+当前大请求在解析前验证登录；网关IP限流、全站接口限流和生产监控仍属上线阻断项。
+
+配置
+将 config/import.env.example 中四项填入根目录 .env：
+OCR_PROVIDER=qwen
+OCR_WORKSPACE_ID=<北京业务空间ID>
+OCR_API_KEY=<该空间有视觉模型权限的Key>
+OCR_MODEL=qwen-vl-plus
+可选择该空间实际开通的其他视觉模型，需重新验收。TTS的Key是否有视觉权限不能据已有语音成功推定；有权限时可在服务端使用同一空间的Key，代码仍使用独立OCR字段。
+未设置OCR_PROVIDER时文档与文本可用，图片明确显示未开通，不能当成图片流程已经验收。
+本地 corepack pnpm local 会加载OCR_*；新迁移自动应用并保留已有学习数据。线上已有库执行增量迁移命令，不运行空库初始化迁移。
+验证：corepack pnpm test:import-export
+真实识别：corepack pnpm test:ocr:live -- /绝对路径/学习材料.png
+真实验证命令只发送显式指定的图片，日志仅输出成功/错误码与字数，不打印识别内容，不写业务数据库；仍需微信端选择→提取→生成→复习一条龙验收。
+
+依据（2026-10-21查阅）
+https://help.aliyun.com/zh/model-studio/qwen-vl-compatible-with-openai
+https://docs.taro.zone/docs/3.x/apis/media/video/chooseMedia
+https://docs.taro.zone/en/docs/apis/media/image/chooseMessageFile
+https://docs.taro.zone/en/docs/apis/open-api/privacy/requirePrivacyAuthorize

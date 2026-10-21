@@ -86,3 +86,5 @@ input,textarea{caret-color:var(--primary)}
 .form-status{min-height:76px;line-height:1.6}
 .wordbook-status{min-height:40px;line-height:40px}
 .btn.secondary[disabled]{background:var(--disabled-bg);color:var(--disabled-text)}
+
+.import-actions,.export-toolbar{display:flex;align-items:center;gap:16rpx;flex-wrap:wrap}.import-actions .btn{flex:1;margin:12rpx 0;min-width:140rpx}.export-toolbar{justify-content:space-between;margin-bottom:16rpx}.export-toolbar .btn{width:auto;margin:0;padding:0 24rpx}.word-select{width:44rpx;flex-shrink:0;color:var(--muted)}.word-select.checked{color:var(--primary)}

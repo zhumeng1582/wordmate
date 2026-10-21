@@ -68,3 +68,7 @@ AI录词验收见 apps/AI-VOCABULARY.txt；完整真实隔离验收命令：core
 
 音色试听更新：设置 → 发音设置 → 选择口音/音色 → “试听当前音色”。不必先保存，也无需先添加孩子。试听后点击“保存设置”才修改账号偏好。
 本轮有004增量迁移：停止旧后端后 corepack pnpm local，再在微信开发者工具编译。首次试听对应音色会调用TTS，后续相同配置复用缓存；已有学习数据保留。
+
+图片与文档导入 / 任意选择导出（0.1）
+更新后重启 corepack pnpm local，自动应用007迁移，已有学习数据保留。OCR_* 配置参照 config/import.env.example；不配置时TXT/CSV/TSV/XLSX/DOCX仍可导入，图片提示尚未开通。真实识别：corepack pnpm test:ocr:live -- /绝对路径/学习材料.png。
+上线结论及资源清单：deliverables/0.1/technical/release-audit.txt。不要将local生成的开发包直接发布。

@@ -28,6 +28,7 @@ const {createApplication}=require('../apps/api/dist/main.js');
  async function ok(path,body,key,method){const r=await request(path,body,key,method);assert.equal(r.status,200,JSON.stringify(r));return r.data;}
  try{
   assert.equal((await request('/me')).status,401);
+  assert.equal((await request('/children/'+randomUUID()+'/import-file',{name:'a.txt',base64:'YQ=='})).status,401);
   assert.equal((await request('/auth/dev',{code:'dev-dad',unexpected:true})).status,422);
   const login=await ok('/auth/dev',{code:'dev-dad'});token=login.access_token;
   assert.equal((await request('/voice-previews',{accent:'en-GB',voice_id:'gb',text:'arbitrary text'})).status,422);
@@ -50,6 +51,14 @@ const {createApplication}=require('../apps/api/dist/main.js');
   const savedPreferences=await ok('/me/audio-settings',{accent:'en-GB',voice_id:'gb',auto_play:true,expected_version:preferences.version},undefined,'PUT');
   assert.deepEqual(await ok('/me/audio-settings'),savedPreferences);assert.equal(savedPreferences.auto_play,true);
   assert.equal((await request('/me/audio-settings',{accent:'en-GB',voice_id:'gb',expected_version:savedPreferences.version,actor_id:c.id},undefined,'PUT')).status,422);
+  assert.equal((await request(`/children/${c.id}/import-file`,{name:'large.txt',base64:'a'.repeat(7*1024*1024)})).status,413);
+  const imported=await ok(`/children/${c.id}/import-file`,{name:'words.csv',base64:Buffer.from('airport,机场').toString('base64')});assert.equal(imported.text,'airport,机场');
+  assert.equal((await request(`/children/${c.id}/import-file`,{name:'bad.exe',base64:'YQ=='})).status,422);
+  const wordPage=await ok(`/children/${c.id}/words?limit=1`);assert.equal(wordPage.total,2);assert(wordPage.next_cursor);
+  const wordPage2=await ok(`/children/${c.id}/words?limit=1&cursor=${wordPage.next_cursor}`);assert.equal(wordPage2.items.length,1);assert.notEqual(wordPage.items[0].id,wordPage2.items[0].id);
+  const exported=await ok(`/children/${c.id}/word-exports`,{word_ids:[wordPage.items[0].id]});assert.equal(exported.count,1);assert(exported.content.startsWith('\uFEFF'));
+  assert.equal((await ok(`/children/${c.id}/word-exports`,{all:true,excluded_ids:[wordPage.items[0].id]})).count,1);
+  assert.equal((await request(`/children/${c.id}/word-exports`,{all:true,word_ids:[]})).status,422);
   const audioWord=(await ok(`/children/${c.id}/words`)).items[0];
   const speech={word_id:audioWord.id,content_version:audioWord.version,accent:'en-GB',voice_id:'gb',speech_rate:1};
   assert.equal((await request('/audio',{...speech,text:'untrusted'})).status,422);

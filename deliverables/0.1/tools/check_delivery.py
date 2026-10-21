@@ -16,11 +16,11 @@ for p in R.rglob('*.html'):
 assert not missing,missing
 api=json.loads((R/'api/openapi.json').read_text());assert api['info']['version']=='0.1'
 assert len(re.findall(r'CREATE TABLE ',(R/'database/001_schema.sql').read_text()))==29
-assert sum(len(v) for v in api['paths'].values())==96
+assert sum(len(v) for v in api['paths'].values())==97
 screens=json.loads((R/'design/screens.json').read_text());assert len(screens)==46
 for i,s in enumerate(screens):
  file=R/'design/screens'/f'{i+1:02}-{s["id"]}'
  ET.parse(file.with_suffix('.svg'));assert file.with_suffix('.png').read_bytes()[:8]==b'\x89PNG\r\n\x1a\n'
 ET.parse(R/'design/overview.svg');ET.parse(R/'technical/architecture.svg')
 for key in ['F'+str(i).zfill(2) for i in range(1,16)]:assert key in (R/'requirements/index.html').read_text()
-print('交付检查通过：本地链接、46 SVG/PNG、架构图、15项需求、29表、96接口、版本0.1。')
+print('交付检查通过：本地链接、46 SVG/PNG、架构图、15项需求、29表、97接口、版本0.1。')

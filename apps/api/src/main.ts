@@ -1,3 +1,5 @@
+import {imageReader,type ImageReader} from './import-files';
+import type {NestExpressApplication} from '@nestjs/platform-express';
 import {encouragementProvider,type EncouragementProvider} from './checkin-share';
 import {audioRuntime,type AudioRuntime} from './audio-runtime';
 import type {VocabularyProvider} from './vocabulary';
@@ -25,9 +27,10 @@ class ApiController {
     try {
       const p=req.path.replace(/^\/api/,'').split('/').filter(Boolean),b=req.body??{},method=req.method;
       const historyRead=method==='GET'&&p[0]==='children'&&['calendar','wrong-words'].includes(p[2]);
+      const wordsRead=method==='GET'&&p[0]==='children'&&p[2]==='words'&&p.length===3;
       const cardsRead=method==='GET'&&p[0]==='study-sessions'&&p[2]==='cards';
       const quizRead=method==='GET'&&(p[0]==='monthly-quizzes'||p[0]==='children'&&p[2]==='monthly-quizzes');
-      ensure(Object.keys(req.query).every(k=>method==='GET'&&p.join('/')==='voices'&&k==='accent'||quizRead&&['month','cursor','limit'].includes(k)||historyRead&&(p[2]==='calendar'?['month']:['date','date_from','date_to','source','quiz_id','cursor','limit']).includes(k)||cardsRead&&['cursor','limit'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
+      ensure(Object.keys(req.query).every(k=>method==='GET'&&p.join('/')==='voices'&&k==='accent'||quizRead&&['month','cursor','limit'].includes(k)||historyRead&&(p[2]==='calendar'?['month']:['date','date_from','date_to','source','quiz_id','cursor','limit']).includes(k)||(cardsRead||wordsRead)&&['cursor','limit'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
       validateBody(p,method,b);
       if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
       const auth=req.headers.authorization;ensure(typeof auth==='string' && auth.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
@@ -64,6 +67,8 @@ class ApiController {
         if(method==='POST'&&p.length===3&&p[2]==='abandon')data=await core.quizzes.abandon(actor,key,id,b);
       }
       else if(p[0]==='children'&&p.length===3){const id=p[1];
+        if(method==='POST'&&p[2]==='import-file')data=await core.imports.extract(actor,id,b);
+        if(method==='POST'&&p[2]==='word-exports')data=await core.exportWords(actor,id,b);
         if(method==='POST'&&p[2]==='checkin-share')data=await core.checkinShare.create(actor,id,b);
         if(p[2]==='learning-goal')data=method==='GET'?await core.learningGoal(actor,id):method==='PUT'?await core.setLearningGoal(actor,key,id,b):undefined;
         if(p[2]==='ai-batches')data=method==='GET'?await core.vocabulary.list(actor,id):method==='POST'?await core.vocabulary.create(actor,key,id,b):undefined;
@@ -72,7 +77,7 @@ class ApiController {
         if(method==='GET'&&p[2]==='wrong-words')data=await core.history.wrongWords(actor,id,req.query);
         if(method==='GET'&&p[2]==='today')data=await core.today(actor,id);
         if(p[2]==='wordbooks')data=method==='GET'?await core.wordbooks(actor,id):method==='POST'?await core.createWordbook(actor,key,id,b):undefined;
-        if(method==='GET'&&p[2]==='words')data=await core.words(actor,id);
+        if(method==='GET'&&p[2]==='words')data=await core.words(actor,id,req.query);
         if(method==='POST'&&p[2]==='batches')data=await core.createBatch(actor,key,id,b);
         if(method==='POST'&&p[2]==='study-sessions')data=await core.startSession(actor,key,id,b);
       }
@@ -87,11 +92,22 @@ class ApiController {
   }
 }
 @Module({controllers:[ApiController]}) class AppModule{}
-export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime,encouragement?:EncouragementProvider}={}){
+export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime,encouragement?:EncouragementProvider,reader?:ImageReader}={}){
   const {db,source}=await connect(env.DATABASE_URL??'');
-  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env),options.audio??await audioRuntime(env),options.encouragement??await encouragementProvider(env));
-  const app=await NestFactory.create(AppModule,{bodyParser:true,logger:['error','warn']});
+  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env),options.audio??await audioRuntime(env),options.encouragement??await encouragementProvider(env),options.reader??imageReader(env));
+  const app=await NestFactory.create<NestExpressApplication>(AppModule,{bodyParser:false,logger:['error','warn']});
+  // Larger bodies only on authenticated imports; all other JSON retains a small bound.
+  app.use('/api/children/:child/import-file',async(req:Request,res:Response,next:any)=>{
+    try{const auth=req.headers.authorization;ensure(auth?.startsWith('Bearer '),401,'UNAUTHENTICATED');await core.authenticate(auth!.slice(7));next();}catch{res.status(401).json({error:{code:'UNAUTHENTICATED'}});}
+  });
+  const importPath=(req:any)=>/^\/api\/children\/[^/]+\/import-file\/?$/.test(req.path);
+  app.useBodyParser('json',{limit:'6mb',type:importPath});
+  app.useBodyParser('json',{limit:'1mb',type:(req:any)=>!importPath(req)&&req.is('application/json')});
+  app.use((err:any,_req:Request,res:Response,next:any)=>{if(err?.type==='entity.too.large')return res.status(413).json({error:{code:'IMPORT_FILE_TOO_LARGE'}});if(err instanceof SyntaxError)return res.status(422).json({error:{code:'INVALID_REQUEST_BODY'}});next(err);});
   await app.init();
+  let cleanup:Promise<void>|undefined;
+  const purgeImports=()=>{if(!cleanup)cleanup=core.imports.purge().catch(()=>console.error('Import cache cleanup failed')).finally(()=>{cleanup=undefined;});};
+  purgeImports();const cleanupTimer=setInterval(purgeImports,3600000);cleanupTimer.unref();
   let preparation:Promise<void>|undefined;
   const timer=setInterval(()=>{if(preparation)return;preparation=core.quizzes.prepare(new StoredMeaningQuizBuilder()).then(()=>{}).catch(()=>console.error('Quiz preparation cycle failed')).finally(()=>{preparation=undefined;});},2000);timer.unref();
   let generation:Promise<void>|undefined;
@@ -100,9 +116,9 @@ export async function createApplication(options:{vocabulary?:VocabularyProvider,
   const audioTimer=setInterval(()=>{if(audioWork)return;audioWork=core.audio.previews.processOne().then(()=>core.audio.processOne()).catch(()=>console.error('Audio generation cycle failed')).finally(()=>{audioWork=undefined;});},1000);audioTimer.unref();
   let disposing:Promise<void>|undefined;
   const dispose=()=>disposing??= (async()=>{
-   clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);
+   clearInterval(cleanupTimer);clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);
    // Stop accepting requests, finish outstanding jobs, then close the database exactly once.
-   await app.close();await Promise.all([preparation,generation,audioWork]);await source.destroy();
+   await app.close();await Promise.all([preparation,generation,audioWork,cleanup]);await source.destroy();
   })();
   return {app,dispose};
 }
