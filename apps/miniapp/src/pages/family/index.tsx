@@ -24,7 +24,6 @@ export default function Family(){
   useDidShow(()=>{if(storage.get('access_token'))void run(refresh);});
   const open=(next:Panel)=>{setError('');setPanel(next);};
   const chooseChild=(c:any)=>{storage.set('child_id',c.id);Taro.reLaunch({url:'/pages/home/index'});};
-  const navigate=(page:string)=>{if(page==='words'&&!storage.get('child_id')){Taro.showToast({title:'请先选择孩子',icon:'none'});open('child');return;}if(page==='home')Taro.reLaunch({url:'/pages/home/index'});else Taro.navigateTo({url:`/pages/${page}/index`});};
   const pending=invites.filter(i=>i.status==='claimed');
   return <View className='family-page'>
     <View className='family-content'>
@@ -34,14 +33,14 @@ export default function Family(){
       {!signedIn?<View className='member-card member-owner'><View className='member-title'>和家人一起，陪孩子成长</View><View className='member-description'>登录后创建家庭，保存孩子的独立学习进度。</View><Button className='btn primary' disabled={busy} onClick={()=>run(()=>signIn())}>{DEV_AUTH?'以爸爸身份体验':'微信登录'}</Button></View>:family?<>
         {!detailsReady&&<View className='member-card'><View className='member-title'>{busy?'正在加载家庭资料':'家庭资料未加载完成'}</View><View className='member-description'>家庭已存在，请勿重复创建。后端重启后可重试。</View><Button className='btn secondary' disabled={busy} onClick={()=>run(refresh)}>重新加载</Button></View>}
         {members.map(m=><View className={`member-card ${m.role==='owner'?'member-owner':''}`} key={m.user_id}><View className='member-title'>{m.display_name.replace('（开发）','')} · {m.role==='owner'?'管理员':'共同家长'}</View><View className='member-description'>{m.role==='owner'?'邀请、审批和管理孩子':'录词、陪学，共同记录学习进度'}</View></View>)}
-        {members.length===1&&<View className='member-card member-empty'><View className='member-title'>邀请另一位家长</View><View className='member-description'>加入同一个家庭，一起陪孩子学单词。</View></View>}
+
         <View className='member-card child-card' onClick={()=>detailsReady&&open('child')}><View className='member-title'>孩子档案 <Text className='card-chevron'>›</Text></View><View className='member-description'>{!detailsReady?'等待家庭资料加载':children.length?children.map(c=>`${c.nickname} · ${c.level}`).join('　　'):'添加孩子，开始记录学习进度'}</View></View>
         {pending.length>0&&<View className='pending-card' onClick={()=>open('invites')}>{pending.length} 位家长申请加入 <Text>查看申请 ›</Text></View>}
       </>:error||busy?<View className='member-card'><View className='member-title'>{busy?'正在加载家庭':'暂时无法加载家庭'}</View><Button className='btn secondary' disabled={busy} onClick={()=>run(refresh)}>重试加载</Button></View>:<View className='member-card member-owner'><View className='member-title'>建立你们的家庭</View><View className='member-description'>创建家庭，或用另一位家长的口令申请加入。</View><Button className='btn primary' disabled={busy} onClick={()=>open('family')}>创建家庭</Button><Button className='btn secondary' disabled={busy} onClick={()=>open('join')}>加入已有家庭</Button></View>}
     </View>
     <View className='family-actions'>
       {family&&<Button className='btn primary invite-button' disabled={busy} onClick={()=>family.role==='owner'?run(async()=>{if(!shareReady){const invite=await api(`/families/${family.id}/invites`,'POST',{},eventId());setShareInvite({...invite,family_id:family.id});}open('share');}):open('child')}>{family.role==='owner'?'邀请另一位家长':'选择孩子，开始陪学'}</Button>}
-      <View className='account-links'><Text onClick={()=>open('child')}>孩子档案</Text>{family?.role==='owner'&&<Text onClick={()=>run(async()=>{await refresh();open('invites');})}>邀请与审批{pending.length?` · ${pending.length}`:''}</Text>}<Text onClick={()=>navigate('settings')}>设置</Text><Text onClick={()=>open('account')}>账号管理</Text></View>
+      <View className='account-links'>{family?.role==='owner'&&<Text onClick={()=>run(async()=>{await refresh();open('invites');})}>邀请与审批{pending.length?` · ${pending.length}`:''}</Text>}{signedIn&&<Text onClick={()=>open('account')}>账号与家庭</Text>}</View>
       {DEV_AUTH&&<View className='dev-label'>本地体验 · 测试身份与词库</View>}
     </View>
 

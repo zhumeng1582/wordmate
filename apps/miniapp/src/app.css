@@ -49,3 +49,7 @@ page{background:var(--background);color:var(--text);font-size:28px;line-height:1
 .home-settings{display:flex;align-items:center;justify-content:center;min-height:88px;margin:0;padding:16px 8px 16px 24px;background:transparent;color:var(--primary);font-size:28px;line-height:1.5}
 .home-settings::after{border:none}
 input,textarea{caret-color:var(--primary)}
+
+.text-action{display:flex;align-items:center;justify-content:center;min-height:88px;padding:16px;margin:8px 0;background:transparent;color:var(--primary);font-size:26px;line-height:1.5}
+.text-action::after{border:none}
+.text-action[disabled]{background:transparent;color:var(--disabled-text)}
