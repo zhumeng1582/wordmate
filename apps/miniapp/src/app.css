@@ -69,3 +69,8 @@ input,textarea{caret-color:var(--primary)}
 @keyframes audio-wave-pulse{0%,100%{opacity:.2}50%{opacity:1}}
 @keyframes audio-ring-turn{to{transform:rotate(360deg)}}
 .text-action .audio-icon{margin-right:12px}
+
+.review-pronunciation{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.review-pronunciation .audio-text{padding:12px 0}
+.review-pos{font-size:24px}
+.review-translation{margin:0 0 8px 50px;line-height:1.6}

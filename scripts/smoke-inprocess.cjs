@@ -111,6 +111,7 @@ const {createApplication}=require('../apps/api/dist/main.js');
   const audioCard=(await ok(`/study-sessions/${audioReview.id}/cards`)).items[0];
   assert.equal(audioCard.ipa_gb,'/test/');assert.equal(audioCard.example.text_en,'I see the pencil.');assert.equal(audioCard.example.content_version,1);
   assert.equal('translation_zh' in audioCard.example,false);
+  const revealedWord=await ok(`/children/${c.id}/words/${audioCard.child_word_id}`);assert.equal(revealedWord.example.translation_zh,'我看到铅笔。');assert.equal(revealedWord.example.id,audioCard.example.id);
   await ok(`/study-sessions/${audioReview.id}/end`,{lease_generation:audioReview.lease_generation});
   assert.equal((await request(`/children/${c.id}/ai-batches`,{...aiBody,unexpected:true})).status,422);
   console.log('PASS: Nest/Express request parsing, validation, auth, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results, calendar, wrong words practice async AI batch save, audio worker/cache/authorized binary download (in process; TCP not tested)');

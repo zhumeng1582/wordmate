@@ -141,3 +141,5 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 - 返回 child_id、nickname、daily_goal、today_goal、effective_from、version。
 - 开始有效复习时冻结当天 daily_activity.goal_snapshot；当日后续修改次日起生效。
 - 不新增表；保留已有学习记录、历史打卡和当日目标，首页返回时刷新进度。
+
+复习卡片：音标与词性同行，无分隔线。点击查看词义后，通过单词详情接口的 example（id、content_version、translation_zh）显示对应例句译文；复习队列接口继续隐藏中文答案。
