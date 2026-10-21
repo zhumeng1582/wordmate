@@ -35,3 +35,17 @@ function sign({method,bucket,key,region,accessKeyId,accessKeySecret,token='',hea
  return {...signed,Authorization:`OSS4-HMAC-SHA256 Credential=${accessKeyId}/${scope},${additional?'AdditionalHeaders='+additional+',':''}Signature=${signature}`};
 }
 module.exports={config,sign,hash,canonicalRequest};
+// Return only enumerated diagnostic fields; never echo account IDs, tokens, or XML.
+function deniedDetail(xml){
+ const read=tag=>xml.match(new RegExp('<'+tag+'>([^<]*)</'+tag+'>'))?.[1];
+ const known=(tag,values)=>values.includes(read(tag))?read(tag):null;
+ const ec=read('EC');
+ return {
+  action:known('AuthAction',['oss:PutObject','oss:GetObject','oss:PutObjectAcl','oss:PutObjectTagging']),
+  denial:known('NoPermissionType',['ExplicitDeny','ImplicitDeny']),
+  policy_type:known('PolicyType',['AccountLevelIdentityBasedPolicy','ResourceGroupLevelIdentityBasedPolicy','ResourceBasedPolicy','SessionPolicy','ControlPolicy']),
+  principal_type:known('AuthPrincipalType',['SubUser','AssumedRole','Anonymous','Account']),
+  error_reference:ec&&/^\d{4}-\d{8}$/.test(ec)?ec:null
+ };
+}
+module.exports.deniedDetail=deniedDetail;

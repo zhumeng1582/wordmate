@@ -18,3 +18,9 @@ test('canonical request matches the published OSS V4 reference hash',()=>{
  assert.notEqual(ordinary.Authorization,sign({...input,key:'other.mp3'}).Authorization);
  assert.notEqual(ordinary.Authorization,sign({...input,method:'PUT'}).Authorization);
 });
+test('denial diagnostics preserve useful authorization fields without exposing identity or arbitrary text',()=>{
+ const {deniedDetail}=require('../lib/oss-probe.cjs');
+ const result=deniedDetail('<Error><AuthAction>oss:PutObject</AuthAction><NoPermissionType>ExplicitDeny</NoPermissionType><PolicyType>AccountLevelIdentityBasedPolicy</PolicyType><AuthPrincipalOwnerId>private-account</AuthPrincipalOwnerId><EncodedDiagnosticMessage>secret-token</EncodedDiagnosticMessage><EC>0003-00000201</EC></Error>');
+ assert.equal(result.action,'oss:PutObject');assert.equal(result.denial,'ExplicitDeny');assert(!JSON.stringify(result).includes('private-account'));assert(!JSON.stringify(result).includes('secret-token'));
+ assert.equal(deniedDetail('<AuthAction>secret-token</AuthAction><EC>secret-token</EC>').action,null);
+});

@@ -1,6 +1,6 @@
 // Uses a previously verified synthetic TTS sample. No new TTS call and no delete permission needed.
 const fs=require('node:fs'),path=require('node:path'),{randomUUID}=require('node:crypto');
-const {config,sign,hash}=require('./lib/oss-probe.cjs');
+const {config,sign,hash,deniedDetail}=require('./lib/oss-probe.cjs');
 const root=path.resolve(__dirname,'..');
 if(fs.existsSync(path.join(root,'.env')))process.loadEnvFile(path.join(root,'.env'));
 (async()=>{
@@ -25,7 +25,7 @@ if(fs.existsSync(path.join(root,'.env')))process.loadEnvFile(path.join(root,'.en
   const request=async(method,body)=>{
    const extra=method==='PUT'?{'content-type':'audio/mpeg','x-oss-forbid-overwrite':'true'}:{};
    const response=await fetchSafe(url,{method,headers:sign({...c,key,method,headers:extra}),...(body?{body}:{})});
-   if(!response.ok){const xml=await response.text();const raw=xml.match(/<Code>([^<]+)<\/Code>/)?.[1];throw Object.assign(Error(),{code:safeOss.has(raw)?'OSS_'+raw:'OSS_HTTP_ERROR',status:response.status});}
+   if(!response.ok){const xml=await response.text();const raw=xml.match(/<Code>([^<]+)<\/Code>/)?.[1];throw Object.assign(Error(),{code:safeOss.has(raw)?'OSS_'+raw:'OSS_HTTP_ERROR',status:response.status,denied:raw==='AccessDenied'?deniedDetail(xml):null});}
    return response;
   };
   stage='oss_upload';const put=await request('PUT',bytes);await put.body?.cancel();uploaded=true;
@@ -36,7 +36,7 @@ if(fs.existsSync(path.join(root,'.env')))process.loadEnvFile(path.join(root,'.en
   report={passed:true,stage:'upload_download_and_private_access',bytes:bytes.length,sha256:sample.sha256,credential_mode:c.mode,anonymous_status:anonymous.status,tts_configuration_valid:true,tts_sample_run_id:previous.run_id};
  }catch(e){
   const safeCode=typeof e.code==='string'&&/^(MISSING_OSS_|MISSING_ALIBABA_|INVALID_OSS_|LOCAL_OSS_|OSS_|MISSING_COSYVOICE_|UNVERIFIED_TTS_|UNSUPPORTED_TTS_|TTS_PROFILE_|BOTH_ACCENTS_|VERIFIED_TTS_SAMPLE_REQUIRED|INVALID_SAMPLE_PATH|LOCAL_SAMPLE_CHECKSUM_MISMATCH)/.test(e.code);
-  report={passed:false,stage,code:safeCode?e.code:stage==='local_sample'?'VERIFIED_TTS_SAMPLE_REQUIRED':'OSS_VERIFICATION_FAILED',http_status:e.status??null,network_code:networkCode};process.exitCode=1;
+  report={passed:false,stage,code:safeCode?e.code:stage==='local_sample'?'VERIFIED_TTS_SAMPLE_REQUIRED':'OSS_VERIFICATION_FAILED',http_status:e.status??null,network_code:networkCode,access_denied_detail:e.denied??null};process.exitCode=1;
  }
  Object.assign(report,{run_id:id,elapsed_ms:Date.now()-start,object_key:key,uploaded,retained_test_object:uploaded,tts_calls:0,business_cache_tested:false,miniapp_tested:false});
  const target=path.join(root,'.local/oss-verification.json');fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,JSON.stringify(report,null,2)+'\n',{mode:0o600});fs.chmodSync(target,0o600);
