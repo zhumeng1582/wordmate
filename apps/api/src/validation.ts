@@ -6,6 +6,7 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  learningGoal:object({daily_goal:{type:'integer',minimum:1,maximum:500},expected_version:positive}),
   voicePreview:object({accent:{enum:['en-GB','en-US']},voice_id:str(100)}),
   audioSettings:object({accent:{enum:['en-GB','en-US']},voice_id:str(100),expected_version:positive}),
   audio:{oneOf:['word_id','sentence_id'].map(resource=>object({[resource]:id,content_version:positive,accent:{enum:['en-GB','en-US']},voice_id:str(100),speech_rate:{type:'number',minimum:0.5,maximum:1.5}}))},
@@ -40,7 +41,7 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='ai-batches'&&path.length===2&&method==='PUT')kind='aiReplace';
   else if(path[0]==='ai-batches'&&path[2]==='retry')kind='empty';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
-  else if(path[0]==='children')kind=({wordbooks:'book',batches:'batch','ai-batches':'aiBatch','study-sessions':'session'} as Record<string,string>)[path[2]];
+  else if(path[0]==='children')kind=({'learning-goal':'learningGoal',wordbooks:'book',batches:'batch','ai-batches':'aiBatch','study-sessions':'session'} as Record<string,string>)[path[2]];
   else if(path[0]==='batches'&&path[2]==='confirm')kind='confirm';
   else if(path[0]==='study-sessions'&&['heartbeat','end'].includes(path[2]))kind='lease';
   if(kind)ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');

@@ -133,3 +133,11 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 - 音标与例句点击播放，不触发条目折叠。
 - 右上角“添加单词”进入独立录入页；生成记录与失败任务重新编辑位于此路径。
 - 录入保留原请求重试及原任务覆盖逻辑；返回词本后自动刷新生成中的内容。
+
+学习目标（0.1）
+- 设置中按当前孩子配置 5/10/20/30 或自定义 1–500，每日新词上限保持原配置。
+- GET/PUT /children/{id}/learning-goal：PUT 传 daily_goal、expected_version 和 Idempotency-Key。
+- 家庭有效成员可读写；版本冲突返回 LEARNING_GOAL_CHANGED，刷新后重选。
+- 返回 child_id、nickname、daily_goal、today_goal、effective_from、version。
+- 开始有效复习时冻结当天 daily_activity.goal_snapshot；当日后续修改次日起生效。
+- 不新增表；保留已有学习记录、历史打卡和当日目标，首页返回时刷新进度。

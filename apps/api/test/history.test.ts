@@ -19,9 +19,18 @@ test('calendar, mixed-source mistakes, practice scheduling, quota, timezone and 
  const dad=(await core.login('dev-dad')).user.id,outsider=(await core.login('dev-outsider')).user.id;
  const f=await core.createFamily(dad,'f',{name:'学习家庭'}),c=await core.createChild(dad,'c',f.id,{nickname:'孩子'}),book=await core.createWordbook(dad,'b',c.id,{name:'词本'});
  await pg.query('UPDATE wordmate.children SET daily_goal=2,daily_new_limit=2 WHERE id=$1',[c.id]);
+ const initialGoal=await core.learningGoal(dad,c.id);assert.equal(initialGoal.daily_goal,2);
+ const goalBefore=await core.setLearningGoal(dad,'goal-before',c.id,{daily_goal:5,expected_version:initialGoal.version});assert.equal(goalBefore.today_goal,5);assert.equal(goalBefore.effective_from,'2026-10-19');
+ await assert.rejects(core.setLearningGoal(dad,'goal-stale',c.id,{daily_goal:6,expected_version:initialGoal.version}),{code:'LEARNING_GOAL_CHANGED'});
+ await assert.rejects(core.learningGoal(outsider,c.id),{code:'FAMILY_NOT_FOUND'});
+ await core.setLearningGoal(dad,'goal-reset',c.id,{daily_goal:2,expected_version:goalBefore.version});
  const batch=await core.createBatch(dad,'batch',c.id,{wordbook_id:book.id,words:['apple','cat','dog']});
  await core.confirmBatch(dad,'confirm',batch.id,{expected_version:1,selections:batch.items.map((i:any)=>({item_id:i.id,action:'select',candidate_id:i.candidates[0].candidate_id}))});
  let session=await core.startSession(dad,'s',c.id,{source:'scheduled'}),cards=(await core.cards(dad,session.id)).items;assert.equal(cards.length,2);
+ const lockedGoal=await core.learningGoal(dad,c.id);
+ const changedGoal=await core.setLearningGoal(dad,'goal-after-start',c.id,{daily_goal:7,expected_version:lockedGoal.version});assert.equal(changedGoal.today_goal,2);assert.equal(changedGoal.effective_from,'2026-10-20');assert.equal((await core.today(dad,c.id)).goal,2);
+ assert.deepEqual(await core.setLearningGoal(dad,'goal-after-start',c.id,{daily_goal:7,expected_version:lockedGoal.version}),changedGoal);
+ await core.setLearningGoal(dad,'goal-restore',c.id,{daily_goal:2,expected_version:changedGoal.version});
  const answer=async(card:any,rating='again')=>core.review(dad,{session_id:session.id,lease_generation:1,card_id:card.id,expected_version:card.version,event_id:randomUUID(),rating});
  for(const card of cards)await answer(card);
  await core.heartbeat(dad,session.id,{lease_generation:1},true);
