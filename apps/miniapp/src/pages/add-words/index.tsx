@@ -5,10 +5,10 @@ import {api,storage,eventId,message} from '../../services/api';
 export default function AddWords(){
  const child=storage.get('child_id'),pendingKey=`vocabulary-submit:${storage.get('access_token')}:${child}`,editKey=`vocabulary-edit:${storage.get('access_token')}:${child}`;
  const [books,setBooks]=useState<any[]>([]),[book,setBook]=useState(0),[raw,setRaw]=useState(''),[theme,setTheme]=useState(''),[jobs,setJobs]=useState<any[]>([]),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[visible,setVisible]=useState(true),[pending,setPending]=useState<any>(()=>storage.get(pendingKey)||null);
- const [editing,setEditing]=useState<any>(null);
+ const [editing,setEditing]=useState<any>(null),[loaded,setLoaded]=useState(false);
  const inFlight=useRef(false),polling=useRef(false);
  const run=async(fn:()=>Promise<any>)=>{if(inFlight.current)return;inFlight.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(message(e));}finally{inFlight.current=false;setBusy(false);}};
- const refresh=async()=>{const [b,j]=await Promise.all([api(`/children/${child}/wordbooks`),api(`/children/${child}/ai-batches`)]);setBooks(b.items);setJobs(j.items);};
+ const refresh=async()=>{const [b,j]=await Promise.all([api(`/children/${child}/wordbooks`),api(`/children/${child}/ai-batches`)]);setBooks(b.items);setJobs(j.items);setLoaded(true);};
  useDidShow(()=>{setVisible(true);if(child)void run(async()=>{
   await refresh();
   const edit=storage.get(editKey);
@@ -24,17 +24,18 @@ export default function AddWords(){
   let job:any;try{job=await api(draft.jobId?`/ai-batches/${draft.jobId}`:`/children/${child}/ai-batches`,draft.jobId?'PUT':'POST',draft.body,draft.key);}catch(e){if((e as any)?.status>=400&&(e as any)?.status<500){Taro.removeStorageSync(pendingKey);setPending(null);}throw e;}
   Taro.removeStorageSync(pendingKey);setPending(null);setEditing(null);setRaw('');setJobs(old=>[job,...old.filter(x=>x.id!==job.id)]);setNotice('已提交，完成后自动加入词本和复习计划。');await refresh();
  };
- return <View className='page'><View className='title'>添加单词</View>{error&&<View className='error'>{error}<Button className='btn' disabled={busy} onClick={()=>run(refresh)}>刷新状态</Button></View>}{notice&&<View className='notice'>{notice}</View>}
+ return <View className='page'><View className='title'>添加单词</View>{error&&<View className='error'>{error}<Button className='btn' disabled={busy} onClick={()=>run(refresh)}>刷新状态</Button></View>}
  <View className='muted'>粘贴整段文本，AI 识别其中的单词或短语，自动补充音标、释义和例句。请勿粘贴密码、密钥或个人敏感资料。</View>
- {editing&&!pending&&<Button className='btn' disabled={busy} onClick={()=>{setEditing(null);setRaw('');setNotice('已取消编辑，原任务未修改。');}}>取消编辑原任务</Button>}
- {pending&&<View className='card'><View>上次提交尚未确认。重试将使用同一任务请求，不重复保存。</View><Button className='btn primary' disabled={busy} onClick={()=>run(()=>submit(pending))}>重试上次提交</Button></View>}
- {!books.length?<Button className='btn' disabled={busy} onClick={()=>run(async()=>{await api(`/children/${child}/wordbooks`,'POST',{name:'我的单词本'},eventId());await refresh();})}>创建第一个单词本</Button>:<View className='card'>
+ {editing&&<Button className='btn' disabled={busy||!!pending} onClick={()=>{setEditing(null);setRaw('');setNotice('已取消编辑，原任务未修改。');}}>取消编辑原任务</Button>}
+ {pending&&!busy&&<View className='card'><View>上次提交尚未确认。重试将使用同一任务请求，不重复保存。</View><Button className='btn primary' disabled={busy} onClick={()=>run(()=>submit(pending))}>重试上次提交</Button></View>}
+ {!loaded?<View className='card input-placeholder muted'>{error?'单词本暂未加载，请重试':'正在加载单词本…'}</View>:!books.length?<Button className='btn' disabled={busy} onClick={()=>run(async()=>{await api(`/children/${child}/wordbooks`,'POST',{name:'我的单词本'},eventId());await refresh();})}>创建第一个单词本</Button>:<View className='card'>
  {books.length>1&&<Picker mode='selector' range={books.map(b=>b.name)} value={book} disabled={busy||!!pending} onChange={e=>setBook(Number(e.detail.value))}><View className='field field-picker'>{books[book]?.name??books[0]?.name} ▾</View></Picker>}
  <Textarea className='field field-area' placeholder='粘贴单词列表、编号或表格文本，AI 自动识别（单次最多 30 项）' maxlength={8000} disabled={busy||!!pending} value={raw} onInput={e=>setRaw(e.detail.value)}/><Input className='field' placeholder='系列主题，如：机场出行（选填）' maxlength={80} disabled={busy||!!pending} value={theme} onInput={e=>setTheme(e.detail.value)}/>
  <View className='muted'>{raw.length} / 8000 字符</View>
  <Button disabled={busy||!!pending||active||!raw.trim()} className='btn primary' onClick={()=>run(async()=>{
   const draft={jobId:editing?.id,body:{...(editing?{expected_attempts:editing.attempts}:{}),wordbook_id:(books[book]??books[0]).id,source_type:'text',raw_text:raw,theme},key:eventId()};storage.set(pendingKey,draft);setPending(draft);await submit(draft);
- })}>{active?'上一批正在生成…':editing?'更新原任务并生成':'生成并加入词本'}</Button></View>}
+ })}>{busy?'正在提交…':active?'上一批正在生成…':editing?'更新原任务并生成':'生成并加入词本'}</Button></View>}
+ <View className='form-status muted'>{notice}</View>
  <Button className='text-action' onClick={()=>Taro.navigateTo({url:'/pages/generation/index'})}>生成记录 ›</Button>
  </View>;
 }

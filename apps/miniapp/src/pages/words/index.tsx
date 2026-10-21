@@ -15,7 +15,7 @@ export default function Words(){
  return <View className='page'><View className='wordbook-heading'><View className='title'>我的单词本</View><Button className='text-action' onClick={()=>go('add-words')}>＋ 添加单词</Button></View>
  {error&&<View className='error'>{error}<Button className='btn' disabled={busy} onClick={()=>refresh()}>重新加载</Button></View>}
  {busy&&!loaded&&<View className='muted'>正在加载…</View>}
- {active&&<View className='muted small'>新单词正在生成，完成后自动显示。</View>}
+ <View className='wordbook-status muted small'>{active?'新单词正在生成，完成后自动显示。':''}</View>
  <AudioFeedback audio={audio}/>
  {loaded&&!words.length&&!error&&<View className='muted'>还没有单词，点击右上角添加。</View>}
  {words.length>=200&&<View className='muted small'>当前展示前 200 个单词</View>}

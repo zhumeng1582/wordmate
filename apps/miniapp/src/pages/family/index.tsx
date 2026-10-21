@@ -12,10 +12,10 @@ export default function Family(){
   const [shareInvite,setShareInvite]=useState<any>(null);
   const shareReady=!!shareInvite&&shareInvite.family_id===family?.id&&family?.role==='owner'&&new Date(shareInvite.expires_at).getTime()>Date.now();
   useShareAppMessage(({from})=>({title:'邀请你一起陪孩子学单词',imageUrl:inviteCover,path:from==='button'&&shareReady&&new Date(shareInvite.expires_at).getTime()>Date.now()?`/pages/invite/index?token=${encodeURIComponent(shareInvite.invite_token)}`:'/pages/home/index'}));
-  const running=useRef(false);
+  const running=useRef(false),detailScope=useRef('');
   const run=async(fn:()=>Promise<any>)=>{if(running.current)return;running.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(message(e));}finally{running.current=false;setBusy(false);}};
   const select=async(f:any)=>{
-    setFamily(f);setDetailsReady(false);setMembers([]);setChildren([]);setInvites([]);storage.set('family_id',f.id);
+    const key=`${storage.get('access_token')}:${f.id}`;setFamily(f);if(detailScope.current!==key){setDetailsReady(false);setMembers([]);setChildren([]);setInvites([]);detailScope.current=key;}storage.set('family_id',f.id);
     const [kids,people,requests]=await Promise.all([api(`/families/${f.id}/children`),api(`/families/${f.id}/members`),f.role==='owner'?api(`/families/${f.id}/invites`):Promise.resolve({items:[]})]);
     setFamily(f);setChildren(kids.items);setMembers(people.items);setInvites(requests.items);setDetailsReady(true);storage.set('family_id',f.id);
   };

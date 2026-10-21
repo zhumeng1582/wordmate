@@ -78,3 +78,11 @@ input,textarea{caret-color:var(--primary)}
 .review-meaning{font-size:34px;line-height:1.5;margin:0 0 20px}
 
 .autoplay-setting{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:96px;margin:16px 0}
+
+.home-progress-card{min-height:330px}
+.input-placeholder{min-height:490px}
+.calendar-placeholder{min-height:500px}
+.list-placeholder{min-height:240px}
+.form-status{min-height:76px;line-height:1.6}
+.wordbook-status{min-height:40px;line-height:40px}
+.btn.secondary[disabled]{background:var(--disabled-bg);color:var(--disabled-text)}
