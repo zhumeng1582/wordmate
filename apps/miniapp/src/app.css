@@ -71,6 +71,8 @@ input,textarea{caret-color:var(--primary)}
 .text-action .audio-icon{margin-right:12px}
 
 .review-pronunciation{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-.review-pronunciation .audio-text{padding:12px 0}
-.review-pos{font-size:24px}
+.review-pronunciation .audio-text{padding:12px 0;align-items:center;line-height:1.5;font-size:28px}
+.review-pos{display:flex;align-items:center;min-height:88px;font-size:28px;line-height:1.5}
 .review-translation{margin:0 0 8px 50px;line-height:1.6}
+
+.review-meaning{font-size:34px;line-height:1.5;margin:0 0 20px}
