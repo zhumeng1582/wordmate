@@ -1,5 +1,5 @@
 import {useAudio} from '../../services/audio';
-import {AudioButtons,AudioSettings} from '../../components/AudioControls';
+import {AudioText,AudioFeedback} from '../../components/AudioControls';
 import {useEffect,useRef,useState} from 'react';
 import {View,Button,Input,Textarea,Picker} from '@tarojs/components';
 import Taro,{useDidShow,useDidHide} from '@tarojs/taro';
@@ -39,6 +39,6 @@ export default function Words(){
   const draft={jobId:editing?.id,body:{...(editing?{expected_attempts:editing.attempts}:{}),wordbook_id:(books[book]??books[0]).id,source_type:'text',raw_text:raw,theme},key:eventId()};storage.set(pendingKey,draft);setPending(draft);await submit(draft);
  })}>{active?'上一批正在生成…':editing?'更新原任务并生成':'生成并加入词本'}</Button></View>}
  <Button className='btn' onClick={()=>Taro.navigateTo({url:'/pages/generation/index'})}>生成记录 ›</Button>
- <AudioSettings audio={audio}/><View className='subtitle'>孩子的全部单词（当前最多展示 200 个）</View>{words.map(w=><View className='card' key={w.id}><View className='word'>{w.lemma}</View><AudioButtons audio={audio} target={{word_id:w.id,content_version:w.version}}/><View>{w.part_of_speech} · {w.meaning_zh}</View>{(w.ipa_gb||w.ipa_us)&&<View className='muted'>英 {w.ipa_gb||'暂无'}　美 {w.ipa_us||'暂无'}</View>}{w.example&&<><View className='divider'/><View>{w.example.text_en}</View><AudioButtons audio={audio} sentence target={{sentence_id:w.example.id,content_version:w.example.content_version}}/><View className='muted'>{w.example.translation_zh}</View></>}{w.dictionary_source?.startsWith('ai:')&&<View className='muted small'>AI 生成内容</View>}</View>)}
+ <AudioFeedback audio={audio}/><View className='subtitle'>孩子的全部单词（当前最多展示 200 个）</View>{words.map(w=><View className='card' key={w.id}><View className='word'>{w.lemma}</View><AudioText audio={audio} phonetic target={{word_id:w.id,content_version:w.version}} text={(audio.accent==='en-GB'?w.ipa_gb:w.ipa_us)||'听发音'}/><View>{w.part_of_speech} · {w.meaning_zh}</View>{w.example&&<><View className='divider'/><AudioText audio={audio} target={{sentence_id:w.example.id,content_version:w.example.content_version}} text={w.example.text_en}/><View className='muted'>{w.example.translation_zh}</View></>}{w.dictionary_source?.startsWith('ai:')&&<View className='muted small'>AI 生成内容</View>}</View>)}
  </View>;
 }

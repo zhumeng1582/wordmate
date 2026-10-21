@@ -15,7 +15,8 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
-  VOICE_ACCENT_UNAVAILABLE:'当前声音未开通此口音，请切换声音或联系管理员。',
+  AUDIO_SETTINGS_CHANGED:'设置已在其他设备更新，已刷新，请重新选择并保存。',
+  VOICE_ACCENT_UNAVAILABLE:'当前音色不可用，请到“我的 → 发音设置”重新选择。',
   AUDIO_NOT_CONFIGURED:'语音尚未配置，请检查后端 TTS 和存储配置并重启。',
   AUDIO_DAILY_LIMIT:'已达到最近 24 小时的新音频生成额度。已缓存音频仍可播放。',
   AUDIO_WAIT_TIMEOUT:'音频仍在后台准备，可以稍后再次点击播放。',

@@ -2,17 +2,17 @@
 更新：2026-10-21
 
 当前实现与验收边界
-已接入：持久音频任务、孩子私有缓存、CosyVoice TTS、OSS V4 读写、鉴权下载、上传失败复用合成文件、英美音按钮、已配置声音选择、例句播放、复习播放、页面退出停止。
+已接入：持久音频任务、孩子私有缓存、CosyVoice TTS、OSS V4 读写、鉴权下载、上传失败复用合成文件、账号发音设置、音标与例句整行点播、复习播放、页面退出停止。
 用户已通过 TTS 实际合成及 OSS 上传/下载/匿名拒绝的独立测试。本轮业务自动化测试使用隔离数据库和模拟供应商；完整真实链路在执行环境遇到 ENOTFOUND，待用户终端运行 test:audio:flow。小程序已构建，微信实际播放与发音质量未验收。
 这不是全部 0.1 完成或可上线结论。公共词典共享音频、云文件自动清理、生产全接口限流、完整生命周期删除、ECS RAM 角色自动取证、其他厂商实际适配均未实现。
 
 一、流程
-点击单词或例句英音/美音 → 检查会话、家庭、孩子、资源版本 → 查找同参数任务。
+点击音标或英文例句（喇叭与文字均可点播），使用账号保存的口音和音色 → 检查会话、家庭、孩子、资源版本 → 查找同参数任务。
 成功缓存：从该文件原存储配置读取 → SHA256/MP3头检查 → 再验权限 → API返回音频 → 小程序临时文件播放。命中不调用TTS。
 无缓存：创建generation_jobs与audio_assets → Worker合成 → 私有临时文件检查点 → OSS上传/读回校验 → 标记成功 → 客户端鉴权下载。
 已有queued/running任务直接复用；失败任务由用户再次点击启动重试，最大总尝试3次；不可重试时明确提示。
-客户端每2秒查询，最多等待120秒；退出/停止等待不取消后台任务，之后点击继续查原任务。仅当前播放意图可启动播放器；切词、切口音、页面隐藏、卸载停止并释放临时文件。
-当前语速固定1.0；API支持0.5–1.5。声音仅来自后端白名单，不自动替换口音或用户选中的性别。用户当前已验证两种女声；男声须在账号实际验证后加入COSYVOICE_ENABLED_VOICES。
+客户端每2秒查询，最多等待120秒；退出页面不取消后台任务，之后点击继续查原任务。仅当前播放意图可启动播放器；切词、切口音、页面隐藏、卸载停止并释放临时文件。
+当前语速固定1.0；API支持0.5–1.5。声音仅来自后端白名单；“我的 → 发音设置”统一选择口音与音色。学习页不显示切换器或取消播放按钮，加载/播放状态在对应文字下轻提示。复习页展示对应口音音标及英文例句，尚无例句则显示“暂无例句”；不提前展示中文释义或例句译文。用户当前已验证两种女声；男声须在账号实际验证后加入COSYVOICE_ENABLED_VOICES。
 
 二、缓存与权限
 缓存身份包含孩子、词/句ID、内容版本、规范化正文、词性/义项/音标发音标识、供应商/地域/模型/策略版本/格式/采样率、口音、声音和语速。
@@ -24,8 +24,8 @@ Cache-Control: no-store，X-Content-Type-Options: nosniff；无永久公开URL�
 已下载的设备字节无法远程撤回；播放结束、停止和退出尽力删除临时文件。
 
 三、迁移与任务
-空库：001_schema.sql建立初始29表，002_audio.sql追加audio_usage_events及audio_assets.storage_profile_id/sha256/size_bytes，共30表。
-已有本地库：corepack pnpm local启动时自动执行幂等增量002，保留已有学习数据；不得删除.local/dev-db或重跑初始DDL。
+空库：001_schema.sql建立初始29表，002_audio.sql追加audio_usage_events及audio_assets.storage_profile_id/sha256/size_bytes，共30表。003_audio_preferences.sql追加users.audio_accent/audio_voice_id/audio_settings_version，不新增表。
+已有本地库：corepack pnpm local启动时自动执行幂等增量002/003，保留已有学习数据；不得删除.local/dev-db或重跑初始DDL。
 已有PostgreSQL：先build:api，再执行 corepack pnpm --filter @wordmate/api migrate:audio。只运行增量，数据库账号需具备对应DDL权限。
 audio_assets保存授权绑定与存储定位；generation_jobs保存内部参数快照、状态、attempts、180秒租约；客户端只获得安全DTO。
 单API进程每秒处理一个任务，同时最多一个；数据库范围锁与唯一约束阻止同音频并发生成。多实例的总并发不等于全局1，需要部署层另行限制。
@@ -58,6 +58,8 @@ TTS配置快照变化不复用旧内容键；待处理任务若与当前TTS配�
 packages/ai已有通用校验复制接口；业务数据库引用迁移、迁移命令、旧文件清理还未接入。不要移除仍被引用的旧配置或自动删除整个audio前缀。
 
 五、接口（均带Bearer，路径相对/api）
+GET /me/audio-settings：{accent,voice_id,version}；当前账号偏好，默认英音及该口音首个配置音色。
+PUT /me/audio-settings：{accent,voice_id,expected_version}及Idempotency-Key，保存后返回最新偏好。跨设备版本冲突409，前端刷新后允许重新保存。账号切换/页面返回读取服务端设置，每次点播再次读取，避免使用其他账号或旧设备偏好。
 GET /voices?accent=en-GB：{items:[{id,accent,gender}],available}。无accent返回全部配置音色；available表示是否配置合成，不是音质/额度承诺。
 POST /audio：Idempotency-Key必填，body={word_id或sentence_id,content_version,accent,voice_id,speech_rate}。
 成功缓存200，其余状态202，统一AudioJob：
@@ -86,7 +88,7 @@ corepack pnpm test:routes：真实Nest请求解析、音频创建/查询/二进�
 corepack pnpm test:audio:flow --offline：隔离持久数据库的模拟流程、关闭/重新打开数据库后的缓存、授权隔离。
 corepack pnpm test:audio:flow：读取.env，实际合成一个单词英美音和一条例句，共3次；上传OSS、读回、重复播放、数据库重启复用。无现有学习数据改动。
 真实验收会保留少量测试OSS对象，不要求删除权限；报告.local/audio-flow-verification.json。失败可能留下孤立对象，按run及隔离任务人工处理，不能据失败结果自动扩大云权限。
-微信验收：重启corepack pnpm local，开发者工具编译；单词本点英音/美音和例句，重复播放、切页/切词/停止、弱网后重试、另一家长授权访问、无权限访问。
+微信验收：重启corepack pnpm local，开发者工具编译；先在“我的 → 发音设置”保存，再点音标或例句文字播放，重复播放、切页/切词、弱网后重试、另一家长授权访问、无权限访问。
 试听同形异音词、英文口音、句子停顿；自动化通过不代表发音教学质量通过。
 
 资料（之前核查的官方入口）

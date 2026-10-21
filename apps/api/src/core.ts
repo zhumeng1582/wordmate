@@ -49,6 +49,18 @@ export class Core {
       await q.query(`UPDATE idempotency_keys SET status='completed',http_status=200,response_body=$4 WHERE actor_user_id=$1 AND operation=$2 AND key=$3`,[actor,op,key,JSON.stringify(result)]);return result;
     });
   }
+  async audioSettings(actor:string){const catalog=await this.audio.voices();return this.tx(async q=>{
+    const user=await one(q,"SELECT audio_accent,audio_voice_id,audio_settings_version FROM users WHERE id=$1 AND status='active'",[actor]);ensure(user,401,'ACCOUNT_UNAVAILABLE');
+    return {accent:user.audio_accent,voice_id:user.audio_voice_id??catalog.items.find(v=>v.accent===user.audio_accent)?.id??null,version:user.audio_settings_version};
+  });}
+  async saveAudioSettings(actor:string,key:string,b:any){
+    return this.write(actor,key,'me:audio-settings',b,q=>one(q,"SELECT * FROM users WHERE id=$1 AND status='active' FOR UPDATE",[actor]),async(q,u)=>{
+      ensure(u,401,'ACCOUNT_UNAVAILABLE');ensure(u.audio_settings_version===b.expected_version,409,'AUDIO_SETTINGS_CHANGED');
+      const catalog=await this.audio.voices();ensure(catalog.items.some(v=>v.id===b.voice_id&&v.accent===b.accent),422,'VOICE_ACCENT_UNAVAILABLE');
+      const r=await one(q,'UPDATE users SET audio_accent=$2,audio_voice_id=$3,audio_settings_version=audio_settings_version+1 WHERE id=$1 RETURNING audio_settings_version',[actor,b.accent,b.voice_id]);
+      return {accent:b.accent,voice_id:b.voice_id,version:r.audio_settings_version};
+    });
+  }
   async me(actor:string){return this.tx(async q=>({families:await this.families(q,actor)}));}
   async createFamily(actor:string,key:string,body:any){return this.write(actor,key,'family:create',body,async()=>null,async q=>{
     const f=await one(q,'INSERT INTO families(name,owner_user_id) VALUES($1,$2) RETURNING *',[text(body.name,40),actor]);
@@ -149,7 +161,7 @@ export class Core {
   private live(s:Row,generation:number){ensure(s.status==='active'&&new Date(s.expires_at)>this.clock()&&s.lease_generation===generation,409,'SESSION_EXPIRED');}
   async heartbeat(actor:string,id:string,body:any,end=false){return this.tx(async q=>{const {s}=await this.session(q,actor,id);this.live(s,integer(body.lease_generation));return one(q,end?`UPDATE study_sessions SET status='ended',ended_at=$2 WHERE id=$1 RETURNING id,status,expires_at,lease_generation`:`UPDATE study_sessions SET expires_at=$2 WHERE id=$1 RETURNING id,status,expires_at,lease_generation`,[id,end?this.clock():new Date(this.clock().getTime()+120000)]);});}
   async cards(actor:string,id:string,query:any={}){return this.tx(async q=>{const {s}=await this.session(q,actor,id);this.live(s,s.lease_generation);const limit=pageSize(query.limit),cursor=query.cursor===undefined?0:Number(query.cursor);ensure(Number.isSafeInteger(cursor)&&cursor>=0,422,'INVALID_CURSOR');
-    const rows=(await q.query(`SELECT r.id,r.version,r.state,r.due_at,r.child_word_id,w.version AS word_version,w.lemma,w.part_of_speech,i.practice_only,i.ordinal FROM study_session_items i JOIN review_cards r ON r.id=i.card_id JOIN child_words w ON w.id=r.child_word_id WHERE i.session_id=$1 AND i.answered_event_id IS NULL AND i.ordinal>$2 ORDER BY i.ordinal LIMIT $3`,[id,cursor,limit+1])).rows;
+    const rows=(await q.query(`SELECT r.id,r.version,r.state,r.due_at,r.child_word_id,w.version AS word_version,w.lemma,w.part_of_speech,w.ipa_gb,w.ipa_us,(SELECT json_build_object('id',e.id,'content_version',e.content_version,'text_en',e.text_en) FROM sentences e JOIN sentence_targets t ON t.sentence_id=e.id WHERE t.child_word_id=w.id AND e.status='validated' ORDER BY e.created_at DESC,e.id DESC LIMIT 1) example,i.practice_only,i.ordinal FROM study_session_items i JOIN review_cards r ON r.id=i.card_id JOIN child_words w ON w.id=r.child_word_id WHERE i.session_id=$1 AND i.answered_event_id IS NULL AND i.ordinal>$2 ORDER BY i.ordinal LIMIT $3`,[id,cursor,limit+1])).rows;
     return {items:rows.slice(0,limit),next_cursor:rows.length>limit?String(rows[limit-1].ordinal):null,remaining:Number((await one(q,'SELECT count(*) n FROM study_session_items WHERE session_id=$1 AND answered_event_id IS NULL',[id])).n)};});}
 
   async review(actor:string,body:any){return this.tx(async q=>{

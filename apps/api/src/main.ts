@@ -31,7 +31,9 @@ class ApiController {
       if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
       const auth=req.headers.authorization;ensure(typeof auth==='string' && auth.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
       const key=String(req.headers['idempotency-key']??'');let data:any;
-      if(method==='GET'&&p.join('/')==='voices')data=await core.audio.voices(req.query.accent);
+      if(method==='GET'&&p.join('/')==='me/audio-settings')data=await core.audioSettings(actor);
+      else if(method==='PUT'&&p.join('/')==='me/audio-settings')data=await core.saveAudioSettings(actor,key,b);
+      else if(method==='GET'&&p.join('/')==='voices')data=await core.audio.voices(req.query.accent);
       else if(method==='POST'&&p.join('/')==='audio'){data=await core.audio.create(actor,key,b);res.status(data.status==='succeeded'?200:202);}
       else if(method==='GET'&&p[0]==='jobs'&&p.length===2)data=await core.audio.get(actor,p[1]);
       else if(method==='POST'&&p[0]==='jobs'&&p[2]==='retry'&&p.length===3){data=await core.audio.retry(actor,key,p[1]);res.status(202);}

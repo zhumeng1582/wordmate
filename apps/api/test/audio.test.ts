@@ -11,7 +11,7 @@ import type {Database} from '../src/ports.ts';
 import type {AudioRuntime} from '../src/audio-runtime.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 async function fixture(){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  const spoolDir=await mkdtemp(join(tmpdir(),'word-audio-'));
  const objects=new Map<string,Uint8Array>();let calls=0,uploadError=false,readError=false,gate:Promise<void>|undefined,now=new Date();
@@ -113,5 +113,17 @@ test('audio: switching storage preserves old reads and checks membership again a
   const original=f.runtime.stores['test-storage'].get;
   f.runtime.stores['test-storage'].get=async k=>{const bytes=await original(k);await f.pg.query("UPDATE wordmate.family_members SET status='removed' WHERE user_id=$1",[f.dad]);return bytes;};
   await assert.rejects(f.core.audio.content(f.dad,job.audio_id),{code:'FAMILY_NOT_FOUND'});
+ }finally{await f.close();}
+});
+
+test('account audio settings sync across sessions, isolate parents and reject conflicting writes',async()=>{
+ const f=await fixture();try{
+  const original=await f.core.audioSettings(f.dad);assert.equal(original.accent,'en-GB');
+  const saved=await f.core.saveAudioSettings(f.dad,'settings',{accent:'en-US',voice_id:'us',expected_version:original.version});
+  assert.deepEqual(await f.newCore().audioSettings(f.dad),saved);
+  assert.equal((await f.newCore().audioSettings(f.mom)).accent,'en-GB');
+  assert.deepEqual(await f.core.saveAudioSettings(f.dad,'settings',{accent:'en-US',voice_id:'us',expected_version:original.version}),saved);
+  await assert.rejects(f.core.saveAudioSettings(f.dad,'stale',{accent:'en-GB',voice_id:'gb',expected_version:original.version}),{code:'AUDIO_SETTINGS_CHANGED'});
+  await assert.rejects(f.core.saveAudioSettings(f.dad,'wrong-voice',{accent:'en-US',voice_id:'gb',expected_version:saved.version}),{code:'VOICE_ACCENT_UNAVAILABLE'});
  }finally{await f.close();}
 });
