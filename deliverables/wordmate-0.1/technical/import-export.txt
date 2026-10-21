@@ -1,4 +1,4 @@
-单词共学 0.1 · 图片、文件导入与单词导出（已实现，真实图片服务和微信端待验收）
+单词共学 0.1 · 图片、文件导入与单词导出（已实现；小样图真实视觉识别通过，微信端整链路待验收）
 
 交互
 添加单词页面保留一个输入框，在上方提供“拍照 / 选图片 / 选文件”。导入成功追加到原输入，用户可编辑，然后点击原有“生成并加入词本”。不增加文件任务页面，不要求逐个确认词义。解析失败/超限保持原输入不变；取消选择不报错。
@@ -26,17 +26,17 @@ POST /api/children/:child_id/word-exports
 当前大请求在解析前验证登录；网关IP限流、全站接口限流和生产监控仍属上线阻断项。
 
 配置
-将 config/import.env.example 中四项填入根目录 .env：
+将 config/import.env.example 中四项填入根目录 .env（已确认业务空间允许图片模型调用；最终实际模型使用 qwen3.7-flash-2026-07-15）：
 OCR_PROVIDER=qwen
 OCR_WORKSPACE_ID=<北京业务空间ID>
 OCR_API_KEY=<该空间有视觉模型权限的Key>
-OCR_MODEL=qwen-vl-plus
-可选择该空间实际开通的其他视觉模型，需重新验收。TTS的Key是否有视觉权限不能据已有语音成功推定；有权限时可在服务端使用同一空间的Key，代码仍使用独立OCR字段。
+OCR_MODEL=qwen3.7-flash-2026-07-15
+当前空间权限接口曾对 qwen3-vl-flash 返回 model_not_found；不要使用该模型。已授权 qwen3.7-flash-2026-07-15，并已通过小样图真实调用HTTP 200和预期文字匹配。TTS的Key是否有视觉权限不能据已有语音成功推定；有权限时可在服务端使用同一空间的Key，代码仍使用独立OCR字段。
 未设置OCR_PROVIDER时文档与文本可用，图片明确显示未开通，不能当成图片流程已经验收。
 本地 corepack pnpm local 会加载OCR_*；新迁移自动应用并保留已有学习数据。线上已有库执行增量迁移命令，不运行空库初始化迁移。
 验证：corepack pnpm test:import-export
 真实识别：corepack pnpm test:ocr:live -- /绝对路径/学习材料.png
-真实验证命令只发送显式指定的图片，日志仅输出成功/错误码与字数，不打印识别内容，不写业务数据库；仍需微信端选择→提取→生成→复习一条龙验收。
+已在 2026-10-21 使用合成小样图验证 qwen3.7-flash-2026-07-15 返回HTTP 200，并核对airport/luggage/delay三个词。命令只发送显式指定的图片，报告只输出成功/错误码、字数和匹配数，不打印识别全文，不写业务数据库。真实教材/手机拍摄效果和微信端选择→提取→生成→保存链路仍需验收。
 
 依据（2026-10-21查阅）
 https://help.aliyun.com/zh/model-studio/qwen-vl-compatible-with-openai
