@@ -20,9 +20,10 @@ export default function Words(){
  {loaded&&!words.length&&!error&&<View className='muted'>还没有单词，点击右上角添加。</View>}
  {words.length>=200&&<View className='muted small'>当前展示前 200 个单词</View>}
  {!!words.length&&<View className='wordbook-list'>{words.map(w=><View className='wordbook-item' key={w.id} onClick={()=>toggle(w.id)}>
- <View className='wordbook-summary'><View className='wordbook-lemma'>{w.lemma}</View><Text className='muted'>{expanded===w.id?'▴':'▾'}</Text></View>
- <View onClick={e=>e.stopPropagation()}><AudioText audio={audio} phonetic target={{word_id:w.id,content_version:w.version}} text={(audio.accent==='en-GB'?w.ipa_gb:w.ipa_us)||'听发音'}/></View>
- {expanded===w.id&&<View className='wordbook-detail' onClick={e=>e.stopPropagation()}><View>{w.part_of_speech} · {w.meaning_zh}</View>{w.example&&<><View className='divider'/><AudioText audio={audio} target={{sentence_id:w.example.id,content_version:w.example.content_version}} text={w.example.text_en}/><View className='muted'>{w.example.translation_zh}</View></>}</View>}
+ <View className='wordbook-summary'><View className='wordbook-lemma'>{w.lemma}</View>
+ <View className='wordbook-pronunciation' onClick={e=>e.stopPropagation()}><AudioText audio={audio} phonetic target={{word_id:w.id,content_version:w.version}} text={(audio.accent==='en-GB'?w.ipa_gb:w.ipa_us)||'听发音'}/></View>
+ <Text className={`wordbook-chevron ${expanded===w.id?'is-open':''}`}>›</Text></View>
+ {expanded===w.id&&<View className='wordbook-detail' onClick={e=>e.stopPropagation()}><View className='wordbook-meaning'><Text className='wordbook-pos'>{w.part_of_speech}</Text><Text>{w.meaning_zh}</Text></View>{w.example&&<View className='wordbook-example'><AudioText audio={audio} target={{sentence_id:w.example.id,content_version:w.example.content_version}} text={w.example.text_en}/><View className='wordbook-translation'>{w.example.translation_zh}</View></View>}</View>}
  </View>)}</View>}
  </View>;
 }

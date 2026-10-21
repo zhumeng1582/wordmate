@@ -1,9 +1,21 @@
 .wordbook-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .wordbook-heading .title{font-size:42px}
 .wordbook-heading .text-action{flex-shrink:0;padding:16px 0}
-.wordbook-list{background:var(--surface);border-radius:28px;padding:0 28px;overflow:hidden}
-.wordbook-item{padding:18px 0;border-bottom:2px solid var(--border)}
+.wordbook-list{background:var(--surface);border-radius:24px;padding:0 24px;overflow:hidden}
+.wordbook-item{padding:4px 0;border-bottom:1px solid var(--border)}
 .wordbook-item:last-child{border-bottom:0}
-.wordbook-summary{display:flex;align-items:center;justify-content:space-between;min-height:76px;gap:20px}
-.wordbook-lemma{font-size:36px;font-weight:600;overflow-wrap:anywhere}
-.wordbook-detail{padding:12px 0 20px}
+.wordbook-summary{display:flex;align-items:center;min-height:100px;gap:16px;flex-wrap:wrap}
+.wordbook-lemma{font-size:34px;font-weight:600;line-height:1.35;overflow-wrap:anywhere;max-width:100%}
+.wordbook-pronunciation{flex:1;min-width:150px}
+.wordbook-pronunciation .audio-text{font-size:25px;line-height:1.5;padding:12px 0;align-items:center;overflow-wrap:anywhere}
+.wordbook-pronunciation .audio-speaker{font-size:23px}
+.wordbook-chevron{flex-shrink:0;font-size:32px;color:var(--subtle);margin-left:auto;transform:rotate(90deg);line-height:1}
+.wordbook-chevron.is-open{transform:rotate(-90deg);color:var(--primary)}
+.wordbook-detail{padding:0 0 20px}
+.wordbook-meaning{display:flex;align-items:baseline;gap:12px;font-size:28px;line-height:1.6;flex-wrap:wrap;margin-bottom:12px}
+.wordbook-pos{font-size:22px;color:var(--muted);background:var(--field);padding:2px 10px;border-radius:6px}
+.wordbook-example{background:var(--field);border-radius:14px;padding:0 16px 14px}
+.wordbook-example .audio-text{font-size:27px;line-height:1.6;padding:12px 0;align-items:center}
+.wordbook-example .audio-speaker{font-size:23px}
+.wordbook-translation{font-size:24px;color:var(--muted);line-height:1.6;margin-left:37px}
+.wordbook-item .audio-status{font-size:22px;margin:0 0 8px 37px}
