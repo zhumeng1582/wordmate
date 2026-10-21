@@ -8,7 +8,7 @@ const object=(properties:any,required=Object.keys(properties))=>({type:'object',
 const schemas:Record<string,any>={
   learningGoal:object({daily_goal:{type:'integer',minimum:1,maximum:500},expected_version:positive}),
   voicePreview:object({accent:{enum:['en-GB','en-US']},voice_id:str(100)}),
-  audioSettings:object({accent:{enum:['en-GB','en-US']},voice_id:str(100),expected_version:positive}),
+  audioSettings:object({accent:{enum:['en-GB','en-US']},voice_id:str(100),auto_play:{type:'boolean'},expected_version:positive},['accent','voice_id','expected_version']),
   audio:{oneOf:['word_id','sentence_id'].map(resource=>object({[resource]:id,content_version:positive,accent:{enum:['en-GB','en-US']},voice_id:str(100),speech_rate:{type:'number',minimum:0.5,maximum:1.5}}))},
   aiReplace:object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80},expected_attempts:{type:'integer',minimum:0}},['wordbook_id','raw_text','expected_attempts']),
   aiBatch:{oneOf:[object({wordbook_id:id,raw_text:str(8000),source_type:{const:'text'},theme:{type:'string',maxLength:80}},['wordbook_id','raw_text']),object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:30},theme:{type:'string',maxLength:80}},['wordbook_id','words'])]},

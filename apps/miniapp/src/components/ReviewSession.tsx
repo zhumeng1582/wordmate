@@ -29,7 +29,15 @@ export function ReviewSession({onExit}:{onExit?:()=>void}){
   useEffect(()=>{if(!entered.current&&!hasPending){entered.current=true;void start();}},[hasPending]);
   const exit=()=>{audio.stop();if(onExit)onExit();else Taro.navigateBack();};
   const card=cards[0];
+  const playRef=useRef(audio.play),autoPlayed=useRef('');playRef.current=audio.play;
   useEffect(()=>{audio.stop();},[card?.id,session?.id,audio.stop]);
+  useEffect(()=>{
+    if(!visible||!card||!session||hasPending)return;
+    const key=`${session.id}:${card.id}`;if(autoPlayed.current===key)return;
+    let cancelled=false;
+    api('/me/audio-settings').then(p=>{if(cancelled)return;autoPlayed.current=key;if(p.auto_play)void playRef.current({word_id:card.child_word_id,content_version:card.word_version});}).catch(()=>{});
+    return()=>{cancelled=true;};
+  },[visible,card?.id,session?.id,hasPending]);
   return <View className='page'><View className='title'>{(session?.source??source.source)==='scheduled'?'今天的复习':'错词再练一遍'}</View><View className='muted'>先回忆，再查看词义，按真实记忆情况选择。</View>{error&&<View className='error'>{error}</View>}<AudioFeedback audio={audio}/>
     {hasPending&&<View className='card'><View>有一条答案尚未确认保存，请重试。</View><Button className='btn' disabled={busy} onClick={()=>run(()=>send(storage.get(pendingKey)))}>重试保存</Button>{rejected&&<Button className='btn secondary' onClick={()=>{Taro.removeStorageSync(pendingKey);setHasPending(false);setRejected(false);setError('');}}>清除已被服务器拒绝的答案，重新开始</Button>}</View>}
     {!session&&!hasPending&&<>{busy?<View className='muted'>正在准备单词…</View>:error&&<Button className='btn primary' onClick={start}>重试</Button>}</>}

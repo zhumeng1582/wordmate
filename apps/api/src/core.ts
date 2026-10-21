@@ -50,15 +50,15 @@ export class Core {
     });
   }
   async audioSettings(actor:string){const catalog=await this.audio.voices();return this.tx(async q=>{
-    const user=await one(q,"SELECT audio_accent,audio_voice_id,audio_settings_version FROM users WHERE id=$1 AND status='active'",[actor]);ensure(user,401,'ACCOUNT_UNAVAILABLE');
-    return {accent:user.audio_accent,voice_id:user.audio_voice_id??catalog.items.find(v=>v.accent===user.audio_accent)?.id??null,version:user.audio_settings_version};
+    const user=await one(q,"SELECT audio_accent,audio_voice_id,audio_auto_play,audio_settings_version FROM users WHERE id=$1 AND status='active'",[actor]);ensure(user,401,'ACCOUNT_UNAVAILABLE');
+    return {accent:user.audio_accent,voice_id:user.audio_voice_id??catalog.items.find(v=>v.accent===user.audio_accent)?.id??null,auto_play:user.audio_auto_play,version:user.audio_settings_version};
   });}
   async saveAudioSettings(actor:string,key:string,b:any){
     return this.write(actor,key,'me:audio-settings',b,q=>one(q,"SELECT * FROM users WHERE id=$1 AND status='active' FOR UPDATE",[actor]),async(q,u)=>{
       ensure(u,401,'ACCOUNT_UNAVAILABLE');ensure(u.audio_settings_version===b.expected_version,409,'AUDIO_SETTINGS_CHANGED');
       const catalog=await this.audio.voices();ensure(catalog.items.some(v=>v.id===b.voice_id&&v.accent===b.accent),422,'VOICE_ACCENT_UNAVAILABLE');
-      const r=await one(q,'UPDATE users SET audio_accent=$2,audio_voice_id=$3,audio_settings_version=audio_settings_version+1 WHERE id=$1 RETURNING audio_settings_version',[actor,b.accent,b.voice_id]);
-      return {accent:b.accent,voice_id:b.voice_id,version:r.audio_settings_version};
+      const r=await one(q,'UPDATE users SET audio_accent=$2,audio_voice_id=$3,audio_auto_play=$4,audio_settings_version=audio_settings_version+1 WHERE id=$1 RETURNING audio_settings_version',[actor,b.accent,b.voice_id,b.auto_play??u.audio_auto_play]);
+      return {accent:b.accent,voice_id:b.voice_id,auto_play:b.auto_play??u.audio_auto_play,version:r.audio_settings_version};
     });
   }
   async me(actor:string){return this.tx(async q=>({families:await this.families(q,actor)}));}

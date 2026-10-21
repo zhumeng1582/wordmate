@@ -143,3 +143,9 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 - 不新增表；保留已有学习记录、历史打卡和当日目标，首页返回时刷新进度。
 
 复习卡片：音标与词性同行，无分隔线。点击查看词义后，通过单词详情接口的 example（id、content_version、translation_zh）显示对应例句译文；复习队列接口继续隐藏中文答案。
+
+自动播放单词（0.1）
+- 设置 → 发音设置 → 自动播放单词发音，默认关闭，修改后保存；按家长账号同步。
+- 开启后进入复习单词时播放一次（含首词），切换停止旧音频，返回页面不重复播放已进入的词；例句仍点按播放。
+- GET/PUT /me/audio-settings 新增 auto_play 布尔字段；旧客户端省略时保留已保存值。
+- 迁移 005_audio_autoplay.sql 新增 users.audio_auto_play，默认 false；本地启动自动应用，生产执行 migrate:audio。
