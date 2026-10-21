@@ -15,6 +15,9 @@ export async function login(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+  INVITE_NOT_FOUND:'邀请不存在，请向邀请人索取新卡片或口令。',
+  INVITE_UNAVAILABLE:'邀请已过期或已被领取，请向邀请人索取新邀请。',
+  ALREADY_MEMBER:'你已是该家庭成员，无需再次加入。',
   NO_WORDS_FOUND:'未识别到可学习的词汇，请编辑输入内容后重新提交。',
   TOO_MANY_WORDS:'识别内容超过 30 项，请拆成几批提交；本次未保存。',
   UNSAFE_INPUT:'内容不适合词汇识别，请只提供要学习的词汇或材料。',

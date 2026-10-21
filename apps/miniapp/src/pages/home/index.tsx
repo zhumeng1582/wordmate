@@ -11,6 +11,6 @@ export default function Home(){
     <Button className='btn' disabled={!today} onClick={()=>go('words')}>单词本 · 添加单词</Button><Button className='btn' onClick={()=>go('family')}>家庭与孩子</Button>
     <Button className='btn' disabled={!today} onClick={()=>go('quiz')}>按月测验 · 抽样 / 全量</Button>
     <Button className='btn' disabled={!today} onClick={()=>go('calendar')}>学习日历 · 打卡记录</Button><Button className='btn' disabled={!today} onClick={()=>go('wrong')}>历史错题集</Button>
-    <View className='muted small'>0.1 开发中 · 当前已接入录词与复习主流程。已接入 AI 录词、例句、复习与日历，语音及分享等功能继续开发。</View>
+    <View className='muted small'>0.1 开发中 · 当前已接入录词与复习主流程。已接入 AI 录词、例句、复习与日历，已支持家庭邀请卡片；语音及学习成果分享继续开发。</View>
   </View>;
 }

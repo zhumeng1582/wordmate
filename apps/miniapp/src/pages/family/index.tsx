@@ -1,13 +1,17 @@
 import {useRef,useState} from 'react';
 import {View,Button,Input,Picker,Text} from '@tarojs/components';
-import Taro,{useDidShow} from '@tarojs/taro';
+import Taro,{useDidShow,useShareAppMessage} from '@tarojs/taro';
 import {api,storage,login,eventId,message} from '../../services/api';
 import './index.css';
-type Panel=''|'account'|'family'|'child'|'join'|'invites';
+const inviteCover='/assets/invite-cover.png';
+type Panel=''|'account'|'family'|'child'|'join'|'invites'|'share';
 export default function Family(){
   const [family,setFamily]=useState<any>(null),[families,setFamilies]=useState<any[]>([]),[members,setMembers]=useState<any[]>([]),[children,setChildren]=useState<any[]>([]);
   const [name,setName]=useState(''),[nickname,setNickname]=useState(''),[accent,setAccent]=useState(0),[token,setToken]=useState(''),[invites,setInvites]=useState<any[]>([]);
   const [panel,setPanel]=useState<Panel>(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[signedIn,setSignedIn]=useState(!!storage.get('access_token')),[detailsReady,setDetailsReady]=useState(false);
+  const [shareInvite,setShareInvite]=useState<any>(null);
+  const shareReady=!!shareInvite&&shareInvite.family_id===family?.id&&family?.role==='owner'&&new Date(shareInvite.expires_at).getTime()>Date.now();
+  useShareAppMessage(({from})=>({title:'邀请你一起陪孩子学单词',imageUrl:inviteCover,path:from==='button'&&shareReady&&new Date(shareInvite.expires_at).getTime()>Date.now()?`/pages/invite/index?token=${encodeURIComponent(shareInvite.invite_token)}`:'/pages/home/index'}));
   const running=useRef(false);
   const run=async(fn:()=>Promise<any>)=>{if(running.current)return;running.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(message(e));}finally{running.current=false;setBusy(false);}};
   const select=async(f:any)=>{
@@ -16,7 +20,7 @@ export default function Family(){
     setFamily(f);setChildren(kids.items);setMembers(people.items);setInvites(requests.items);setDetailsReady(true);storage.set('family_id',f.id);
   };
   const refresh=async()=>{const list=(await api('/me')).families;setFamilies(list);const selected=list.find((f:any)=>f.id===storage.get('family_id'))??list[0];if(selected)await select(selected);else{setFamily(null);setMembers([]);setChildren([]);setInvites([]);}};
-  const signIn=async(identity='dev-dad')=>{await login(identity);setSignedIn(true);await refresh();setPanel('');};
+  const signIn=async(identity='dev-dad')=>{await login(identity);setShareInvite(null);setSignedIn(true);await refresh();setPanel('');};
   useDidShow(()=>{if(storage.get('access_token'))void run(refresh);});
   const open=(next:Panel)=>{setError('');setPanel(next);};
   const chooseChild=(c:any)=>{storage.set('child_id',c.id);Taro.reLaunch({url:'/pages/home/index'});};
@@ -36,14 +40,15 @@ export default function Family(){
       </>:error||busy?<View className='member-card'><View className='member-title'>{busy?'正在加载家庭':'暂时无法加载家庭'}</View><Button className='btn secondary' disabled={busy} onClick={()=>run(refresh)}>重试加载</Button></View>:<View className='member-card member-owner'><View className='member-title'>建立你们的家庭</View><View className='member-description'>创建家庭，或用另一位家长的口令申请加入。</View><Button className='btn primary' disabled={busy} onClick={()=>open('family')}>创建家庭</Button><Button className='btn secondary' disabled={busy} onClick={()=>open('join')}>加入已有家庭</Button></View>}
     </View>
     <View className='family-actions'>
-      {family&&<Button className='btn primary invite-button' disabled={busy} onClick={()=>family.role==='owner'?run(async()=>{const invite=await api(`/families/${family.id}/invites`,'POST',{},eventId());await Taro.setClipboardData({data:invite.invite_token});Taro.showToast({title:'口令已复制，24 小时内有效',icon:'none'});}):open('child')}>{family.role==='owner'?'邀请另一位家长':'选择孩子，开始陪学'}</Button>}
+      {family&&<Button className='btn primary invite-button' disabled={busy} onClick={()=>family.role==='owner'?run(async()=>{if(!shareReady){const invite=await api(`/families/${family.id}/invites`,'POST',{},eventId());setShareInvite({...invite,family_id:family.id});}open('share');}):open('child')}>{family.role==='owner'?'邀请另一位家长':'选择孩子，开始陪学'}</Button>}
       <View className='account-links'><Text onClick={()=>open('child')}>孩子档案</Text>{family?.role==='owner'&&<Text onClick={()=>run(async()=>{await refresh();open('invites');})}>邀请与审批{pending.length?` · ${pending.length}`:''}</Text>}<Text onClick={()=>open('account')}>账号管理</Text></View>
       {DEV_AUTH&&<View className='dev-label'>本地体验 · 测试身份与词库</View>}
     </View>
     <View className='family-tabs'><View className='family-tab' onClick={()=>navigate('home')}>今日</View><View className='family-tab' onClick={()=>navigate('words')}>单词本</View><View className='family-tab tab-disabled' onClick={()=>Taro.showToast({title:'日历复习尚在开发中',icon:'none'})}>日历</View><View className='family-tab tab-active'>我的</View></View>
     {!!panel&&<View className='sheet-backdrop' onClick={()=>!busy&&setPanel('')}><View className='family-sheet' onClick={e=>e.stopPropagation()}>
-      <View className='sheet-top'><View className='sheet-heading'>{{account:'账号与家庭',family:'创建家庭',child:'孩子档案',join:'加入家庭',invites:'邀请与审批'}[panel]}</View><Button className='sheet-close' disabled={busy} onClick={()=>setPanel('')}>关闭</Button></View>
+      <View className='sheet-top'><View className='sheet-heading'>{{account:'账号与家庭',family:'创建家庭',child:'孩子档案',join:'加入家庭',invites:'邀请与审批',share:'邀请另一位家长'}[panel]}</View><Button className='sheet-close' disabled={busy} onClick={()=>setPanel('')}>关闭</Button></View>
       {error&&<View className='error'>{error}</View>}
+      {panel==='share'&&<><View className='muted'>邀请有效期 24 小时，仅供一位家长领取；加入前需要你批准。</View>{shareReady?<><Button className='btn primary' openType='share' disabled={busy}>分享邀请卡片给朋友</Button><Button className='btn secondary' disabled={busy} onClick={()=>run(async()=>{if(new Date(shareInvite.expires_at).getTime()<=Date.now())throw Error('INVITE_UNAVAILABLE');await Taro.setClipboardData({data:shareInvite.invite_token});})}>复制邀请口令</Button><View className='muted'>如果口令已被领取，请为下一位家长生成新邀请。</View></>:<View className='notice'>邀请已过期或家庭已切换，请生成新邀请。</View>}<Button className='btn secondary' disabled={busy||family?.role!=='owner'} onClick={()=>run(async()=>{const invite=await api(`/families/${family.id}/invites`,'POST',{},eventId());setShareInvite({...invite,family_id:family.id});})}>生成新邀请</Button></>}
       {panel==='account'&&<>
         {DEV_AUTH&&<><View className='muted'>测试身份切换仅用于本地联调</View><View className='row'><Button className='btn secondary' disabled={busy} onClick={()=>run(()=>signIn('dev-dad'))}>切换为爸爸</Button><Button className='btn secondary' disabled={busy} onClick={()=>run(()=>signIn('dev-mom'))}>切换为妈妈</Button></View></>}
         {signedIn&&<>{families.map(f=><Button className='btn secondary' key={f.id} disabled={busy} onClick={()=>run(async()=>{await select(f);setPanel('');})}>{f.name} · {f.role==='owner'?'管理员':'家长'}</Button>)}<Button className='btn secondary' onClick={()=>open('family')}>创建新家庭</Button><Button className='btn secondary' onClick={()=>open('join')}>申请加入家庭</Button><Button className='btn secondary' disabled={busy} onClick={()=>run(refresh)}>刷新加入结果</Button></>}

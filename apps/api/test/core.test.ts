@@ -24,7 +24,14 @@ for (const [label,activeScheduler] of [['fixture',scheduler],['real FSRS',await 
     await assert.rejects(core.members(mom.user.id,family.id),{code:'FAMILY_NOT_FOUND'});
     assert.equal((await core.members(dad,family.id)).items.length,1);
     const invite=await core.createInvite(dad,'invite1',family.id);
-    await core.claimInvite(mom.user.id,'claim1',{invite_token:invite.invite_token});
+    assert.match(invite.invite_token,/^[A-Za-z0-9_-]{43}$/);
+    await assert.rejects(core.claimInvite(dad,'self-claim',{invite_token:invite.invite_token}),{code:'ALREADY_MEMBER'});
+    const claimed=await core.claimInvite(mom.user.id,'claim1',{invite_token:invite.invite_token});
+    assert.deepEqual(await core.claimInvite(mom.user.id,'claim1',{invite_token:invite.invite_token}),JSON.parse(JSON.stringify(claimed)));
+    await assert.rejects(core.claimInvite(mom.user.id,'claim-again',{invite_token:invite.invite_token}),{code:'INVITE_UNAVAILABLE'});
+    const expired=await core.createInvite(dad,'expired-invite',family.id);
+    await pg.query('UPDATE wordmate.family_invites SET created_at=$3,expires_at=$2 WHERE id=$1',[expired.id,new Date(now.getTime()-1),new Date(now.getTime()-86400001)]);
+    await assert.rejects(core.claimInvite(mom.user.id,'expired-claim',{invite_token:expired.invite_token}),{code:'INVITE_UNAVAILABLE'});
     await assert.rejects(core.today(mom.user.id,child.id),{code:'FAMILY_NOT_FOUND'});
     await core.approveInvite(dad,'approve1',invite.id);
     assert.equal((await core.today(mom.user.id,child.id)).child.id,child.id);

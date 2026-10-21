@@ -94,3 +94,10 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 日历与错题复习已实现，新增接口、规则及验收清单见 CALENDAR-REVIEW.txt；这一轮新页面待模拟器验收。
 
 本轮已接通AI录词业务流程，运行与测试说明见 AI-VOCABULARY.txt。
+
+家庭邀请分享（0.1）
+“我的 → 邀请另一位家长”先生成邀请，再展示“分享邀请卡片给朋友”和“复制邀请口令”，二者使用同一邀请。分享调用微信原生 openType=share，由用户选择收件人，程序不自动发送、不把取消分享当作发送成功。
+卡片使用包内固定PNG（scripts/generate-invite-cover.swift可重建），不截图家庭/孩子数据。标题不含个人信息。仅按钮分享携带邀请口令；右上角普通分享指向首页。
+落地页 pages/invite/index?token=… 只接受43位base64url口令；不直接展示家庭资料、不自动领取。未登录先登录，登录后点击申请；由现有 claim/approve 接口执行24小时有效期、单次领取、成员权限和管理员审批。口令不写新增本地存储或日志；API现有网络重试缓存可能在未确认提交时保存请求体，确认后删除。
+开发者工具可用有效邀请口令配置启动路径 pages/invite/index 和参数 token=口令，切换妈妈身份测试申请。请勿把真实口令提交Git。微信好友收卡需在真机和可访问的后端环境验收；本地127.0.0.1不能作为另一台手机的服务器地址。
+参考：https://docs.taro.zone/docs/hooks/#useshareappmessage
