@@ -53,7 +53,7 @@ test('scope, >200 word paging, arbitrary selection/all exclusions, OCR caching a
  }finally{await pg.close();}
 });
 test('vision adapter isolates credentials and image data; handles refusal, truncation, timeout',async()=>{
- const env={OCR_PROVIDER:'qwen',OCR_API_KEY:'private-test',OCR_WORKSPACE_ID:'workspace-test',OCR_MODEL:'qwen-vl-plus'};let request:any;
+ const env={OCR_PROVIDER:'qwen',OCR_API_KEY:'private-test',OCR_WORKSPACE_ID:'workspace-test',OCR_MODEL:'qwen3.7-flash-2026-07-15'};let request:any;
  const reader=imageReader(env,(async(url:any,init:any)=>{request={url,init,body:JSON.parse(init.body)};return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({text:'airport'})}}]}));}) as any)!;
  assert.equal(await reader.read(png,'image/png'),'airport');assert(request.url.startsWith('https://workspace-test.cn-beijing.maas.aliyuncs.com/'));assert.equal(request.init.redirect,'error');assert(!JSON.stringify(request.body).includes(env.OCR_API_KEY));
  for(const response of [{choices:[{finish_reason:'length'}]},{choices:[{finish_reason:'stop',message:{content:'invalid'}}]}]){const bad=imageReader(env,(async()=>new Response(JSON.stringify(response))) as any)!;await assert.rejects(bad.read(png,'image/png'),{code:'OCR_FAILED'});}

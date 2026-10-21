@@ -1,4 +1,4 @@
-最新变更（2026-10-21）：图片/拍照/文档导入和任选CSV导出已接入，配置与格式边界见 deliverables/0.1/technical/import-export.txt。正式上线审核结论：未达标，阻断项见 deliverables/0.1/technical/release-audit.txt。本地仍为开发构建，不能直接提交发布。
+最新变更（2026-10-21）：图片/拍照/文档导入和任选CSV导出已接入，配置与格式边界见 deliverables/0.1/technical/import-export.txt。正式上线审核结论：未达标，阻断项见 deliverables/0.1/technical/release-audit.txt。本地仍为开发构建，不能直接提交发布。OCR当前配置为已授权的 qwen3.7-flash-2026-07-15。
 
 本地运行更新：优先参阅根目录 LOCAL-RUN.txt。新增 PGlite 持久化开发数据库和 node scripts/local-dev.cjs 一键构建启动，不再要求本地安装 Docker/PostgreSQL。持久化适配器已测试，前后端编译与类型检查已通过；真实 FSRS 及 Nest 路由测试通过，端口连接与微信模拟器操作尚待用户终端联调。
 

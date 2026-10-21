@@ -21,6 +21,6 @@ async function checkVisionModels(env,fetcher=fetch){
   for(const row of rows)if(row.permissions?.inference===true&&/^qwen[a-zA-Z0-9._-]{1,95}$/.test(row.model??''))models.add(row.model);
   if(count>=total){complete=true;break;}if(rows.length===0)break;
  }
- return {passed:true,stage:'workspace_model_permissions',model,selected_model_authorized:models.has(model)?true:complete?false:null,vision_candidates:[...models].filter(m=>/-vl(?:-|$)|-ocr(?:-|$)/.test(m)).sort(),list_complete:complete,inference_tested:false};
+ return {passed:true,stage:'workspace_model_permissions',model,selected_model_authorized:models.has(model)?true:complete?false:null,vision_candidates:[...models].filter(m=>/-vl(?:-|$)|-ocr(?:-|$)|qwen3\.(?:6|7|8)-/.test(m)).sort(),list_complete:complete,inference_tested:false};
 }
 module.exports={checkVisionModels};
