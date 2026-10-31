@@ -21,6 +21,7 @@ console.log('\n小程序构建完成。微信开发者工具导入 apps/miniapp�
 const {existsSync,readFileSync}=require('node:fs'),{parseEnv}=require('node:util');
 const local=existsSync(resolve(root,'.env'))?parseEnv(readFileSync(resolve(root,'.env'),'utf8')):{};
 const profilePrefixes=local.AUDIO_STORAGE_PROFILES?Object.values(JSON.parse(local.AUDIO_STORAGE_PROFILES)).map(p=>p.env_prefix).filter(p=>typeof p==='string'&&/^[A-Z][A-Z0-9_]*_$/.test(p)):[];
-const providers=Object.fromEntries(Object.entries(local).filter(([key])=>/^(LLM_|DEEPSEEK_|OPENAI_|QWEN_|OCR_|TTS_|COSYVOICE_|OSS_|ALIBABA_CLOUD_|AUDIO_)/.test(key)||profilePrefixes.some(prefix=>key.startsWith(prefix))));
+const providers=Object.fromEntries(Object.entries(local).filter(([key])=>/^(AI_|WECHAT_VIRTUAL_|LLM_|DEEPSEEK_|OPENAI_|QWEN_|OCR_|TTS_|COSYVOICE_|OSS_|ALIBABA_CLOUD_|AUDIO_)/.test(key)||profilePrefixes.some(prefix=>key.startsWith(prefix))));
 const serverEnv={...env,...providers};
+if(!serverEnv.AI_CREDENTIAL_KEY){const {mkdirSync,writeFileSync}=require('node:fs'),{randomBytes}=require('node:crypto');const keyFile=resolve(root,'.local/ai-credential-key');mkdirSync(resolve(root,'.local'),{recursive:true});try{writeFileSync(keyFile,randomBytes(32).toString('hex'),{flag:'wx',mode:0o600});}catch(e){if(e.code!=='EEXIST')throw e;}serverEnv.AI_CREDENTIAL_KEY=readFileSync(keyFile,'utf8').trim();}
 const r=spawnSync(process.execPath,['apps/api/dist/main.js'],{cwd:root,env:serverEnv,stdio:'inherit'});process.exit(r.status??1);

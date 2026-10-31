@@ -1,0 +1,609 @@
+{
+  "date": "2026-10-24",
+  "scope": "Current workspace; isolated local probes and official npm dependency audit; no production mutation",
+  "baseline": {
+    "tests": 90,
+    "passed": 90,
+    "probe_findings": 9
+  },
+  "probes": {
+    "checks": {
+      "cross_family_denied": "FAMILY_NOT_FOUND"
+    },
+    "findings": {
+      "non_owner_can_create_child": true,
+      "archived_word_review_accepted": {
+        "stale_cards": 1,
+        "completed_words": 1
+      },
+      "quiz_answers_before_submission": {
+        "unanswered_items_with_correct_answer": 2,
+        "can_rewrite_after_feedback": true
+      },
+      "deleting_child_resets_user_paid_quota": {
+        "configured_user_daily_limit": 1,
+        "synthesis_calls": 2,
+        "deletion_status": "succeeded",
+        "remaining_usage_rows": 1
+      },
+      "poster_cleanup_forgets_failed_delete": {
+        "objects_left": 1,
+        "assignment_rows": 0,
+        "child_deletion_status": "succeeded"
+      },
+      "makeup_credits_can_replenish_themselves": {
+        "total": 3,
+        "used": 2,
+        "available": 1
+      },
+      "edited_job_keeps_withdrawn_requester": {
+        "edit_accepted": true,
+        "still_original_requester": true,
+        "worker_status": "failed",
+        "worker_error": "GENERATION_FAILED"
+      },
+      "production_preflight_and_storage_disagree": {
+        "preflight_passed": true,
+        "adapter_error": "OSS_CREDENTIAL_MODE_MISMATCH"
+      },
+      "old_unauthorized_response_erases_new_account_session": true
+    }
+  },
+  "dependency_audit": {
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 4,
+        "moderate": 16,
+        "high": 13,
+        "critical": 1
+      },
+      "dependencies": 458,
+      "devDependencies": 0,
+      "optionalDependencies": 0,
+      "totalDependencies": 458
+    },
+    "advisories": [
+      {
+        "module_name": "esbuild",
+        "severity": "moderate",
+        "title": "esbuild enables any website to send any requests to the development server and read the response",
+        "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
+        "vulnerable_versions": "<=0.24.2",
+        "patched_versions": ">=0.25.0",
+        "findings": [
+          {
+            "version": "0.21.5",
+            "paths": [
+              "apps__miniapp>@tarojs/helper>esbuild"
+            ]
+          },
+          {
+            "version": "0.18.20",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite>esbuild"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "low",
+        "title": "Vite middleware may serve files starting with the same name with the public directory",
+        "url": "https://github.com/advisories/GHSA-g4jq-h2w9-997c",
+        "vulnerable_versions": "<=5.4.19",
+        "patched_versions": ">=5.4.20",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "low",
+        "title": "Vite's `server.fs` settings were not applied to HTML files",
+        "url": "https://github.com/advisories/GHSA-jqfw-vq24-v9c3",
+        "vulnerable_versions": "<=5.4.19",
+        "patched_versions": ">=5.4.20",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "moderate",
+        "title": "vite allows server.fs.deny bypass via backslash on Windows",
+        "url": "https://github.com/advisories/GHSA-93m4-6634-74q7",
+        "vulnerable_versions": ">=4.5.3 <5.0.0",
+        "patched_versions": ">=5.4.21",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "glob",
+        "severity": "high",
+        "title": "glob CLI: Command injection via -c/--cmd executes matches with shell:true",
+        "url": "https://github.com/advisories/GHSA-5j98-mcp5-4vw2",
+        "vulnerable_versions": ">=10.2.0 <10.5.0",
+        "patched_versions": ">=10.5.0",
+        "findings": [
+          {
+            "version": "10.4.5",
+            "paths": [
+              "apps__api>typeorm>glob"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "swiper",
+        "severity": "critical",
+        "title": "Prototype pollution in swiper",
+        "url": "https://github.com/advisories/GHSA-hmx5-qpq5-p643",
+        "vulnerable_versions": ">=6.5.1 <12.1.2",
+        "patched_versions": ">=12.1.2",
+        "findings": [
+          {
+            "version": "11.1.15",
+            "paths": [
+              "apps__miniapp>@tarojs/components>swiper"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "high",
+        "title": "Multer vulnerable to Denial of Service via incomplete cleanup",
+        "url": "https://github.com/advisories/GHSA-xf7r-hgr6-v32p",
+        "vulnerable_versions": "<2.1.0",
+        "patched_versions": ">=2.1.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "high",
+        "title": "Multer vulnerable to Denial of Service via resource exhaustion",
+        "url": "https://github.com/advisories/GHSA-v52c-386h-88mc",
+        "vulnerable_versions": "<2.1.0",
+        "patched_versions": ">=2.1.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "ajv",
+        "severity": "moderate",
+        "title": "ajv has ReDoS when using `$data` option",
+        "url": "https://github.com/advisories/GHSA-2g4f-4pwh-qvx6",
+        "vulnerable_versions": ">=7.0.0-alpha.0 <8.18.0",
+        "patched_versions": ">=8.18.0",
+        "findings": [
+          {
+            "version": "8.17.1",
+            "paths": [
+              "apps__api>ajv"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "high",
+        "title": "Multer Vulnerable to Denial of Service via Uncontrolled Recursion",
+        "url": "https://github.com/advisories/GHSA-5528-5vmv-3xc2",
+        "vulnerable_versions": "<2.1.1",
+        "patched_versions": ">=2.1.1",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "file-type",
+        "severity": "moderate",
+        "title": "file-type affected by infinite loop in ASF parser on malformed input with zero-size sub-header",
+        "url": "https://github.com/advisories/GHSA-5v7r-6r5c-r473",
+        "vulnerable_versions": ">=13.0.0 <21.3.1",
+        "patched_versions": ">=21.3.1",
+        "findings": [
+          {
+            "version": "21.0.0",
+            "paths": [
+              "apps__api>@nestjs/common>file-type"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "file-type",
+        "severity": "moderate",
+        "title": "file-type: ZIP Decompression Bomb DoS via [Content_Types].xml entry",
+        "url": "https://github.com/advisories/GHSA-j47w-4g3g-c36v",
+        "vulnerable_versions": ">=20.0.0 <=21.3.1",
+        "patched_versions": ">=21.3.2",
+        "findings": [
+          {
+            "version": "21.0.0",
+            "paths": [
+              "apps__api>@nestjs/common>file-type"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "path-to-regexp",
+        "severity": "high",
+        "title": "path-to-regexp vulnerable to Denial of Service via sequential optional groups",
+        "url": "https://github.com/advisories/GHSA-j3q9-mxjg-w52f",
+        "vulnerable_versions": ">=8.0.0 <8.4.0",
+        "patched_versions": ">=8.4.0",
+        "findings": [
+          {
+            "version": "8.2.0",
+            "paths": [
+              "apps__api>@nestjs/core>path-to-regexp"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "path-to-regexp",
+        "severity": "moderate",
+        "title": "path-to-regexp vulnerable to Regular Expression Denial of Service via multiple wildcards",
+        "url": "https://github.com/advisories/GHSA-27v5-c462-wpq7",
+        "vulnerable_versions": ">=8.0.0 <8.4.0",
+        "patched_versions": ">=8.4.0",
+        "findings": [
+          {
+            "version": "8.2.0",
+            "paths": [
+              "apps__api>@nestjs/core>path-to-regexp"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "moderate",
+        "title": "Vite Vulnerable to Path Traversal in Optimized Deps `.map` Handling",
+        "url": "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
+        "vulnerable_versions": "<=6.4.1",
+        "patched_versions": ">=6.4.2",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "@nestjs/core",
+        "severity": "moderate",
+        "title": "@nestjs/core Improperly Neutralizes Special Elements in Output Used by a Downstream Component ('Injection')",
+        "url": "https://github.com/advisories/GHSA-36xv-jgw5-4q75",
+        "vulnerable_versions": "<=11.1.17",
+        "patched_versions": ">=11.1.18",
+        "findings": [
+          {
+            "version": "11.1.6",
+            "paths": [
+              "apps__api>@nestjs/core"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "high",
+        "title": "launch-editor vulnerable to command injection via the crafted request on Windows",
+        "url": "https://github.com/advisories/GHSA-c27g-q93r-2cwf",
+        "vulnerable_versions": "<=5.4.8",
+        "patched_versions": ">=5.4.9",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "moderate",
+        "title": "launch-editor: NTLMv2 hash disclosure via UNC path handling on Windows",
+        "url": "https://github.com/advisories/GHSA-v6wh-96g9-6wx3",
+        "vulnerable_versions": "<=6.4.2",
+        "patched_versions": ">=6.4.3",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "high",
+        "title": "Multer vulnerable to Denial of Service via deeply nested field names",
+        "url": "https://github.com/advisories/GHSA-72gw-mp4g-v24j",
+        "vulnerable_versions": ">=1.0.0 <2.2.0",
+        "patched_versions": ">=2.2.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "moderate",
+        "title": "Multer vulnerable to Denial of Service via incomplete cleanup of aborted uploads",
+        "url": "https://github.com/advisories/GHSA-3p4h-7m6x-2hcm",
+        "vulnerable_versions": ">=2.0.0-alpha.1 <2.2.0",
+        "patched_versions": ">=2.2.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "typeorm",
+        "severity": "moderate",
+        "title": "TypeORM: SQL Injection in UpdateQueryBuilder/SoftDeleteQueryBuilder orderBy (MySQL/MariaDB)",
+        "url": "https://github.com/advisories/GHSA-9ggv-8w38-r7pm",
+        "vulnerable_versions": ">=0.1.12 <=0.3.28",
+        "patched_versions": ">=0.3.29",
+        "findings": [
+          {
+            "version": "0.3.27",
+            "paths": [
+              "apps__api>typeorm"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "high",
+        "title": "vite: `server.fs.deny` bypass on Windows alternate paths",
+        "url": "https://github.com/advisories/GHSA-fx2h-pf6j-xcff",
+        "vulnerable_versions": "<=6.4.2",
+        "patched_versions": ">=6.4.3",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "typeorm",
+        "severity": "moderate",
+        "title": " TypeORM: migration:generate template-literal code injection",
+        "url": "https://github.com/advisories/GHSA-2rp8-mm9q-fp49",
+        "vulnerable_versions": "<0.3.31",
+        "patched_versions": ">=0.3.31",
+        "findings": [
+          {
+            "version": "0.3.27",
+            "paths": [
+              "apps__api>typeorm"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "high",
+        "title": "multer vulnerable to Denial of Service via crafted multipart field names",
+        "url": "https://github.com/advisories/GHSA-wc9g-mqfw-jrwm",
+        "vulnerable_versions": "<2.3.0",
+        "patched_versions": ">=2.3.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "low",
+        "title": "multer vulnerable to file size limit bypass via async fileFilter race condition",
+        "url": "https://github.com/advisories/GHSA-qvfw-j98x-7q72",
+        "vulnerable_versions": "<2.3.0",
+        "patched_versions": ">=2.3.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "high",
+        "title": "multer vulnerable to Denial of Service via oversized array index in field names",
+        "url": "https://github.com/advisories/GHSA-535w-7cp7-47q4",
+        "vulnerable_versions": "<2.3.0",
+        "patched_versions": ">=2.3.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "moderate",
+        "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+        "url": "https://github.com/advisories/GHSA-698v-4r3x-3vcv",
+        "vulnerable_versions": "<=6.4.3",
+        "patched_versions": ">=6.4.4",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "moderate",
+        "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+        "url": "https://github.com/advisories/GHSA-r825-w8mm-5pxw",
+        "vulnerable_versions": "<=6.4.3",
+        "patched_versions": ">=6.4.4",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "high",
+        "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+        "url": "https://github.com/advisories/GHSA-587h-7wmj-h5pm",
+        "vulnerable_versions": "<=6.4.3",
+        "patched_versions": ">=6.4.4",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "low",
+        "title": "Vite: Cross origin script execution through Vite custom middleware",
+        "url": "https://github.com/advisories/GHSA-9jrq-w75r-8gcw",
+        "vulnerable_versions": "<=6.4.3",
+        "patched_versions": ">=6.4.4",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "vite",
+        "severity": "moderate",
+        "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
+        "url": "https://github.com/advisories/GHSA-rq7h-c2jc-7f22",
+        "vulnerable_versions": "<=6.4.3",
+        "patched_versions": ">=6.4.4",
+        "findings": [
+          {
+            "version": "4.5.14",
+            "paths": [
+              "apps__miniapp>@tarojs/plugin-framework-react>vite"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "body-parser",
+        "severity": "high",
+        "title": "body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body",
+        "url": "https://github.com/advisories/GHSA-27r3-jxmh-p828",
+        "vulnerable_versions": ">=2.0.0 <2.4.0",
+        "patched_versions": ">=2.4.0",
+        "findings": [
+          {
+            "version": "2.3.0",
+            "paths": [
+              "apps__api>@nestjs/platform-express>express>body-parser"
+            ]
+          }
+        ]
+      },
+      {
+        "module_name": "multer",
+        "severity": "high",
+        "title": "multer vulnerable to Denial of Service via a pending asynchronous fileFilter after request teardown",
+        "url": "https://github.com/advisories/GHSA-q7qp-rjg7-q26m",
+        "vulnerable_versions": ">=2.0.0 <2.5.0",
+        "patched_versions": ">=2.5.0",
+        "findings": [
+          {
+            "version": "2.0.2",
+            "paths": [
+              "apps__api>@nestjs/platform-express>multer"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "limitations": [
+    "Dependency advisory matches are not equivalent to reachable exploits.",
+    "PGlite does not verify PostgreSQL multi-connection lock ordering.",
+    "No phone UI or production cloud deletion validation.",
+    "No completed real HTTP crash reproduction for body-parser."
+  ]
+}

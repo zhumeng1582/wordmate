@@ -1,14 +1,21 @@
-.wordbook-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.wordbook-heading{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;box-sizing:border-box}
 .wordbook-heading .title{font-size:42px}
 .wordbook-heading .text-action{flex-shrink:0;padding:16px 0}
+.word-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin:20px 0}
+.word-search .field{min-width:0;margin:0}
+.word-search .field-picker{padding:16px 20px;white-space:nowrap}
+.word-search .btn{grid-column:1/-1;margin:0;min-height:76px}
 .wordbook-list{background:var(--surface);border-radius:24px;padding:0 24px;overflow:hidden}
 .wordbook-item{padding:4px 0;border-bottom:1px solid var(--border)}
 .wordbook-item:last-child{border-bottom:0}
 .wordbook-summary{display:flex;align-items:center;min-height:100px;gap:16px;flex-wrap:wrap}
 .wordbook-lemma{font-size:34px;font-weight:600;line-height:1.35;overflow-wrap:anywhere;max-width:100%}
-.wordbook-pronunciation{flex:1;min-width:150px}
-.wordbook-pronunciation .audio-text{font-size:25px;line-height:1.5;padding:12px 0;align-items:center;overflow-wrap:anywhere}
-.wordbook-pronunciation .audio-speaker{font-size:23px}
+.wordbook-pronunciation{display:flex;align-items:center;flex:1;min-width:150px;gap:8px;color:var(--muted)}
+.wordbook-speaker{display:flex;align-items:center;justify-content:flex-start;flex:0 1 auto;width:auto;min-width:48px;min-height:48px;height:auto;gap:12px;margin:0;padding:0 8px;background:transparent;border:0;border-radius:12px;color:var(--muted);font-size:25px;line-height:1.5;text-align:left}
+.wordbook-speaker::after{border:0}
+.wordbook-speaker:active{background:var(--soft)}
+.wordbook-speaker .audio-icon{width:30px;height:30px;margin:0}
+.wordbook-ipa{font-size:25px;line-height:1.5;overflow-wrap:anywhere;color:var(--muted)}
 .wordbook-chevron{flex-shrink:0;font-size:32px;color:var(--subtle);margin-left:auto;transform:rotate(90deg);line-height:1}
 .wordbook-chevron.is-open{transform:rotate(-90deg);color:var(--primary)}
 .wordbook-detail{padding:0 0 20px}
@@ -19,3 +26,39 @@
 .wordbook-example .audio-speaker{font-size:23px}
 .wordbook-translation{font-size:24px;color:var(--muted);line-height:1.6;margin-left:37px}
 .wordbook-item .audio-status{font-size:22px;margin:0 0 8px 37px}
+.word-marks{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.word-marks .mark-button{width:auto;min-width:116px;min-height:64px;padding:10px 16px;margin:0;font-size:23px}
+.word-marks .mark-selected{background:var(--primary);color:#fff}
+.book-tools{margin:18px 0;padding:18px 20px}
+.book-tools-row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.book-tools-row .field{flex:1;min-width:0;margin:0}
+.book-tools-row .btn{width:auto;min-width:100px;min-height:64px;margin:0;padding:8px 14px;font-size:22px}
+.book-tools-row .text-action{width:auto;white-space:nowrap;margin:0}
+.share-tools{border-top:1px solid var(--border);margin-top:14px;padding-top:14px}
+.share-tools .field{margin:10px 0}
+.link{color:var(--primary);padding:6px}
+.share-toggle{justify-content:space-between}
+.share-toggle .muted{flex:1}
+.wordbook-toolbar{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:center;padding:16px 20px}
+.wordbook-toolbar .field{min-width:0;margin:0;height:76px;min-height:76px;padding:0 18px;font-size:25px}
+.wordbook-toolbar .btn{width:auto;min-height:68px;margin:0;padding:8px 16px;font-size:22px;white-space:nowrap}
+.word-search-entry{display:flex;align-items:center;justify-content:space-between;min-height:80px;padding:16px 24px;margin:18px 0}
+.search-arrow{font-size:36px;color:var(--subtle)}
+.wordbook-tools-trigger{position:absolute;right:0;top:0;z-index:1;display:flex;align-items:center;justify-content:center;width:70px;min-width:70px;height:70px;padding:0;border-radius:50%;background:var(--soft);color:var(--primary);font-size:27px;letter-spacing:2px;line-height:1}
+.wordbook-tools-trigger::after{border:0}
+.wordbook-tools-trigger.active{background:var(--primary);color:var(--on-primary)}
+.wordbook-tools-dismiss{position:fixed;inset:0;z-index:30;background:transparent}
+.wordbook-tools-bubble{position:absolute;top:calc(env(safe-area-inset-top) + 125px);right:38px;width:320px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:22px;box-shadow:0 12px 44px rgba(23,45,34,.2);display:flex;flex-direction:column;gap:4px}
+.wordbook-tool-book{display:flex;align-items:center;justify-content:space-between;min-height:70px;padding:0 14px;margin-bottom:6px;border-bottom:1px solid var(--border);color:var(--text);font-size:24px}
+.wordbook-tool-option{display:flex;align-items:center;gap:12px;min-height:68px;padding:0 12px;border-radius:14px;color:var(--text);font-size:23px}
+.wordbook-tool-option:active{background:var(--soft)}
+.wordbook-tool-icon{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:12px;background:var(--field);color:var(--primary);font-size:25px}
+.wordbook-progress-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 14px;min-width:0}
+.wordbook-progress-toolbar.is-selecting{justify-content:flex-end;flex-wrap:wrap}
+.word-learning-progress{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:1;min-width:0;margin:0;padding:0 4px}
+.word-learning-progress .progress-count,.word-learning-progress .muted{white-space:nowrap}
+.wordbook-progress-toolbar .export-action{flex-shrink:0;margin:0;padding:8px 0 8px 8px;white-space:nowrap}
+.progress-count{font-size:28px;font-weight:650;color:var(--primary)}
+.locate-button{width:auto;min-height:66px;margin:0;padding:8px 16px;border-radius:16px;background:var(--soft);font-size:23px;white-space:nowrap}
+.all-learned-label{color:var(--primary);font-size:23px;white-space:nowrap}
+.unlearned-tag{flex-shrink:0;padding:3px 10px;border-radius:999px;background:var(--notice-bg);color:var(--notice-text);font-size:20px;line-height:1.5}

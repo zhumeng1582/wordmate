@@ -15,7 +15,8 @@ page{
   --disabled-bg:#2c352f;--disabled-text:#91a195;--overlay:rgba(0,0,0,.6);
  }
 }
-page{background:var(--background);color:var(--text);font-size:28px;line-height:1.6}
+page{background:var(--background);color:var(--text);font-size:28px;line-height:1.6;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,'PingFang SC',sans-serif}
+button,input,textarea{font-family:inherit}
 .page{padding:36px 46px 80px}
 .title{font-size:48px;font-weight:600;line-height:1.35;margin:18px 0 34px}
 .subtitle,.muted{color:var(--muted);font-size:24px}
@@ -40,6 +41,8 @@ page{background:var(--background);color:var(--text);font-size:28px;line-height:1
 
 .audio-text{display:flex;align-items:flex-start;gap:14px;width:100%;min-height:88px;padding:18px 0;margin:0;background:transparent;border:0;border-radius:0;color:var(--text);font-size:30px;line-height:1.7;text-align:left;font-weight:400}
 .audio-text::after{border:none}
+.audio-error-feedback{display:flex;align-items:center;gap:16px}.audio-error-message{flex:1;min-width:0}.audio-error-feedback .audio-retry{flex-shrink:0;margin:0;padding:12px 0;white-space:nowrap}
+.audio-text-wrap{min-width:0}.audio-phonetic{align-items:center}.audio-text-label{min-width:0}.audio-text-suffix{flex-shrink:0;color:var(--muted);font-size:inherit;line-height:inherit;white-space:nowrap}.audio-retry{min-height:64px;padding:12px 0;margin:4px 0 0;background:transparent;color:inherit;font-size:24px;line-height:1.5;text-align:left}.audio-retry::after{border:0}
 .audio-phonetic{color:var(--muted);font-size:28px}
 .audio-speaker{flex-shrink:0;font-size:28px}
 .audio-active{color:var(--primary)}
@@ -55,7 +58,8 @@ input,textarea{caret-color:var(--primary)}
 .text-action[disabled]{background:transparent;color:var(--disabled-text)}
 
 /* Fixed-size speaker: activity never changes the text row height. */
-.audio-icon{position:relative;display:inline-block;flex-shrink:0;width:32px;height:32px;color:var(--muted);align-self:center;margin-right:4px}
+/* Leave room for the loading ring inside WeChat buttons, which clip overflow. */
+.audio-icon{position:relative;display:inline-block;flex-shrink:0;width:32px;height:32px;color:var(--muted);align-self:center;margin:0 4px 0 8px}
 .audio-icon-box{position:absolute;left:3px;top:12px;width:7px;height:10px;border-radius:2px;background:currentColor}
 .audio-icon-cone{position:absolute;left:6px;top:7px;width:0;height:0;border-top:10px solid transparent;border-bottom:10px solid transparent;border-right:11px solid currentColor}
 .audio-wave{position:absolute;border:2px solid currentColor;border-top-color:transparent;border-bottom-color:transparent;border-left-color:transparent;border-radius:50%}
@@ -76,10 +80,44 @@ input,textarea{caret-color:var(--primary)}
 .review-translation{margin:0 0 8px 50px;line-height:1.6}
 
 .review-meaning{font-size:34px;line-height:1.5;margin:0 0 20px}
+.new-learn-word{padding:20px 0;border-bottom:2px solid var(--border)}
+.new-learn-word:last-of-type{border-bottom:0}
+.new-learn-word .word{font-size:40px}
+.new-learn-single{min-height:420px;border-bottom:0;touch-action:pan-y}
+.new-learn-example{margin:12px 0 18px}
+.review-example-row{display:flex;align-items:flex-start;gap:12px;margin:12px 0 18px;min-height:88px}
+.review-example-speaker{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:88px;min-height:88px;padding:0;margin:0;background:transparent;color:var(--muted)}
+.review-example-speaker::after{border:0}
+.review-example-content{flex:1;min-width:0}
+.review-example-hint{display:flex;align-items:center;min-height:88px;padding:0 8px;color:var(--text);font-size:30px;line-height:1.6;word-break:break-word}
+.review-example-translation{margin:0 8px 14px;font-size:26px;line-height:1.55}
+.review-choices{margin:22px 0}
+.review-quiz-counter{font-size:24px;color:var(--muted)}
+.review-progress-track{height:8px;background:var(--field);border-radius:99px;overflow:hidden;margin:14px 0 24px}
+.review-progress-value{height:100%;background:var(--primary);border-radius:99px;transition:width .2s ease}
+.review-quiz-word{font-size:52px;line-height:1.35;font-weight:600;margin:28px 0}
+.review-choice{justify-content:flex-start;text-align:left;padding:22px 24px;border:2px solid var(--border)}
+.review-choice-letter{display:inline-block;flex-shrink:0;width:48px;color:var(--muted);font-weight:600}
+.review-choice.review-choice-selected,.review-choice[disabled].review-choice-selected{background:var(--soft);border-color:var(--primary);color:var(--primary);opacity:1}
+.review-choice.review-choice-correct,.review-choice[disabled].review-choice-correct{background:var(--soft);border-color:var(--primary);color:var(--primary);opacity:1}
+.review-choice.review-choice-incorrect,.review-choice[disabled].review-choice-incorrect{background:var(--error-bg);border-color:var(--error-text);color:var(--error-text);opacity:1}
+.review-choice[disabled].review-choice-incorrect .review-choice-letter{color:var(--error-text)}
+.review-choice[disabled].review-choice-correct .review-choice-letter{color:var(--primary)}
+.review-correct-answer{font-size:26px;font-weight:600;color:var(--error-text);margin:8px 0 16px}
+.review-navigation{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0}
+.review-navigation .btn{flex:1;margin:0;min-width:0}
+.review-navigation .muted{white-space:nowrap;font-size:24px}
+.answer-feedback{padding:18px 20px;border-radius:16px;margin:20px 0;font-size:28px}
+.answer-feedback.correct{background:var(--soft);color:var(--primary)}
+.answer-feedback.incorrect{background:var(--notice-bg);color:var(--notice-text)}
 
 .autoplay-setting{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:96px;margin:16px 0}
 
 .home-progress-card{min-height:330px}
+.home-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;margin:28px 0 0;padding-top:22px;border-top:2px solid var(--border)}
+.home-shortcut{display:flex;align-items:center;justify-content:space-between;min-width:0;min-height:72px;padding:12px 16px;margin:0;border-radius:14px;background:var(--field);color:var(--secondary-text);font-size:25px;text-align:left;line-height:1.4}
+.home-shortcut::after{border:0}
+.home-shortcut text{color:var(--muted);font-size:30px}
 .input-placeholder{min-height:490px}
 .calendar-placeholder{min-height:500px}
 .list-placeholder{min-height:240px}

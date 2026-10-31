@@ -1,3 +1,5 @@
+import type {AiAccounts,AiSelection} from './ai-accounts.ts';
+import {usageBudget,recordUsage} from './usage-budget.ts';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -7,21 +9,23 @@ import {ensure,text,uuid} from './errors.ts';
 const one=async(q:Sql,s:string,p:any[]=[]) => (await q.query(s,p)).rows[0];
 const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export interface VocabularyProvider {
- provider:string;model:string;promptVersion:string;rawPromptVersion?:string;
- generateRaw?(raw:string,theme:string,level:string):Promise<{items:Row[];error:string|null}>;
- generate(words:string[],theme:string,level:string):Promise<{items:Row[]}>;
+ provider:string;model:string;promptVersion:string;rawPromptVersion?:string;selection?:AiSelection;
+ generateRaw?(raw:string,theme:string,level:string):Promise<{items:Row[];error:string|null;billing_id?:string}>;
+ generate(words:string[],theme:string,level:string):Promise<{items:Row[];billing_id?:string}>;
+ validate?(words:string[],items:unknown,theme:string,level:string):{items:Row[]};
 }
-export async function vocabularyProvider(env:Record<string,string|undefined>):Promise<VocabularyProvider|undefined>{
- const provider=env.LLM_PROVIDER||'deepseek',prefix=({deepseek:'DEEPSEEK',openai:'OPENAI',qwen:'QWEN'} as Record<string,string>)[provider];
- if(!prefix||!env[`${prefix}_API_KEY`]||!env[`${prefix}_MODEL`])return undefined;
- const base=resolve(__dirname,'../../../packages/ai/dist');
+export async function vocabularyProvider(env:Record<string,string|undefined>,fetcher:typeof fetch=fetch):Promise<VocabularyProvider|undefined>{
+ const provider=env.LLM_PROVIDER||'qwen',prefix=({deepseek:'DEEPSEEK',openai:'OPENAI',qwen:'QWEN'} as Record<string,string>)[provider];
+ const apiKey=provider==='qwen'?(env.QWEN_API_KEY||env.OCR_API_KEY):(prefix?env[`${prefix}_API_KEY`]:undefined),model=provider==='qwen'?(env.QWEN_MODEL||env.OCR_MODEL):(prefix?env[`${prefix}_MODEL`]:undefined);
+ if(!prefix||!apiKey||!model)return undefined;
+ const base=resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist');
  const adapter=await import(pathToFileURL(resolve(base,'index.js')).href),vocabulary=await import(pathToFileURL(resolve(base,'vocabulary.js')).href);
- const generator=adapter.createTextGenerator(env);
- return {provider,model:env[`${prefix}_MODEL`]!,promptVersion:vocabulary.VOCABULARY_PROMPT_VERSION,rawPromptVersion:vocabulary.RAW_VOCABULARY_PROMPT_VERSION,generateRaw:async(raw,theme,level)=>(await vocabulary.generateRawVocabulary(generator,raw,theme,level)).data,generate:async(words,theme,level)=>(await vocabulary.generateVocabulary(generator,words,theme,level)).data};
+ const generator=adapter.createTextGenerator(env,fetcher);
+ return {provider,model:env[`${prefix}_MODEL`]!,promptVersion:vocabulary.VOCABULARY_PROMPT_VERSION,rawPromptVersion:vocabulary.RAW_VOCABULARY_PROMPT_VERSION,generateRaw:async(raw,theme,level)=>(await vocabulary.generateRawVocabulary(generator,raw,theme,level)).data,generate:async(words,theme,level)=>(await vocabulary.generateVocabulary(generator,words,theme,level)).data,validate:(words,items,theme,level)=>vocabulary.validateVocabularyItems(words,items,theme,level)};
 }
 export class Vocabulary {
- private a:QuizAccess;private scheduler:Scheduler;private provider?:VocabularyProvider;
- constructor(a:QuizAccess,scheduler:Scheduler,provider?:VocabularyProvider){this.a=a;this.scheduler=scheduler;this.provider=provider;}
+ private a:QuizAccess;private scheduler:Scheduler;private provider?:VocabularyProvider;private accounts?:AiAccounts;
+ constructor(a:QuizAccess,scheduler:Scheduler,provider?:VocabularyProvider,accounts?:AiAccounts){this.a=a;this.scheduler=scheduler;this.provider=provider;this.accounts=accounts;}
  private async scope(q:Sql,actor:string,id:string){const job=await one(q,"SELECT * FROM generation_jobs WHERE id=$1 AND kind='sentences' AND payload->>'flow'='vocabulary_v1'",[uuid(id)]);ensure(job,404,'GENERATION_NOT_FOUND');const c=await this.a.child(q,actor,job.child_id);return {c,job:await one(q,'SELECT * FROM generation_jobs WHERE id=$1 FOR UPDATE',[id])};}
  private async dto(q:Sql,j:Row){return {id:j.id,input_type:j.payload.input_type??'words',raw_text:j.payload.raw_text??null,wordbook_id:j.payload.wordbook_id,theme:j.payload.theme,batch_id:j.payload.batch_id,status:j.status,attempts:j.attempts,max_attempts:j.max_attempts,error_code:j.error_code,provider:j.payload.provider,model:j.payload.model,retryable:['failed','partial'].includes(j.status)&&j.attempts<j.max_attempts&&!['NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT'].includes(j.error_code),items:(await q.query('SELECT ordinal,raw_text,status,child_word_id,candidates FROM batch_items WHERE batch_id=$1 ORDER BY ordinal',[j.payload.batch_id])).rows.map(r=>({ordinal:r.ordinal,input:r.raw_text,status:r.status,word_id:r.child_word_id,reason:r.candidates[0]?.reason??null}))};}
  async replace(actor:string,key:string,id:string,b:any){
@@ -33,29 +37,32 @@ export class Vocabulary {
    ensure(edited.status==='failed'&&edited.attempts<edited.max_attempts&&edited.attempts===b.expected_attempts,409,'GENERATION_NOT_EDITABLE');
    ensure(!await one(q,'SELECT 1 FROM batch_items WHERE batch_id=$1 AND child_word_id IS NOT NULL',[edited.payload.batch_id]),409,'GENERATION_NOT_EDITABLE');
   }
-  ensure(this.provider,503,'AI_NOT_CONFIGURED');const isRaw=b.raw_text!==undefined;
-  if(isRaw){ensure(b.words===undefined&&(!b.source_type||b.source_type==='text')&&this.provider.generateRaw,422,'INVALID_INPUT_TYPE');text(b.raw_text,8000);ensure(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(b.raw_text),422,'INVALID_RAW_TEXT');ensure(!/sk-[a-zA-Z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(b.raw_text+String(b.theme??'')),422,'SENSITIVE_INPUT');}
+  const isPrepared=b.prepared_items!==undefined,isRaw=b.raw_text!==undefined&&!isPrepared;const provider=this.accounts?await this.accounts.vocabulary(q,actor,undefined,undefined,c.family_id,isPrepared):this.provider;ensure(provider,503,'AI_NOT_CONFIGURED');
+  if(isPrepared){ensure(b.words===undefined&&b.source_type==='vision'&&provider!.validate,422,'INVALID_INPUT_TYPE');text(b.raw_text,8000);ensure(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(b.raw_text),422,'INVALID_RAW_TEXT');ensure(!/sk-[a-zA-Z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(b.raw_text+String(b.theme??'')),422,'SENSITIVE_INPUT');ensure(Array.isArray(b.prepared_items)&&b.prepared_items.length>0&&b.prepared_items.length<=30,422,'INVALID_WORD_COUNT');}
+  else if(isRaw){ensure(b.words===undefined&&(!b.source_type||b.source_type==='text')&&provider!.generateRaw,422,'INVALID_INPUT_TYPE');text(b.raw_text,8000);ensure(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(b.raw_text),422,'INVALID_RAW_TEXT');ensure(!/sk-[a-zA-Z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(b.raw_text+String(b.theme??'')),422,'SENSITIVE_INPUT');}
   else ensure(Array.isArray(b.words)&&b.words.length>0&&b.words.length<=30,422,'INVALID_WORD_COUNT');
-  const words=isRaw?[]:b.words.flatMap((w:unknown)=>text(w,120).split(/[\r\n,，、;；]+/).map(x=>x.trim()).filter(Boolean)),theme=b.theme===undefined?'':String(b.theme).trim();ensure(isRaw||words.length>0&&words.length<=30,422,'INVALID_WORD_COUNT');ensure(theme.length<=80,422,'INVALID_THEME');ensure(new Set(words.map((w:string)=>w.toLowerCase())).size===words.length,422,'DUPLICATE_WORDS');
+  const theme=b.theme===undefined?'':String(b.theme).trim();let words=isPrepared?b.prepared_items.map((i:Row)=>text(i?.input,120)):isRaw?[]:b.words.flatMap((w:unknown)=>text(w,120).split(/[\r\n,，、;；]+/).map(x=>x.trim()).filter(Boolean));ensure(isRaw||words.length>0&&words.length<=30,422,'INVALID_WORD_COUNT');ensure(theme.length<=80,422,'INVALID_THEME');ensure(new Set(words.map((w:string)=>w.toLowerCase())).size===words.length,422,'DUPLICATE_WORDS');
+  let preparedItems:Row[]|undefined; if(isPrepared){try{preparedItems=provider!.validate!(words,b.prepared_items,theme,c.level).items;}catch{ensure(false,422,'GENERATED_CONTENT_REJECTED');}const source=String(b.raw_text).normalize('NFKC').toLocaleLowerCase().replace(/\s+/g,' ');for(const item of preparedItems!)ensure(source.includes(String(item.input).normalize('NFKC').toLocaleLowerCase().replace(/\s+/g,' ')),422,'GENERATED_CONTENT_REJECTED');}
   ensure(!/sk-[a-zA-Z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test((isRaw?b.raw_text:words.join('\n'))+theme),422,'SENSITIVE_INPUT');
-  ensure(await one(q,'SELECT 1 FROM wordbooks WHERE id=$1 AND child_id=$2 AND archived_at IS NULL',[uuid(b.wordbook_id),child]),404,'WORDBOOK_NOT_FOUND');
-  const dedupe=`vocabulary:${digest({wordbook:b.wordbook_id,...(isRaw?{raw_text:b.raw_text,input_type:'text'}:{words:words.map((w:string)=>w.toLowerCase())}),theme,level:c.level})}`;
+  ensure(await one(q,'SELECT 1 FROM wordbooks WHERE id=$1 AND child_id=$2 AND archived_at IS NULL AND read_only=false',[uuid(b.wordbook_id),child]),404,'WORDBOOK_NOT_FOUND');
+  const dedupe=`vocabulary:${digest({wordbook:b.wordbook_id,...(isRaw?{raw_text:b.raw_text,input_type:'text'}:isPrepared?{raw_text:b.raw_text,prepared_items:preparedItems,input_type:'vision'}:{words:words.map((w:string)=>w.toLowerCase())}),theme,level:c.level})}`;
   const existing=await one(q,"SELECT * FROM generation_jobs WHERE child_id=$1 AND kind='sentences' AND dedupe_key=$2",[child,dedupe]);if(existing&&existing.id!==editId){ensure(!editId,409,'DUPLICATE_GENERATION');return this.dto(q,existing);}
   ensure(!await one(q,"SELECT 1 FROM generation_jobs WHERE child_id=$1 AND payload->>'flow'='vocabulary_v1' AND status IN ('queued','running')",[child]),409,'ACTIVE_GENERATION');
   if(edited)await q.query('DELETE FROM batch_items WHERE batch_id=$1',[edited.payload.batch_id]);
   const batch=edited?{id:edited.payload.batch_id}:await one(q,'INSERT INTO batches(child_id,wordbook_id,theme,created_by) VALUES($1,$2,$3,$4) RETURNING id',[child,b.wordbook_id,theme,actor]);
   for(let i=0;i<words.length;i++)await q.query("INSERT INTO batch_items(batch_id,child_id,ordinal,raw_text,status) VALUES($1,$2,$3,$4,'ready')",[batch.id,child,i+1,words[i]]);
-  const payload=JSON.stringify({flow:'vocabulary_v1',batch_id:batch.id,wordbook_id:b.wordbook_id,theme,level:c.level,provider:this.provider.provider,model:this.provider.model,prompt_version:this.provider.promptVersion,schema_version:isRaw?'vocabulary-raw-0.1-1':'vocabulary-0.1-1',input_type:isRaw?'text':'words',...(isRaw?{raw_text:b.raw_text,raw_prompt_version:this.provider.rawPromptVersion}: {})});
+  const payload=JSON.stringify({...(provider!.selection?{ai_selection:provider!.selection}:{}),flow:'vocabulary_v1',batch_id:batch.id,wordbook_id:b.wordbook_id,theme,level:c.level,provider:provider!.provider,model:provider!.model,prompt_version:provider!.promptVersion,schema_version:isRaw?'vocabulary-raw-0.1-1':'vocabulary-0.1-1',input_type:isRaw?'text':isPrepared?'prepared':'words',...(isRaw?{raw_text:b.raw_text,raw_prompt_version:provider!.rawPromptVersion}:isPrepared?{raw_text:b.raw_text,prepared_items:preparedItems}: {})});
   if(edited){
    await q.query("UPDATE batches SET wordbook_id=$2,theme=$3,status='draft',version=version+1 WHERE id=$1",[batch.id,b.wordbook_id,theme]);
-   return this.dto(q,await one(q,"UPDATE generation_jobs SET payload=$2,dedupe_key=$3,status='queued',error_code=NULL,lease_until=NULL,run_after=$4,updated_at=$4 WHERE id=$1 RETURNING *",[editId,payload,dedupe,this.a.now()]));
+   return this.dto(q,await one(q,"UPDATE generation_jobs SET payload=$2,dedupe_key=$3,status='queued',error_code=NULL,lease_until=NULL,run_after=$4,updated_at=$4,requested_by=$5 WHERE id=$1 RETURNING *",[editId,payload,dedupe,this.a.now(),actor]));
   }
   const job=await one(q,"INSERT INTO generation_jobs(child_id,requested_by,kind,dedupe_key,payload,max_attempts,run_after) VALUES($1,$2,'sentences',$3,$4,3,$5) RETURNING *",[child,actor,dedupe,payload,this.a.now()]);return this.dto(q,job);
  });}
  async get(actor:string,id:string){return this.a.tx(async q=>this.dto(q,(await this.scope(q,actor,id)).job));}
  async list(actor:string,child:string){return this.a.tx(async q=>{await this.a.child(q,actor,child);return {items:await Promise.all((await q.query("SELECT * FROM generation_jobs WHERE child_id=$1 AND payload->>'flow'='vocabulary_v1' ORDER BY created_at DESC,id DESC LIMIT 20",[child])).rows.map(j=>this.dto(q,j)))};});}
- async retry(actor:string,key:string,id:string){return this.a.write(actor,key,`vocabulary:retry:${id}`,{},q=>this.scope(q,actor,id),async(q,{job:j})=>{
-  ensure(this.provider&&this.provider.provider===j.payload.provider&&this.provider.model===j.payload.model&&this.provider.promptVersion===j.payload.prompt_version,503,'AI_CONFIGURATION_CHANGED');
+ async retry(actor:string,key:string,id:string){return this.a.write(actor,key,`vocabulary:retry:${id}`,{},q=>this.scope(q,actor,id),async(q,{job:j,c})=>{
+  ensure(!this.accounts||j.requested_by===actor,403,'AI_BILLING_OWNER_REQUIRED');const provider=this.accounts?await this.accounts.vocabulary(q,actor,undefined,undefined,c.family_id,j.payload.input_type==='prepared'):this.provider;ensure(provider&&provider.provider===j.payload.provider&&provider.model===j.payload.model&&provider.promptVersion===j.payload.prompt_version,503,'AI_CONFIGURATION_CHANGED');
+  if(this.accounts){ensure(provider?.selection?.mode===j.payload.ai_selection?.mode,409,'AI_CONFIGURATION_CHANGED');j.payload.ai_selection=provider!.selection;await q.query('UPDATE generation_jobs SET payload=$2 WHERE id=$1',[j.id,JSON.stringify(j.payload)]);}
   ensure(!['NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT'].includes(j.error_code),422,'INPUT_REENTRY_REQUIRED');
   ensure(!await one(q,"SELECT 1 FROM batch_items WHERE batch_id=$1 AND child_word_id IS NULL AND raw_text ~ '[,，、;；\\r\\n]'",[j.payload.batch_id]),422,'INPUT_REENTRY_REQUIRED');
   ensure(['failed','partial'].includes(j.status)&&j.attempts<j.max_attempts,409,'GENERATION_NOT_RETRYABLE');
@@ -66,25 +73,25 @@ export class Vocabulary {
  // Claim in a short transaction, perform network I/O without database locks, then commit atomically.
  async processOne(){
   const candidate=await this.a.tx(q=>one(q,"SELECT id FROM generation_jobs WHERE payload->>'flow'='vocabulary_v1' AND ((status='queued' AND run_after<=$1) OR (status='running' AND lease_until<=$1)) ORDER BY created_at LIMIT 1",[this.a.now()]));if(!candidate)return;
-  let j:Row|undefined;
+  let j:Row|undefined;let provider:VocabularyProvider|undefined;
   try{j=await this.a.tx(async q=>{
-   const first=await one(q,'SELECT * FROM generation_jobs WHERE id=$1',[candidate.id]);await this.a.child(q,first.requested_by,first.child_id);
+   const first=await one(q,'SELECT * FROM generation_jobs WHERE id=$1',[candidate.id]);const jobChild=await this.a.child(q,first.requested_by,first.child_id);
    const job=await one(q,'SELECT * FROM generation_jobs WHERE id=$1 FOR UPDATE',[candidate.id]);
    if(!(job.status==='queued'||job.status==='running'&&new Date(job.lease_until)<=this.a.now()))return;
    if(job.attempts>=job.max_attempts){await q.query("UPDATE generation_jobs SET status='failed',error_code='GENERATION_ATTEMPTS_EXHAUSTED',lease_until=NULL WHERE id=$1",[job.id]);return;}
-   ensure(this.provider&&this.provider.provider===job.payload.provider&&this.provider.model===job.payload.model&&this.provider.promptVersion===job.payload.prompt_version,503,'AI_CONFIGURATION_CHANGED');
+   ensure(!this.accounts||job.payload.ai_selection,503,'AI_CONFIGURATION_CHANGED');provider=this.accounts?await this.accounts.vocabulary(q,job.requested_by,job.payload.ai_selection,`vocabulary:${job.id}:${job.attempts+1}`,jobChild.family_id,job.payload.input_type==='prepared'):this.provider;ensure(provider&&provider.provider===job.payload.provider&&provider.model===job.payload.model&&provider.promptVersion===job.payload.prompt_version,503,'AI_CONFIGURATION_CHANGED');
    ensure(await one(q,'SELECT 1 FROM wordbooks WHERE id=$1 AND child_id=$2 AND archived_at IS NULL',[job.payload.wordbook_id,job.child_id]),404,'WORDBOOK_NOT_FOUND');
-   if(job.payload.input_type==='text')ensure(this.provider.generateRaw&&this.provider.rawPromptVersion===job.payload.raw_prompt_version,503,'AI_CONFIGURATION_CHANGED');
-   await q.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[job.requested_by]);
-   const usage=await one(q,`SELECT coalesce(sum(attempts) FILTER(WHERE child_id=$1),0)::int child_attempts,coalesce(sum(attempts) FILTER(WHERE requested_by=$2),0)::int actor_attempts FROM generation_jobs WHERE payload->>'flow'='vocabulary_v1' AND updated_at>=$3`,[job.child_id,job.requested_by,new Date(this.a.now().getTime()-86400000)]);
-   ensure(usage.child_attempts<30&&usage.actor_attempts<60,429,'AI_DAILY_LIMIT');
+   if(job.payload.input_type==='text')ensure(provider.generateRaw&&provider.rawPromptVersion===job.payload.raw_prompt_version,503,'AI_CONFIGURATION_CHANGED');
+   const usage=await usageBudget(q,job.requested_by,job.child_id,'vocabulary',this.a.now());
+   ensure(usage.child_count<30&&usage.user_count<60,429,'AI_DAILY_LIMIT');
    const items=(await q.query('SELECT id,ordinal,raw_text FROM batch_items WHERE batch_id=$1 AND child_word_id IS NULL ORDER BY ordinal',[job.payload.batch_id])).rows;
-   const claimed=await one(q,"UPDATE generation_jobs SET status='running',attempts=attempts+1,lease_until=$2,error_code=NULL,updated_at=$3 WHERE id=$1 RETURNING *",[job.id,new Date(this.a.now().getTime()+120000),this.a.now()]);return {...claimed,items};
+   if(this.accounts&&job.attempts>0)await this.accounts.releaseInTransaction(q,`vocabulary:${job.id}:${job.attempts}`);
+   const claimed=await one(q,"UPDATE generation_jobs SET status='running',attempts=attempts+1,lease_until=$2,error_code=NULL,updated_at=$3 WHERE id=$1 RETURNING *",[job.id,new Date(this.a.now().getTime()+120000),this.a.now()]);await recordUsage(q,'vocabulary',job.id,claimed.attempts,usage.key,job.child_id,this.a.now());return {...claimed,items};
   });}catch(e){await this.fail(candidate.id,undefined,e);return;}
   if(!j)return;const job=j;
   try{
    const rawPass=job.payload.input_type==='text'&&job.items.length===0;
-   const data=rawPass?await this.provider!.generateRaw!(job.payload.raw_text,job.payload.theme,job.payload.level):await this.provider!.generate(job.items.map((i:Row)=>i.raw_text),job.payload.theme,job.payload.level);
+   const data:{items:Row[];billing_id?:string;error?:string|null}=job.payload.input_type==='prepared'?{items:job.payload.prepared_items}:rawPass?await provider!.generateRaw!(job.payload.raw_text,job.payload.theme,job.payload.level):await provider!.generate(job.items.map((i:Row)=>i.raw_text),job.payload.theme,job.payload.level);
    const error=(data as any).error;if(error)ensure(false,422,['NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT'].includes(error)?error:'GENERATED_CONTENT_REJECTED');
    ensure(Array.isArray(data.items)&&data.items.length>0&&data.items.length<=30,422,'GENERATED_CONTENT_REJECTED');
    if(!rawPass)ensure(data.items.length===job.items.length,422,'GENERATED_CONTENT_REJECTED');
@@ -96,7 +103,7 @@ export class Vocabulary {
     ensure(await one(q,'SELECT 1 FROM wordbooks WHERE id=$1 AND child_id=$2 AND archived_at IS NULL',[job.payload.wordbook_id,job.child_id]),404,'WORDBOOK_NOT_FOUND');
     if(rawPass){
      ensure(!await one(q,'SELECT 1 FROM batch_items WHERE batch_id=$1',[job.payload.batch_id]),409,'GENERATED_CONTENT_REJECTED');
-     ensure(new Set(data.items.map(r=>String(r.input).toLowerCase())).size===data.items.length,422,'GENERATED_CONTENT_REJECTED');
+     ensure(new Set(data.items.map((r:Row)=>String(r.input).toLowerCase())).size===data.items.length,422,'GENERATED_CONTENT_REJECTED');
      job.items=[];
      for(let n=0;n<data.items.length;n++)job.items.push(await one(q,"INSERT INTO batch_items(batch_id,child_id,ordinal,raw_text,status) VALUES($1,$2,$3,$4,'ready') RETURNING id,raw_text",[job.payload.batch_id,job.child_id,n+1,text(data.items[n].input,120)]));
     }
@@ -116,12 +123,13 @@ export class Vocabulary {
     }
     const counts=await one(q,'SELECT count(*) FILTER(WHERE child_word_id IS NOT NULL)::int saved,count(*) FILTER(WHERE child_word_id IS NULL)::int missing FROM batch_items WHERE batch_id=$1',[job.payload.batch_id]);
     await q.query("UPDATE batches SET status='confirmed',version=version+1 WHERE id=$1",[job.payload.batch_id]);
+    if(data.billing_id)await this.accounts?.settle(q,data.billing_id);
     await q.query('UPDATE generation_jobs SET status=$2,result=$3,error_code=NULL,lease_until=NULL,updated_at=$4 WHERE id=$1',[job.id,counts.missing?'partial':'succeeded',JSON.stringify(counts),this.a.now()]);
    });
-  }catch(e){await this.fail(job.id,job.attempts,e);}
+  }catch(e){await this.accounts?.failReference(`vocabulary:${job.id}:${job.attempts}`);await this.fail(job.id,job.attempts,e);}
  }
  private async fail(id:string,attempt:number|undefined,e:unknown){
-  const code=(e as any)?.code;const allowed=['AI_DAILY_LIMIT','NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT','AI_CONFIGURATION_CHANGED','GENERATED_CONTENT_REJECTED','UPSTREAM_NETWORK_OR_TIMEOUT','UPSTREAM_HTTP_ERROR','UPSTREAM_INVALID_JSON','INVALID_GENERATED_JSON','INCOMPLETE_GENERATION','MODEL_REFUSAL'];
+  const code=(e as any)?.code;const allowed=['AI_KEY_REQUIRED','AI_VISION_UNAVAILABLE','AI_MODEL_UNAVAILABLE','AI_PRICE_NOT_CONFIGURED','AI_INSUFFICIENT_BALANCE','AI_SYSTEM_BUDGET_EXHAUSTED','AI_USAGE_MISSING','AI_USAGE_OVER_RESERVATION','AI_CALL_ALREADY_STARTED','AI_DAILY_LIMIT','NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT','AI_CONFIGURATION_CHANGED','GENERATED_CONTENT_REJECTED','UPSTREAM_NETWORK_OR_TIMEOUT','UPSTREAM_HTTP_ERROR','UPSTREAM_INVALID_JSON','INVALID_GENERATED_JSON','INCOMPLETE_GENERATION','MODEL_REFUSAL'];
   const accessLost=['FAMILY_NOT_FOUND','CHILD_NOT_FOUND','WORDBOOK_NOT_FOUND'].includes(code);
   await this.a.tx(q=>q.query(`UPDATE generation_jobs SET status=$2,error_code=$3,lease_until=NULL,updated_at=$4 WHERE id=$1 AND status IN ('queued','running') AND (($5::int IS NOT NULL AND attempts=$5) OR ($5::int IS NULL AND (status='queued' OR lease_until<=$4)))`,[id,accessLost?'cancelled':'failed',accessLost?'GENERATION_SCOPE_UNAVAILABLE':allowed.includes(code)?code:'GENERATION_FAILED',this.a.now(),attempt??null]));
  }

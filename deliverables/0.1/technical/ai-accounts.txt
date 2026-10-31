@@ -1,0 +1,54 @@
+家庭共享 AI 额度与独立文字/图片模型（2026-10-26）
+
+当前规则
+入口：设置 → AI 与用量。先选择家庭，再分别选择“文字模型”或“图片 / 多模态模型”。两类配置均默认使用系统模型，可以独立切换系统 / 自带 Key，不会相互覆盖。文字已适配千问、DeepSeek、OpenAI；图片已适配千问 Chat Completions 和 OpenAI Responses。DeepSeek 文字适配器不接收图片。自定义模型 ID 仍须具备所选协议和模态能力，保存后可测试；不开放客户端自定义 base URL。这里的多模态指图片理解，语音合成仍独立使用系统 TTS 和原有音频缓存、每日限额。
+
+家庭钱包
+每个家庭一次性赠送 20000000 微元（20 元），无自动到期。新建家庭通过数据库触发器初始化；已有 active 家庭通过迁移 018 补发。家庭 ID 与赠送流水唯一键保证重复登录、加入/退出家庭、换孩子、改配置、迁移重跑和余额用完后均不重复发放。同一家庭所有有效家长共享余额和系统消费账单。多家庭用户必须选择目标家庭；业务调用始终以孩子实际所属家庭为准。非成员和已退出/被移除成员不能查看或消费该家庭资金。
+赠送与充值分开核算，成功调用优先消耗赠送额度。赠送额度不能退款，解散家庭时剩余赠送额度失效。家长退出或注销不会带走家庭余额；解散家庭前须处理真实充值余额、欠款、冻结金额和待核实订单。真实交易所需的最少账目在家庭删除后保留，用于历史退款核对，不开放给其他家庭。
+
+个人配置与 Key
+文字和图片设置按 (家长账号, capability) 分别保存，其中 capability=text / vision；每类都有模式、模型、Key 和版本号。Key 用 AES-256-GCM 加密，账号 UUID 作为附加认证数据，返回值只有 has_key 和掩码提示。家庭共享的是钱，不共享私有 Key。客户端只在页面内存保留输入，页面隐藏时清除；不写本地缓存、草稿、日志或幂等请求缓存。Key 无效时不切换到其他模型、不自动动用系统余额。删除文字 Key 不删除图片 Key，反之亦然。连接测试会产生少量用户供应商用量，图片连接测试确实附带有效测试 PNG。
+AI_CREDENTIAL_KEY：服务端独立保存的 32 字节随机密钥，64 位十六进制。不要直接更换；轮转需先重加密已有记录。corepack pnpm local 在开发模式未配置该值时创建 .local/ai-credential-key（0600）；生产和直接启动 API 须自行提供。账号注销会清除两类模型 Key。迁移 018 把旧设置复制为 text，再清除旧表中的冗余 Key 副本，vision 默认 system。
+
+模型目录与系统默认值
+AI_MODEL_CATALOG 可提供 JSON 模型数组，字段见 config/ai-models.example.json。支持 id/provider/model/label/vision/base_url/价格/max_input_tokens；vision=true 的模型才进入图片选项，当前仅允许 qwen/openai 图片适配器。供应商地址只取受信服务端配置：OpenAI 固定官方 Responses 地址，千问限定官方 aliyuncs.com HTTPS 兼容接口。系统文字和图片默认目录项分别由 AI_SYSTEM_MODEL_ID、AI_SYSTEM_VISION_MODEL_ID 指定，未指定时分别采用 LLM_PROVIDER 对应项和首个图片模型。
+未配置目录时，从现有供应商环境变量构建目录；OCR_MODEL 会生成独立 qwen-vision 项，即使文字 QWEN_MODEL 不同也不会丢掉图片模型。文字系统凭证优先 QWEN_API_KEY；千问图片优先 QWEN_VISION_API_KEY、其次 OCR_API_KEY，再用 QWEN_API_KEY。OpenAI 图片优先 OPENAI_VISION_API_KEY，再用 OPENAI_API_KEY。私有凭证按两类分别读取。
+
+当前已核实默认价格
+对默认目录中、北京官方端点下的精确模型 qwen3.7-flash-2026-07-15，内置 2026-10-26 核查的标准输入/输出阶梯售价，保证当前系统模型可以直接消耗家庭赠送额度：
+总输入 ≤32768 Token：每百万输入 0.2 元，输出 0.8 元。
+32768 < 总输入 ≤262144：每百万输入 0.6 元，输出 2.4 元。
+262144 < 总输入 ≤1048576：每百万输入 1.2 元，输出 4.8 元。
+当前平台缓存输入售价按所在阶梯的标准输入单价公示，不将供应商缓存折扣自动承诺给用户；可通过目录显式设置 cached_yuan_per_million。此处为平台售价快照，不代表实时供应商结算金额。供应商调价时需核查并更新。其他模型、地域、浮动别名不猜测价格，须显式配置。提供 AI_MODEL_CATALOG 后以目录为准，不套用内置价格。
+官方依据：https://help.aliyun.com/zh/model-studio/model-pricing （核查日 2026-10-26）。
+
+通用计价与冻结
+input_yuan_per_million / output_yuan_per_million / cached_yuan_per_million 为十进制人民币字符串，最多六位小数。可用 pricing_tiers=[{up_to_input_tokens,input_yuan_per_million,output_yuan_per_million,cached_yuan_per_million}] 配置按总输入长度选择的阶梯，阈值必须递增并覆盖 max_input_tokens；未提供时固定单价。未填缓存价时使用该阶梯输入价。缓存 Token 是输入 Token 子集，不能重复计费。
+金额以整数微元核算，1000000 微元=1 元，整次费用合并后向上取整到微元。max_input_tokens 默认 65536，允许 8192–131072；输出上限 8192。调用前冻结所有可达阶梯、普通/缓存输入组合的最高费用；对当前默认模型最高冻结 58983 微元（0.058983 元），实际收费通常远低于此值。前端显示阶梯和单次最高扣费。任务保存家庭、模态、供应商、模型、设置版本和售价快照，排队期间改价不会改变原报价。
+网络调用不占数据库事务。成功保存业务内容的同一事务结算扣款、释放差额并记账；失败或保存回滚时释放冻结，不扣用户余额，保留平台尝试记录。同一 reference 和结算流水唯一，重复处理不重复扣款。并发家长共享同一钱包锁，不能各自透支。图片识别已生成的 prepared 内容只校验和保存，不因文字模型 Key 缺失再调用文字 AI，也不重复收费。相同识别缓存不重复调用；切换图片模型/版本后缓存身份变化。
+usage 缺失、异常或超出冻结时不扣用户钱，不伪造用量；未知成本按原冻结上限保守计入系统预算。崩溃遗留冻结在 10 分钟后由每 30 秒维护任务释放；词汇续跑先释放过期尝试。AI_SYSTEM_DAILY_LIMIT_MICROS 默认 20000000（平台滚动 24 小时 20 元估值限额），不是每家庭赠送数；AI_USER_DAILY_CALLS 默认每家长 100 次/滚动 24 小时，业务已有次数上限仍有效。平台预算限额不能替代供应商真实账单上限。
+
+充值与退款
+微信“支付与交易 → 虚拟支付”开通、已发布道具和正式参数均准备好后才设置 AI_RECHARGE_ENABLED=true，当前默认关闭。个人主体须满足平台开放类目与账号审核条件；iOS 另需开通 IAP。采用现金道具直购 wx.requestVirtualPayment，非普通商户 APIv3，不实现微信代币钱包。服务器参数：WECHAT_APP_ID / WECHAT_APP_SECRET / WECHAT_VIRTUAL_OFFER_ID / WECHAT_VIRTUAL_APP_KEY（现网）/ WECHAT_VIRTUAL_NOTIFY_TOKEN / WECHAT_VIRTUAL_AES_KEY（43 位 EncodingAESKey）/ WECHAT_VIRTUAL_PRODUCTS。iOS 开通后另设 WECHAT_VIRTUAL_IOS_ENABLED=true。
+档位格式：[{"id":"已发布道具ID","label":"AI额度","amount_fen":1000,"credit_micros":10000000}]，这里只示意字段，不自动开通档位。下单必须提供当前 family_id，服务端验证有效成员、微信身份、档位和固定金额，并保存原家庭。request_id 同账号幂等，同一 ID 不能改投其他家庭。服务端用 code2Session 的 session_key 和 AppKey 双签名，密钥不返回前端。前端支付 success 不作为入账证据。
+回调配置：JSON / 安全模式 AES；URL=https://正式API域名/api/payments/virtual/notify；订阅 xpay_goods_deliver_notify 和 xpay_refund_notify。校验签名、AES、AppID、付款身份后，仍重新查微信订单的业务 ID、环境、类型、金额和状态，再事务入账/退款。重复通知不重复加款。家庭其他成员可核对该家庭订单，使用订单原付款身份查微信，不使用核对者身份。成员退出、账号注销和当前家庭切换不改变退款归属；后台内部核单不依赖原付款人继续是成员。
+退款按微信查询的累计 left_fee 比例回收原家庭充值额度，赠送额度不作现金退款。重复和乱序结果不恢复已回收金额；已消费充值再退款可能产生负余额并停止后续系统调用。充值付款方微信标识单独加密保留，供注销后的历史核对，不保留模型 API Key。Android 等端通过运营后台处理退款，iOS 经 Apple 审批。过期未支付订单本地关闭后仍定期查单，晚到的交易继续核对，不把本地关闭当作微信撤销。
+
+升级与历史资金
+执行迁移 017 后再执行 018；已有个人冻结须先完成/过期，018 检查未清冻结并拒绝贸然转账。旧个人余额仅在该账号恰有一个有效家庭时自动转入；多家庭/无家庭的旧余额完整保留，设置页提示待确认归属，不猜测转向。历史已支付订单重复核对不会把已转移资金再入账。新家庭钱包与最少财务流水不依赖 families 的级联删除。
+开发赠送工具 ai-dev-credit.js 仍仅在 development 模式允许；它给指定账号唯一家庭记入开发赠送，不模拟真实支付。真实赠送 20 元由迁移/触发器完成，无客户端任意加余额接口。
+
+部署和验收
+corepack pnpm build:api
+corepack pnpm --filter @wordmate/api migrate:ai-accounts   （执行 017、018）
+corepack pnpm --filter @wordmate/miniapp typecheck
+corepack pnpm build:miniapp
+corepack pnpm test:ai-accounts
+2026-10-26 已在备份本地 .local/dev-db 后执行迁移：4 个 active 家庭各到账 20 元，共 80 元。备份在 .local/backups/family-ai-2026-10-26T10-08-30-133Z。此记录不是生产服务器迁移证明；其他部署库仍需升级。未调用真实收费模型或真实微信支付。
+测试覆盖默认系统双模态、文字与图片独立改配、千问图片模型切换、OpenAI Responses 图片协议、各类 Key 隔离、家庭共享与跨家庭拒绝、不同家长并发冻结、赠送幂等、已有资金迁移、旧订单防重复入账、保存回滚、超时释放、支付和退款。离线测试不能代替真实账号模型权限、英语质量、真机页面和微信支付闭环验收。
+
+参考
+OpenAI 官方图片协议：https://developers.openai.com/api/docs/guides/images-vision
+微信虚拟支付：https://github.com/TencentCloudBase/CloudBase-AI-Toolkit/blob/main/config/source/skills/cloudbase-wechat-integration/references/virtual-payment.md
+百炼模型价格：https://help.aliyun.com/zh/model-studio/model-pricing

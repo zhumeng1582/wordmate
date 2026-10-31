@@ -1,0 +1,7 @@
+.book-manage-card{padding:24px;margin:18px 0}
+.book-manage-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.book-manage-name{font-size:30px;font-weight:650;margin-bottom:4px}
+.book-badge{padding:7px 12px;border-radius:100px;background:var(--soft);color:var(--primary);font-size:21px;white-space:nowrap}
+.book-badge.readonly{background:var(--field);color:var(--muted)}
+.book-manage-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.book-manage-actions .btn{margin:0;min-height:68px;font-size:23px}

@@ -2,8 +2,11 @@ import type {Sql,Row} from './ports.ts';
 import {ensure,uuid} from './errors.ts';
 export function validDate(value:unknown){ensure(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&value>='2000-01-01'&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value,422,'INVALID_DATE');return value;}
 export function pageSize(value:unknown){const n=value===undefined?50:Number(value);ensure((typeof value==='string'||typeof value==='number'||value===undefined)&&Number.isInteger(n)&&n>=1&&n<=100,422,'INVALID_PAGE');return n;}
-export async function streak(q:Sql,child:string,today:string){
-  const rows=(await q.query(`SELECT to_char(local_date,'YYYY-MM-DD') AS day FROM daily_activity WHERE child_id=$1 AND local_date<=$2 AND distinct_words>=goal_snapshot ORDER BY local_date DESC`,[child,today])).rows;
+export async function streak(q:Sql,child:string,today:string,includeMakeup=true){
+  const rows=(await q.query(`SELECT to_char(day,'YYYY-MM-DD') AS day FROM (
+    SELECT local_date AS day FROM daily_activity WHERE child_id=$1 AND local_date<=$2 AND distinct_words>=goal_snapshot
+    UNION SELECT used_for_date AS day FROM checkin_makeup_credits WHERE $3::boolean AND child_id=$1 AND used_for_date<=$2
+  ) checkins ORDER BY day DESC`,[child,today,includeMakeup])).rows;
   const previous=(d:string)=>new Date(Date.parse(d)-86400000).toISOString().slice(0,10);
   let expected=rows[0]?.day===today?today:previous(today),count=0;const through=expected;
   for(const row of rows){if(row.day!==expected)break;count++;expected=previous(expected);}
@@ -15,8 +18,9 @@ export class History {
   async calendar(actor:string,child:string,month?:unknown){return this.access.tx(async q=>{
     const c=await this.access.child(q,actor,child),today=await this.access.day(q,c),m=month??today.slice(0,7);
     ensure(typeof m==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(m)&&m>='2000-01'&&m<=today.slice(0,7),422,'INVALID_MONTH');
-    const days=(await q.query(`WITH dates AS (SELECT d::date AS day FROM generate_series($2::date,($2::date+interval '1 month - 1 day')::date,interval '1 day') d), mistakes AS (SELECT local_date,count(*)::int mistake_count,count(DISTINCT child_word_id)::int wrong_words FROM mistake_events WHERE child_id=$1 AND local_date >= $2::date AND local_date < $2::date+interval '1 month' GROUP BY local_date), quizzes AS (SELECT submitted_local_date AS day,count(*)::int quiz_count FROM monthly_quizzes WHERE child_id=$1 AND status='submitted' AND submitted_local_date >= $2::date AND submitted_local_date < $2::date+interval '1 month' GROUP BY submitted_local_date) SELECT to_char(d.day,'YYYY-MM-DD') date,coalesce(a.distinct_words,0)::int studied_words,a.goal_snapshot goal,coalesce(a.distinct_words>=a.goal_snapshot,false) checked_in,coalesce(m.wrong_words,0)::int wrong_words,coalesce(m.mistake_count,0)::int mistake_count,coalesce(t.quiz_count,0)::int quiz_count FROM dates d LEFT JOIN daily_activity a ON a.child_id=$1 AND a.local_date=d.day LEFT JOIN mistakes m ON m.local_date=d.day LEFT JOIN quizzes t ON t.day=d.day ORDER BY d.day`,[child,`${m}-01`])).rows;
-    return {month:m,timezone:c.timezone,days,...await streak(q,child,today)};
+    const days=(await q.query(`WITH dates AS (SELECT d::date AS day FROM generate_series($2::date,($2::date+interval '1 month - 1 day')::date,interval '1 day') d), mistakes AS (SELECT local_date,count(*)::int mistake_count,count(DISTINCT child_word_id)::int wrong_words FROM mistake_events WHERE child_id=$1 AND local_date >= $2::date AND local_date < $2::date+interval '1 month' GROUP BY local_date), quizzes AS (SELECT submitted_local_date AS day,count(*)::int quiz_count FROM monthly_quizzes WHERE child_id=$1 AND status='submitted' AND submitted_local_date >= $2::date AND submitted_local_date < $2::date+interval '1 month' GROUP BY submitted_local_date) SELECT to_char(d.day,'YYYY-MM-DD') date,coalesce(a.distinct_words,0)::int studied_words,a.goal_snapshot goal,(coalesce(a.distinct_words>=a.goal_snapshot,false) OR mu.used_for_date IS NOT NULL) checked_in,(mu.used_for_date IS NOT NULL) makeup,coalesce(m.wrong_words,0)::int wrong_words,coalesce(m.mistake_count,0)::int mistake_count,coalesce(t.quiz_count,0)::int quiz_count FROM dates d LEFT JOIN daily_activity a ON a.child_id=$1 AND a.local_date=d.day LEFT JOIN checkin_makeup_credits mu ON mu.child_id=$1 AND mu.used_for_date=d.day LEFT JOIN mistakes m ON m.local_date=d.day LEFT JOIN quizzes t ON t.day=d.day ORDER BY d.day`,[child,`${m}-01`])).rows;
+    const credits=Number((await q.query('SELECT count(*)::int n FROM checkin_makeup_credits WHERE child_id=$1 AND used_for_date IS NULL',[child])).rows[0].n);
+    return {month:m,timezone:c.timezone,days,makeup_credits:credits,...await streak(q,child,today)};
   });}
   async wrongWords(actor:string,child:string,query:any={}){return this.access.tx(async q=>{
     await this.access.child(q,actor,child);const date=query.date===undefined?null:validDate(query.date),source=query.source??null,quiz=query.quiz_id===undefined?null:uuid(query.quiz_id),limit=pageSize(query.limit);

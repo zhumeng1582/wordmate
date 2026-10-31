@@ -31,7 +31,7 @@ export class StoredMeaningQuizBuilder implements QuizBuilder {
   const meanings=w.meaning_zh.split(/[；;，,、/]/).map((s:string)=>s.trim()).filter(Boolean);
   const distractors=shuffle(pool.filter(x=>!meanings.some((m:string)=>m.includes(x)||x.includes(m)))).slice(0,3);
   ensure(distractors.length===3,503,'QUIZ_QUESTION_PROVIDER_REQUIRED');const correctId=randomUUID();
-  return {prompt:`“${w.lemma}”在词本中保存的意思是？`,correctId,options:shuffle([{id:correctId,text:w.meaning_zh},...distractors.map(text=>({id:randomUUID(),text}))])};
+  return {prompt:`“${w.lemma}”的中文意思是？`,correctId,options:shuffle([{id:correctId,text:w.meaning_zh},...distractors.map(text=>({id:randomUUID(),text}))])};
  }
 }
 export class MonthlyQuizzes {
@@ -87,18 +87,18 @@ export class MonthlyQuizzes {
   r=await one(q,"UPDATE monthly_quizzes SET status='in_progress',started_at=coalesce(started_at,$2),version=version+1 WHERE id=$1 RETURNING *",[id,now]);
   return {quiz:await this.dto(q,r),session:{id:s.id,child_id:r.child_id,actor:await one(q,'SELECT id,display_name FROM users WHERE id=$1',[actor]),purpose:'quiz',source:'quiz',quiz_id:id,expires_at:s.expires_at,lease_generation:s.lease_generation,status:s.status}};
  });}
- private item(r:Row){return {id:r.id,ordinal:r.ordinal,prompt:r.prompt_snapshot,options:r.options_snapshot,selected_option_id:r.selected_option_id,answer_version:r.answer_version,flagged:r.flagged};}
+ private item(r:Row,revealCorrectOption=false){const item={id:r.id,ordinal:r.ordinal,prompt:r.prompt_snapshot,word:{id:r.child_word_id,lemma:r.word_snapshot.lemma,version:r.word_snapshot.version},options:r.options_snapshot,selected_option_id:r.selected_option_id,answer_version:r.answer_version,flagged:r.flagged};return revealCorrectOption&&r.selected_option_id!==null?{...item,correct_option_id:r.correct_option_id}:item;}
  async items(actor:string,id:string,query:any,kind:'items'|'results'|'mistakes'='items'){return this.a.tx(async q=>{
   const {quiz:r}=await this.scope(q,actor,id);ensure(kind==='items'?['ready','in_progress','submitted'].includes(r.status):r.status==='submitted',409,kind==='items'?'QUIZ_NOT_READY':'QUIZ_NOT_SUBMITTED');
   const limit=integer(Number(query.limit??50),1,100),after=query.cursor?integer(Number(query.cursor),0,10000):0;
   const rows=(await q.query(`SELECT * FROM monthly_quiz_items WHERE quiz_id=$1 AND ordinal>$2 ${kind==='mistakes'?'AND is_correct=false':''} ORDER BY ordinal LIMIT $3`,[id,after,limit+1])).rows;
-  return {items:rows.slice(0,limit).map(i=>kind==='items'?this.item(i):{item:this.item(i),word:Object.fromEntries(['lemma','part_of_speech','meaning_zh','sense_key','version'].map(k=>[k,i.word_snapshot[k]])),correct_option_id:i.correct_option_id,is_correct:i.is_correct,reason:i.selected_option_id===null?'unanswered':i.is_correct?'correct':'incorrect'}),next_cursor:rows.length>limit?String(rows[limit-1].ordinal):null};
+  return {items:rows.slice(0,limit).map(i=>kind==='items'?this.item(i,r.status==='in_progress'):{item:this.item(i),word:Object.fromEntries(['lemma','part_of_speech','meaning_zh','sense_key','version'].map(k=>[k,i.word_snapshot[k]])),correct_option_id:i.correct_option_id,is_correct:i.is_correct,reason:i.selected_option_id===null?'unanswered':i.is_correct?'correct':'incorrect'}),next_cursor:rows.length>limit?String(rows[limit-1].ordinal):null};
  });}
  async answer(actor:string,key:string,id:string,itemId:string,b:any){return this.a.write(actor,key,`quiz:answer:${id}:${itemId}`,b,q=>this.scope(q,actor,id),async(q,{quiz:r})=>{
   ensure(r.status==='in_progress',409,'QUIZ_NOT_IN_PROGRESS');await this.lease(q,actor,r,b);const i=await one(q,'SELECT * FROM monthly_quiz_items WHERE id=$1 AND quiz_id=$2 FOR UPDATE',[uuid(itemId),id]);ensure(i,404,'QUIZ_ITEM_NOT_FOUND');ensure(i.answer_version===integer(b.expected_version),409,'ANSWER_VERSION_CONFLICT');
-  ensure('selected_option_id'in b||'flagged'in b,422,'EMPTY_ANSWER');const selected='selected_option_id'in b?b.selected_option_id:i.selected_option_id;ensure(selected===null||i.options_snapshot.some((o:any)=>o.id===selected),422,'INVALID_OPTION');if('flagged'in b)ensure(typeof b.flagged==='boolean',422,'INVALID_FLAG');
+  ensure('selected_option_id'in b||'flagged'in b,422,'EMPTY_ANSWER');ensure(i.selected_option_id===null||!('selected_option_id'in b)||b.selected_option_id===i.selected_option_id,409,'ANSWER_LOCKED');const selected='selected_option_id'in b?b.selected_option_id:i.selected_option_id;ensure(selected===null||i.options_snapshot.some((o:any)=>o.id===selected),422,'INVALID_OPTION');if('flagged'in b)ensure(typeof b.flagged==='boolean',422,'INVALID_FLAG');
   const updated=await one(q,'UPDATE monthly_quiz_items SET selected_option_id=$2,flagged=$3,answer_version=answer_version+1,answered_at=$4 WHERE id=$1 RETURNING *',[itemId,selected,b.flagged??i.flagged,selected===null?null:this.a.now()]);
-  const v=await one(q,'UPDATE monthly_quizzes SET version=version+1 WHERE id=$1 RETURNING version',[id]);const answered=await one(q,'SELECT count(*)::int n FROM monthly_quiz_items WHERE quiz_id=$1 AND selected_option_id IS NOT NULL',[id]);return {item:this.item(updated),quiz_version:v.version,answered_count:answered.n};
+  const v=await one(q,'UPDATE monthly_quizzes SET version=version+1 WHERE id=$1 RETURNING version',[id]);const answered=await one(q,'SELECT count(*)::int n FROM monthly_quiz_items WHERE quiz_id=$1 AND selected_option_id IS NOT NULL',[id]);return {item:this.item(updated,true),quiz_version:v.version,answered_count:answered.n};
  });}
  async submit(actor:string,key:string,id:string,b:any){return this.a.write(actor,key,`quiz:submit:${id}`,b,q=>this.scope(q,actor,id),async(q,{child:c,quiz:r})=>{
   if(r.status==='submitted')return this.result(r);ensure(r.status==='in_progress',409,'QUIZ_NOT_IN_PROGRESS');ensure(r.version===integer(b.expected_version),409,'QUIZ_VERSION_CONFLICT');const s=await this.lease(q,actor,r,b);

@@ -1,9 +1,13 @@
-import {imageReader,type ImageReader} from './import-files';
+import {AiAccounts} from './ai-accounts';
+import {AiPayments} from './ai-payments';
+import {Privacy} from './privacy';
+import {Lifecycle} from './lifecycle';
+import type {ImageReader} from './import-files';
 import type {NestExpressApplication} from '@nestjs/platform-express';
-import {encouragementProvider,type EncouragementProvider} from './checkin-share';
+import type {EncouragementProvider} from './checkin-share';
 import {audioRuntime,type AudioRuntime} from './audio-runtime';
+import {checkinShareImageCache,type CheckinShareImageCache} from './checkin-share-images';
 import type {VocabularyProvider} from './vocabulary';
-import {vocabularyProvider} from './vocabulary';
 import 'reflect-metadata';
 import {All,Controller,Get,Module,Req,Res} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
@@ -18,7 +22,7 @@ import {validateBody} from './validation';
 const env=process.env,development=env.AUTH_MODE==='development';
 if(development&&env.NODE_ENV!=='development')throw Error('Development identities require NODE_ENV=development');
 if(env.DICTIONARY_PROVIDER==='fixture'&&!development)throw Error('Fixture dictionary requires development auth');
-let core:Core;
+let core:Core;let privacy:Privacy;let lifecycle:Lifecycle;let accounts:AiAccounts;let payments:AiPayments;
 @Controller('api')
 class ApiController {
   @Get('health') health(){return {status:'ok',api_revision:'0.1-audio',mode:development?'development':'production'};}
@@ -26,16 +30,54 @@ class ApiController {
     const request_id=randomUUID();res.setHeader('Cache-Control','no-store');
     try {
       const p=req.path.replace(/^\/api/,'').split('/').filter(Boolean),b=req.body??{},method=req.method;
+      if(p.join('/')==='payments/virtual/notify'){if(method==='GET'){const echo=String(req.query.echostr??'');payments.verify(req.query,req.query.encrypt_type==='aes'?echo:undefined);return res.send(echo);}if(method==='POST')return res.json(await payments.notify(req.query,b));}
+      const aiRead=method==='GET'&&['me/ai-settings','me/ai-usage','me/ai-recharges'].includes(p.join('/'));
+      if(aiRead&&req.query.capability!==undefined)ensure(typeof req.query.capability==='string'&&['text','vision'].includes(req.query.capability),422,'INVALID_REQUEST_BODY');
       const historyRead=method==='GET'&&p[0]==='children'&&['calendar','wrong-words'].includes(p[2]);
       const wordsRead=method==='GET'&&p[0]==='children'&&p[2]==='words'&&p.length===3;
+      const sharedBooksRead=method==='GET'&&p[0]==='shared-wordbooks';
+      const avatarRead=method==='GET'&&p[0]==='parents'&&p[2]==='avatar'&&p.length===3;
+      if(avatarRead&&req.query.v!==undefined)ensure(typeof req.query.v==='string'&&/^[1-9][0-9]{0,9}$/.test(req.query.v),422,'INVALID_REQUEST_BODY');
       const cardsRead=method==='GET'&&p[0]==='study-sessions'&&p[2]==='cards';
       const quizRead=method==='GET'&&(p[0]==='monthly-quizzes'||p[0]==='children'&&p[2]==='monthly-quizzes');
-      ensure(Object.keys(req.query).every(k=>method==='GET'&&p.join('/')==='voices'&&k==='accent'||quizRead&&['month','cursor','limit'].includes(k)||historyRead&&(p[2]==='calendar'?['month']:['date','date_from','date_to','source','quiz_id','cursor','limit']).includes(k)||(cardsRead||wordsRead)&&['cursor','limit'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
+      ensure(Object.keys(req.query).every(k=>avatarRead&&k==='v'||aiRead&&['family_id','capability'].includes(k)||method==='GET'&&p.join('/')==='voices'&&k==='accent'||quizRead&&['month','cursor','limit'].includes(k)||historyRead&&(p[2]==='calendar'?['month']:['date','date_from','date_to','source','quiz_id','cursor','limit']).includes(k)||cardsRead&&['cursor','limit'].includes(k)||wordsRead&&['cursor','limit','q','mark','wordbook_id'].includes(k)||sharedBooksRead&&['q','limit','offset'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
       validateBody(p,method,b);
-      if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code)});
+      if(method==='GET'&&p.join('/')==='privacy/policy')return res.json({request_id,data:privacy.policy});
+      if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code,b.invite_code,b.management_only===true)});
       const auth=req.headers.authorization;ensure(typeof auth==='string' && auth.startsWith('Bearer '),401,'UNAUTHENTICATED');const actor=await core.authenticate(auth.slice(7));
+      const route=p.join('/'),privacyManagement=route==='me'||route==='me/privacy-consent'||route==='me/data-management'||method==='GET'&&['me/ai-settings','me/ai-usage','me/ai-recharges'].includes(route)||method==='DELETE'&&route==='me/ai-key'||method==='GET'&&p[0]==='me'&&p[1]==='ai-recharges'||route==='auth/logout'||p[0]==='lifecycle-jobs'||p[0]==='families'&&(method==='DELETE'||['leave','transfer-owner'].includes(p[2]))||p[0]==='children'&&method==='DELETE'&&p.length===2;
+      if(!privacyManagement){ensure(!await core.managementOnly(auth.slice(7)),403,'MANAGEMENT_SESSION_ONLY');await core.requirePrivacy(actor);}
       const key=String(req.headers['idempotency-key']??'');let data:any;
-      if(method==='POST'&&p.join('/')==='voice-previews'){data=await core.audio.previews.create(actor,b);res.status(data.status==='succeeded'?200:202);}
+      if(route==='me/privacy-consent'){
+       if(method==='GET')data={...await privacy.consent(actor),management_only:await core.managementOnly(auth.slice(7))};
+       if(method==='PUT'){data=await privacy.accept(actor,b);await core.upgradeSession(actor,auth.slice(7));}
+       if(method==='DELETE')data=await privacy.withdraw(actor);
+      }
+      else if(route==='me/profile'&&method==='PUT')data=await core.saveProfile(actor,key,b);
+      else if(avatarRead){const avatar=await core.parentAvatar(actor,p[1],req.query.v as string|undefined);res.setHeader('Content-Type',avatar.mime);res.setHeader('X-Content-Type-Options','nosniff');return res.send(avatar.bytes);}
+      else if(route==='me/ai-settings'&&method==='GET')data=await accounts.overview(actor,req.query.family_id as string|undefined,(req.query.capability??'text') as 'text'|'vision');
+      else if(route==='me/ai-settings'&&method==='PUT')data=await accounts.save(actor,b);
+      else if(route==='me/ai-key'&&method==='DELETE')data=await accounts.deleteKey(actor,b.expected_version,b.capability,b.family_id);
+      else if(route==='me/ai-test'&&method==='POST')data=await accounts.test(actor,b.capability,b.family_id);
+      else if(route==='me/ai-usage'&&method==='GET')data=await accounts.history(actor,req.query.family_id as string|undefined);
+      else if(route==='me/ai-recharges'&&method==='GET')data=await payments.catalog(actor,req.query.family_id as string|undefined);
+      else if(route==='me/ai-recharges'&&method==='POST')data=await payments.create(actor,b.request_id,b);
+      else if(p[0]==='me'&&p[1]==='ai-recharges'&&p.length===3&&method==='GET')data=await payments.check(actor,p[2]);
+      else if(route==='me/data-management'&&method==='GET')data=await lifecycle.overview(actor);
+      else if(route==='auth/logout'&&method==='POST')data=await lifecycle.logout(actor,auth.slice(7));
+      else if(route==='me'&&method==='DELETE')data=await lifecycle.deleteAccount(actor);
+      else if(p[0]==='lifecycle-jobs'){
+       if(method==='GET'&&p.length===1)data=await lifecycle.jobs(actor);
+       if(method==='GET'&&p.length===2)data=await lifecycle.job(actor,p[1]);
+       if(method==='POST'&&p.length===3&&p[2]==='retry')data=await lifecycle.retry(actor,p[1]);
+      }
+      else if(method==='DELETE'&&p[0]==='children'&&p.length===2){data=await lifecycle.deleteChild(actor,p[1],b);res.status(202);}
+      else if(method==='DELETE'&&p[0]==='families'&&p.length===2){data=await lifecycle.deleteFamily(actor,p[1],b);res.status(202);}
+      else if(method==='POST'&&p[0]==='families'&&p[2]==='leave'&&p.length===3)data=await lifecycle.leave(actor,p[1]);
+      else if(method==='POST'&&p[0]==='families'&&p[2]==='transfer-owner'&&p.length===3)data=await lifecycle.transfer(actor,p[1],b);
+      else if(method==='DELETE'&&p[0]==='families'&&p[2]==='members'&&p.length===4)data=await lifecycle.leave(actor,p[1],p[3]);
+
+      else if(method==='POST'&&p.join('/')==='voice-previews'){data=await core.audio.previews.create(actor,b);res.status(data.status==='succeeded'?200:202);}
       else if(method==='GET'&&p[0]==='voice-previews'&&p.length===2)data=await core.audio.previews.get(actor,p[1]);
       else if(method==='GET'&&p[0]==='voice-previews'&&p[2]==='content'&&p.length===3){const bytes=await core.audio.previews.content(actor,p[1]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(Buffer.from(bytes));}
       else if(method==='GET'&&p.join('/')==='me/audio-settings')data=await core.audioSettings(actor);
@@ -45,17 +87,27 @@ class ApiController {
       else if(method==='GET'&&p[0]==='jobs'&&p.length===2)data=await core.audio.get(actor,p[1]);
       else if(method==='POST'&&p[0]==='jobs'&&p[2]==='retry'&&p.length===3){data=await core.audio.retry(actor,key,p[1]);res.status(202);}
       else if(method==='GET'&&p[0]==='audio'&&p[2]==='content'&&p.length===3){const bytes=await core.audio.content(actor,p[1]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(Buffer.from(bytes));}
+      else if(method==='GET'&&p[0]==='checkin-share-images'&&p.length===2)data=await core.checkinShare.imageStatus(actor,p[1]);
+      else if(method==='GET'&&p[0]==='checkin-share-images'&&p[2]==='content'&&p.length===3){const image=await core.checkinShare.imageContent(actor,p[1]);res.setHeader('Content-Type',image.mime_type);res.setHeader('X-Content-Type-Options','nosniff');return res.send(Buffer.from(image.bytes));}
       else if(p[0]==='ai-batches'&&p.length===2&&method==='PUT')data=await core.vocabulary.replace(actor,key,p[1],b);
       else if(p[0]==='ai-batches'&&p.length===2&&method==='GET')data=await core.vocabulary.get(actor,p[1]);
       else if(p[0]==='ai-batches'&&p.length===3&&p[2]==='retry'&&method==='POST')data=await core.vocabulary.retry(actor,key,p[1]);
       else if(method==='GET'&&p.join('/')==='me')data=await core.me(actor);
+      else if(sharedBooksRead&&p.length===1)data=await core.searchSharedWordbooks(actor,req.query);
+      else if(sharedBooksRead&&p.length===2)data=await core.sharedWordbook(actor,p[1]);
       else if(method==='POST'&&p.join('/')==='families')data=await core.createFamily(actor,key,b);
       else if(method==='GET'&&p[0]==='families'&&p[2]==='members'&&p.length===3)data=await core.members(actor,p[1]);
       else if(p[0]==='families'&&p[2]==='invites'&&p.length===3)data=method==='GET'?await core.invites(actor,p[1]):method==='POST'?await core.createInvite(actor,key,p[1]):undefined;
       else if(method==='POST'&&p.join('/')==='family-invites/claim')data=await core.claimInvite(actor,key,b);
+      else if(method==='POST'&&p.join('/')==='family-invites/resolve')data=await core.resolveInvite(actor,b);
       else if(method==='POST'&&p[0]==='family-invites'&&p[2]==='approve'&&p.length===3)data=await core.approveInvite(actor,key,p[1]);
       else if(p[0]==='families'&&p[2]==='children'&&p.length===3){data=method==='GET'?await core.children(actor,p[1]):method==='POST'?await core.createChild(actor,key,p[1],b):undefined;}
       else if(method==='GET'&&p[0]==='children'&&p[2]==='words'&&p.length===4)data=await core.word(actor,p[1],p[3]);
+      else if(p[0]==='children'&&p[2]==='wordbooks'&&p.length===4){if(method==='PATCH')data=await core.renameWordbook(actor,key,p[1],p[3],b);else if(method==='DELETE')data=await core.archiveWordbook(actor,key,p[1],p[3]);}
+      else if(p[0]==='children'&&p[2]==='wordbooks'&&p.length===5&&p[4]==='share'&&method==='PUT')data=await core.shareWordbook(actor,key,p[1],p[3],b);
+      else if(p[0]==='children'&&p[2]==='shared-wordbooks'&&p.length===5&&p[4]==='join'&&method==='POST')data=await core.joinSharedWordbook(actor,key,p[1],p[3]);
+      else if(p[0]==='children'&&p[2]==='shared-wordbooks'&&p.length===5&&p[4]==='leave'&&method==='POST')data=await core.leaveSharedWordbook(actor,key,p[1],p[3]);
+      else if(method==='PATCH'&&p[0]==='words'&&p[2]==='annotations'&&p.length===3)data=await core.patchWordAnnotations(actor,key,p[1],b);
       else if(p[0]==='children'&&p[2]==='monthly-quizzes'&&p[3]==='preview'&&p.length===4&&method==='GET')data=await core.quizzes.preview(actor,p[1],req.query.month);
       else if(p[0]==='monthly-quizzes'){
         const id=p[1];
@@ -73,6 +125,7 @@ class ApiController {
         if(p[2]==='learning-goal')data=method==='GET'?await core.learningGoal(actor,id):method==='PUT'?await core.setLearningGoal(actor,key,id,b):undefined;
         if(p[2]==='ai-batches')data=method==='GET'?await core.vocabulary.list(actor,id):method==='POST'?await core.vocabulary.create(actor,key,id,b):undefined;
         if(p[2]==='monthly-quizzes')data=method==='GET'?await core.quizzes.list(actor,id,req.query):method==='POST'?await core.quizzes.create(actor,key,id,b):undefined;
+        if(method==='POST'&&p[2]==='checkin-makeup')data=await core.useCheckinMakeup(actor,key,id,b);
         if(method==='GET'&&p[2]==='calendar')data=await core.history.calendar(actor,id,req.query.month);
         if(method==='GET'&&p[2]==='wrong-words')data=await core.history.wrongWords(actor,id,req.query);
         if(method==='GET'&&p[2]==='today')data=await core.today(actor,id);
@@ -92,21 +145,26 @@ class ApiController {
   }
 }
 @Module({controllers:[ApiController]}) class AppModule{}
-export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime,encouragement?:EncouragementProvider,reader?:ImageReader}={}){
+export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime,encouragement?:EncouragementProvider,reader?:ImageReader,shareImages?:CheckinShareImageCache,aiFetch?:typeof fetch,paymentFetch?:typeof fetch}={}){
   const {db,source}=await connect(env.DATABASE_URL??'');
-  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary??await vocabularyProvider(env),options.audio??await audioRuntime(env),options.encouragement??await encouragementProvider(env),options.reader??imageReader(env));
+  const shareImages=options.shareImages??await checkinShareImageCache(env,db),runtime=options.audio??await audioRuntime(env);
+  accounts=new AiAccounts(db,env,options.aiFetch);payments=new AiPayments(db,accounts,env,options.paymentFetch);
+  privacy=new Privacy(db,env);lifecycle=new Lifecycle(db,runtime,shareImages);shareImages?.setAuthorization((q,actor,scope)=>privacy.authorizePoster(q,actor,scope));
+  core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary,runtime,options.encouragement,options.reader,shareImages,(q,actor)=>privacy.assertConsent(q,actor),options.vocabulary?undefined:accounts);
   const app=await NestFactory.create<NestExpressApplication>(AppModule,{bodyParser:false,logger:['error','warn']});
+  // Reject compressed bodies before decoding, including unauthenticated requests.
+  app.use((req:Request,res:Response,next:any)=>{const encoding=req.headers['content-encoding'];if(encoding&&String(encoding).trim().toLowerCase()!=='identity')return res.status(415).json({error:{code:'CONTENT_ENCODING_UNSUPPORTED',message:'请发送未压缩的 JSON 请求'}});next();});
   // Larger bodies only on authenticated imports; all other JSON retains a small bound.
   app.use('/api/children/:child/import-file',async(req:Request,res:Response,next:any)=>{
     try{const auth=req.headers.authorization;ensure(auth?.startsWith('Bearer '),401,'UNAUTHENTICATED');await core.authenticate(auth!.slice(7));next();}catch{res.status(401).json({error:{code:'UNAUTHENTICATED'}});}
   });
   const importPath=(req:any)=>/^\/api\/children\/[^/]+\/import-file\/?$/.test(req.path);
-  app.useBodyParser('json',{limit:'6mb',type:importPath});
-  app.useBodyParser('json',{limit:'1mb',type:(req:any)=>!importPath(req)&&req.is('application/json')});
+  app.useBodyParser('json',{limit:'6mb',inflate:false,type:importPath});
+  app.useBodyParser('json',{limit:'1mb',inflate:false,type:(req:any)=>!importPath(req)&&req.is('application/json')});
   app.use((err:any,_req:Request,res:Response,next:any)=>{if(err?.type==='entity.too.large')return res.status(413).json({error:{code:'IMPORT_FILE_TOO_LARGE'}});if(err instanceof SyntaxError)return res.status(422).json({error:{code:'INVALID_REQUEST_BODY'}});next(err);});
   await app.init();
   let cleanup:Promise<void>|undefined;
-  const purgeImports=()=>{if(!cleanup)cleanup=core.imports.purge().catch(()=>console.error('Import cache cleanup failed')).finally(()=>{cleanup=undefined;});};
+  const purgeImports=()=>{if(!cleanup)cleanup=core.imports.purge().then(()=>lifecycle.purgeEphemeral()).catch(()=>console.error('Import cache cleanup failed')).finally(()=>{cleanup=undefined;});};
   purgeImports();const cleanupTimer=setInterval(purgeImports,3600000);cleanupTimer.unref();
   let preparation:Promise<void>|undefined;
   const timer=setInterval(()=>{if(preparation)return;preparation=core.quizzes.prepare(new StoredMeaningQuizBuilder()).then(()=>{}).catch(()=>console.error('Quiz preparation cycle failed')).finally(()=>{preparation=undefined;});},2000);timer.unref();
@@ -114,11 +172,16 @@ export async function createApplication(options:{vocabulary?:VocabularyProvider,
   const aiTimer=setInterval(()=>{if(generation)return;generation=core.vocabulary.processOne().catch(()=>{console.error('Vocabulary generation cycle failed');}).finally(()=>{generation=undefined;});},1000);aiTimer.unref();
   let audioWork:Promise<void>|undefined;
   const audioTimer=setInterval(()=>{if(audioWork)return;audioWork=core.audio.previews.processOne().then(()=>core.audio.processOne()).catch(()=>console.error('Audio generation cycle failed')).finally(()=>{audioWork=undefined;});},1000);audioTimer.unref();
+  const shareImageWorkers=new Set<Promise<void>>();
+  const shareImageTimer=setInterval(()=>{if(shareImageWorkers.size>=3)return;let work:Promise<void>;work=core.checkinShare.processImageOne().then(()=>{}).catch(()=>console.error('Share poster generation cycle failed')).finally(()=>{shareImageWorkers.delete(work);});shareImageWorkers.add(work);},1000);shareImageTimer.unref();
+  let deletionWork:Promise<void>|undefined;
+  const deletionTimer=setInterval(()=>{if(!deletionWork)deletionWork=lifecycle.processOne().catch(()=>console.error('Deletion cycle failed')).finally(()=>{deletionWork=undefined;});},1000);deletionTimer.unref();
+  let billingWork:Promise<void>|undefined;const billingTimer=setInterval(()=>{if(!billingWork)billingWork=accounts.sweep().then(()=>payments.reconcile()).catch(()=>console.error('AI account maintenance failed')).finally(()=>{billingWork=undefined;});},30000);billingTimer.unref();
   let disposing:Promise<void>|undefined;
   const dispose=()=>disposing??= (async()=>{
-   clearInterval(cleanupTimer);clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);
+   clearInterval(cleanupTimer);clearInterval(timer);clearInterval(aiTimer);clearInterval(audioTimer);clearInterval(shareImageTimer);clearInterval(deletionTimer);clearInterval(billingTimer);
    // Stop accepting requests, finish outstanding jobs, then close the database exactly once.
-   await app.close();await Promise.all([preparation,generation,audioWork,cleanup]);await source.destroy();
+   await app.close();await Promise.all([preparation,generation,audioWork,cleanup,deletionWork,billingWork,...shareImageWorkers]);await source.destroy();
   })();
   return {app,dispose};
 }

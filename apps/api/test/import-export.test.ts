@@ -27,7 +27,7 @@ test('CSV preserves quotes, newlines, Chinese and neutralizes spreadsheet formul
  for(const value of ['=cmd()',' +SUM(1)','@SUM(A1)','-1','\t=1'])assert(csvCell(value).startsWith('"\''));
 });
 test('scope, >200 word paging, arbitrary selection/all exclusions, OCR caching and budgets',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/007_import_attempts.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/007_import_attempts.sql','utf8'));
  const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))};
  let calls=0,revoke='',fail=false;const reader={profile:'test',read:async()=>{calls++;if(revoke)await pg.query("UPDATE wordmate.family_members SET status='removed' WHERE user_id=$1",[revoke]);if(fail)throw Error('provider failure');return 'airport\nluggage';}};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),{} as any,'test',()=>new Date(),undefined,undefined,undefined,reader);
@@ -37,11 +37,12 @@ test('scope, >200 word paging, arbitrary selection/all exclusions, OCR caching a
   let cursor:string|null=null,seen=new Set<string>();do{const page=await core.words(dad,c.id,{limit:100,...(cursor?{cursor}:{})});assert.equal(page.total,205);page.items.forEach((w:any)=>{assert(!seen.has(w.id));seen.add(w.id);});cursor=page.next_cursor;}while(cursor);assert.equal(seen.size,205);
   const selected=await core.exportWords(dad,c.id,{word_ids:[ids[0],ids[204]]});assert.equal(selected.count,2);assert(selected.content.startsWith('\uFEFF'));assert(selected.content.includes('"word0"'));assert(!selected.content.includes('"word1"'));
   assert.equal((await core.exportWords(dad,c.id,{all:true,excluded_ids:[ids[0]]})).count,204);
+  const scoped=await core.createWordbook(dad,'scoped-book',c.id,{name:'仅两词'});await pg.query('INSERT INTO wordmate.wordbook_words(child_id,wordbook_id,child_word_id) VALUES($1,$2,$3),($1,$2,$4)',[c.id,scoped.id,ids[0],ids[1]]);assert.equal((await core.words(dad,c.id,{wordbook_id:scoped.id})).total,2);assert.equal((await core.exportWords(dad,c.id,{all:true,wordbook_id:scoped.id})).count,2);assert.equal((await core.exportWords(dad,c.id,{word_ids:[ids[0]],wordbook_id:scoped.id})).count,1);await assert.rejects(core.exportWords(dad,c.id,{word_ids:[ids[2]],wordbook_id:scoped.id}),{code:'EXPORT_SELECTION_CHANGED'});
   await assert.rejects(core.exportWords(outsider,c.id,{all:true}),{code:'FAMILY_NOT_FOUND'});
   await assert.rejects(core.exportWords(dad,c.id,{word_ids:[ids[0],randomUUID()]}),{code:'EXPORT_SELECTION_CHANGED'});
   const input={name:'page.png',base64:png.toString('base64')};await assert.rejects(core.imports.extract(outsider,c.id,input),{code:'FAMILY_NOT_FOUND'});assert.equal(calls,0);
   assert.equal((await core.imports.extract(dad,c.id,{name:'words.txt',base64:Buffer.from('apple').toString('base64')})).text,'apple');assert.equal(calls,0);
-  assert.equal((await core.imports.extract(dad,c.id,input)).text,'airport\nluggage');assert.equal((await core.imports.extract(dad,c.id,input)).text,'airport\nluggage');assert.equal(calls,1);
+  assert.equal((await core.imports.extract(dad,c.id,input)).text,'airport\nluggage');const cached=await core.imports.extract(dad,c.id,input);assert.equal(cached.text,'airport\nluggage');assert.deepEqual(cached.prepared_items,[]);assert.equal(calls,1);
   const row=(await pg.query('SELECT * FROM wordmate.import_attempts')).rows[0];assert(!JSON.stringify(row).includes(input.base64));
   const changed={...input,base64:Buffer.concat([png,Buffer.from('different')]).toString('base64')};fail=true;for(let i=0;i<3;i++)await assert.rejects(core.imports.extract(dad,c.id,changed));await assert.rejects(core.imports.extract(dad,c.id,changed),{code:'IMPORT_ATTEMPTS_EXHAUSTED'});assert.equal(calls,4);fail=false;
   for(let i=0;i<26;i++)await pg.query("INSERT INTO wordmate.import_attempts(actor_id,child_id,digest,status) VALUES($1,$2,$3,'failed')",[dad,c.id,'budget-'+i]);
@@ -54,8 +55,12 @@ test('scope, >200 word paging, arbitrary selection/all exclusions, OCR caching a
 });
 test('vision adapter isolates credentials and image data; handles refusal, truncation, timeout',async()=>{
  const env={OCR_PROVIDER:'qwen',OCR_API_KEY:'private-test',OCR_WORKSPACE_ID:'workspace-test',OCR_MODEL:'qwen3.7-flash-2026-07-15'};let request:any;
- const reader=imageReader(env,(async(url:any,init:any)=>{request={url,init,body:JSON.parse(init.body)};return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({text:'airport'})}}]}));}) as any)!;
- assert.equal(await reader.read(png,'image/png'),'airport');assert(request.url.startsWith('https://workspace-test.cn-beijing.maas.aliyuncs.com/'));assert.equal(request.init.redirect,'error');assert(!JSON.stringify(request.body).includes(env.OCR_API_KEY));
+ const entry={input_index:0,input:'airport',status:'ok',lemma:'airport',part_of_speech:'noun',ipa_gb:'/ˈeəpɔːt/',ipa_us:'/ˈerpɔːrt/',meaning_zh:'机场',sentence_en:'We arrived at the airport.',sentence_zh:'我们到达了机场。',reason:null};
+ const reader=imageReader(env,(async(url:any,init:any)=>{request={url,init,body:JSON.parse(init.body)};return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({text:'airport',error:null,items:[entry]})}}]}));}) as any)!;
+ assert.deepEqual(await reader.readVocabulary!(png,'image/png','','travel'),{text:'airport',items:[entry]});assert(request.url.startsWith('https://workspace-test.cn-beijing.maas.aliyuncs.com/'));assert.equal(request.init.redirect,'error');assert.deepEqual(request.body.response_format,{type:'json_object'});assert.equal(request.body.messages[1].content.filter((x:any)=>x.type==='image_url').length,1);assert(!JSON.stringify(request.body).includes(env.OCR_API_KEY));
+ const words=['airport','luggage','delay'],items=words.map(word=>({input:word,status:'ok',lemma:word,part_of_speech:'n.',ipa_gb:'[ˈeəpɔːt]',ipa_us:'[ˈerpɔːrt]',meaning_zh:'机场',sentence_en:`We saw the ${word}.`,sentence_zh:`我们看到了${word}。`}));
+ const multi=imageReader(env,(async()=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({result:{items,explanation:'ignored'}})}}]}))) as any)!;
+ const multiResult=await multi.readVocabulary!(png,'image/png','','');assert.deepEqual(multiResult.items.map((x:any)=>x.input),words);assert(multiResult.text.includes('airport')&&multiResult.text.includes('luggage')&&multiResult.text.includes('delay'));
  for(const response of [{choices:[{finish_reason:'length'}]},{choices:[{finish_reason:'stop',message:{content:'invalid'}}]}]){const bad=imageReader(env,(async()=>new Response(JSON.stringify(response))) as any)!;await assert.rejects(bad.read(png,'image/png'),{code:'OCR_FAILED'});}
  assert.equal(imageReader({}),undefined);assert.throws(()=>imageReader({...env,OCR_WORKSPACE_ID:'attacker/../'}),{code:'OCR_CONFIGURATION_INVALID'});
 });

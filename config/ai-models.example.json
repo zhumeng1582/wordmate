@@ -1,0 +1,11 @@
+[
+  {
+    "id": "qwen",
+    "provider": "qwen",
+    "model": "REPLACE_WITH_VERIFIED_MODEL_ID",
+    "label": "千问",
+    "vision": false,
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "max_input_tokens": 65536
+  }
+]

@@ -9,21 +9,23 @@ import {Core} from '../src/core.ts';
 import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts';
 import type {Database} from '../src/ports.ts';
 import type {AudioRuntime} from '../src/audio-runtime.ts';
+import {audioCharacters,audioCost,audioTariff} from '../src/audio-tariff.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 async function fixture(){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/004_voice_previews.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/005_audio_autoplay.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/004_voice_previews.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/005_audio_autoplay.sql','utf8'));
+ for(const file of ['017_ai_accounts.sql','018_family_ai.sql','020_audio_billing.sql'])await pg.exec(readFileSync('apps/api/migrations/'+file,'utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  const spoolDir=await mkdtemp(join(tmpdir(),'word-audio-'));
  const objects=new Map<string,Uint8Array>();let calls=0,uploadError=false,readError=false,gate:Promise<void>|undefined,now=new Date();
  const bytes=Buffer.from('ID3-offline-audio-test');
- const runtime:AudioRuntime={profile:{provider:'test',model:'test',revision:'1'},voices:[{id:'gb',accent:'en-GB',gender:'Female'},{id:'us',accent:'en-US',gender:'Female'}],storageProfile:'test-storage',stores:{'test-storage':{put:async(k,b)=>{if(uploadError)throw Object.assign(Error(),{code:'AUDIO_STORAGE_UNAVAILABLE',retryable:true});objects.set(k,b);},stat:async k=>objects.has(k)?{size:objects.get(k)!.length}:null,get:async k=>{if(readError)throw Object.assign(Error(),{code:'AUDIO_STORAGE_ACCESS_DENIED'});const b=objects.get(k);if(!b)throw Object.assign(Error(),{code:'AUDIO_OBJECT_MISSING'});return b;}}},synthesize:async()=>{calls++;await gate;return {bytes};},spoolDir,childDaily:20,userDaily:40};
+ const runtime:AudioRuntime={profile:{provider:'test',model:'test',revision:'1'},voices:[{id:'gb',accent:'en-GB',gender:'Female'},{id:'us',accent:'en-US',gender:'Female'}],storageProfile:'test-storage',stores:{'test-storage':{put:async(k,b)=>{if(uploadError)throw Object.assign(Error(),{code:'AUDIO_STORAGE_UNAVAILABLE',retryable:true});objects.set(k,b);},stat:async k=>objects.has(k)?{size:objects.get(k)!.length}:null,get:async k=>{if(readError)throw Object.assign(Error(),{code:'AUDIO_STORAGE_ACCESS_DENIED'});const b=objects.get(k);if(!b)throw Object.assign(Error(),{code:'AUDIO_OBJECT_MISSING'});return b;}}},synthesize:async()=>{calls++;await gate;return {bytes};},spoolDir,pricePer10000Characters:'1'};
  const scheduler=await createScheduler();
  const newCore=()=>new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'test',()=>now,undefined,runtime),core=newCore();
  const dad=(await core.login('dev-dad')).user.id,mom=(await core.login('dev-mom')).user.id;
  const family=await core.createFamily(dad,'family',{name:'测试'}),child=await core.createChild(dad,'child',family.id,{nickname:'孩子'}),book=await core.createWordbook(dad,'book',child.id,{name:'词本'});
  const batch=await core.createBatch(dad,'batch',child.id,{wordbook_id:book.id,words:['apple','book']});
  await core.confirmBatch(dad,'confirm',batch.id,{expected_version:1,selections:batch.items.map((i:any)=>({item_id:i.id,action:'select',candidate_id:i.candidates[0].candidate_id}))});
- const words=(await core.words(dad,child.id)).items,request={word_id:words[0].id,content_version:1,accent:'en-GB',voice_id:'gb',speech_rate:1};
+ const words=(await core.words(dad,child.id)).items.sort((a:any,b:any)=>a.lemma.localeCompare(b.lemma)),request={word_id:words[0].id,content_version:1,accent:'en-GB',voice_id:'gb',speech_rate:1};
  return {pg,core,newCore,runtime,objects,bytes,dad,mom,child,words,request,calls:()=>calls,uploadFail:(v:boolean)=>uploadError=v,readFail:(v:boolean)=>readError=v,gate:(v:Promise<void>)=>gate=v,advance:(ms:number)=>now=new Date(now.getTime()+ms),close:async()=>{await pg.close();await rm(spoolDir,{recursive:true,force:true});}};
 }
 test('audio: cache survives service restart, accents separate, access and versions enforced',async()=>{
@@ -50,12 +52,52 @@ test('audio: concurrent workers claim once and failed upload reuses private spoo
   for(let n=0;n<100&&f.calls()===0;n++)await new Promise(r=>setTimeout(r,5));
   assert.equal(f.calls(),1);await f.newCore().audio.processOne();assert.equal(f.calls(),1);
   unblock();await work;assert.equal((await f.core.audio.get(f.dad,job.job_id)).status,'queued');
+  let wallet=(await f.pg.query('SELECT balance_micros,frozen_micros FROM wordmate.ai_family_wallets')).rows[0];assert.equal(Number(wallet.balance_micros),20000000);assert.equal(Number(wallet.frozen_micros),0);
   f.uploadFail(false);f.advance(6000);await f.newCore().audio.processOne();
   assert.equal((await f.core.audio.get(f.dad,job.job_id)).status,'succeeded');assert.equal(f.calls(),1);
   assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.audio_usage_events')).rows[0].n,1);
+  wallet=(await f.pg.query('SELECT balance_micros,frozen_micros FROM wordmate.ai_family_wallets')).rows[0];assert.equal(Number(wallet.balance_micros),19999500);assert.equal(Number(wallet.frozen_micros),0);assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,1);
  }finally{await f.close();}
 });
-test('audio: quota stops synthesis; forbidden storage access does not regenerate; missing object can retry',async()=>{
+test('audio billing counts Unicode input characters and rounds once in integer micro-CNY',()=>{
+ assert.equal(audioCharacters('中A文123'),8);assert.equal(audioCharacters('hello world.'),12);assert.equal(audioCharacters('😀'),1);
+ assert.equal(audioCost(5,audioTariff('cosyvoice-v3-flash','1')),500);assert.equal(audioCost(1,audioTariff('test','0.000001')),1);
+});
+test('audio: new generations exceed the old 20-attempt cap and each saved asset is charged once',async()=>{
+ const f=await fixture();try{
+  for(let i=0;i<21;i++){const job=await f.core.audio.create(f.dad,`rate-${i}`,{...f.request,speech_rate:0.5+i/100});await f.core.audio.processOne();assert.equal((await f.core.audio.get(f.dad,job.job_id)).status,'succeeded');}
+  const before=(await f.pg.query('SELECT balance_micros,frozen_micros FROM wordmate.ai_family_wallets')).rows[0];assert.equal(Number(before.balance_micros),20000000-21*500);assert.equal(Number(before.frozen_micros),0);assert.equal(f.calls(),21);
+  await f.core.audio.create(f.dad,'cached',{...f.request,speech_rate:0.5});await f.core.audio.processOne();assert.equal(f.calls(),21);assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,21);
+ }finally{await f.close();}
+});
+test('audio: concurrent reservations cannot overspend and insufficient funds do not consume synthesis retries',async()=>{
+ const f=await fixture();try{
+  await f.pg.query('UPDATE wordmate.ai_family_wallets SET balance_micros=500,gift_remaining_micros=500');let unblock!:()=>void;f.gate(new Promise(resolve=>unblock=resolve));
+  const first=await f.core.audio.create(f.dad,'first',f.request),second=await f.core.audio.create(f.dad,'second',{...f.request,speech_rate:1.1});const work=f.core.audio.processOne();
+  for(let i=0;i<100&&f.calls()===0;i++)await new Promise(resolve=>setTimeout(resolve,5));await f.newCore().audio.processOne();const denied=await f.core.audio.get(f.dad,second.job_id);assert.equal(denied.error_code,'AI_INSUFFICIENT_BALANCE');assert.equal(denied.attempts,0);assert.equal(f.calls(),1);
+  unblock();await work;assert.equal((await f.core.audio.get(f.dad,first.job_id)).status,'succeeded');const wallet=(await f.pg.query('SELECT balance_micros,frozen_micros FROM wordmate.ai_family_wallets')).rows[0];assert.equal(Number(wallet.balance_micros),0);assert.equal(Number(wallet.frozen_micros),0);
+ }finally{await f.close();}
+});
+test('audio: queued prices stay fixed and storage recovery does not charge a paid asset twice',async()=>{
+ const f=await fixture();try{
+  const job=await f.core.audio.create(f.dad,'quoted',f.request);f.runtime.pricePer10000Characters='2';await f.core.audio.processOne();let call=(await f.pg.query("SELECT charge_micros,tariff,billable_characters FROM wordmate.ai_calls WHERE kind='audio'")).rows[0];assert.equal(Number(call.charge_micros),500);assert.equal(call.tariff.yuan_per_10000_characters,'1');assert.equal(call.billable_characters,5);
+  f.objects.clear();await assert.rejects(f.core.audio.content(f.dad,job.audio_id),{code:'AUDIO_OBJECT_MISSING'});await f.core.audio.retry(f.dad,'recover',job.job_id);await f.core.audio.processOne();assert.equal((await f.core.audio.get(f.dad,job.job_id)).status,'succeeded');assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,1);
+ }finally{await f.close();}
+});
+test('audio: a job blocked by the removed quota can be retried without a retrospective debit',async()=>{
+ const f=await fixture();try{
+  const job=await f.core.audio.create(f.dad,'legacy-quota',f.request);await f.pg.query("UPDATE wordmate.generation_jobs SET status='failed',attempts=3,error_code='AUDIO_DAILY_LIMIT' WHERE id=$1",[job.job_id]);await f.pg.exec(readFileSync('apps/api/migrations/020_audio_billing.sql','utf8'));const reset=await f.core.audio.get(f.dad,job.job_id);assert.equal(reset.attempts,0);assert.equal(reset.retryable,true);assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,0);
+  await f.core.audio.retry(f.dad,'retry-legacy',job.job_id);await f.core.audio.processOne();assert.equal((await f.core.audio.get(f.dad,job.job_id)).status,'succeeded');assert.equal(f.calls(),1);
+ }finally{await f.close();}
+});
+test('audio: historical completed files remain playable without a new billing entry',async()=>{
+ const f=await fixture();try{
+  const job=await f.core.audio.create(f.dad,'old-cache',f.request);await f.core.audio.processOne();
+  await f.pg.exec("DELETE FROM wordmate.ai_family_wallet_entries WHERE kind='charge';DELETE FROM wordmate.ai_calls WHERE kind='audio';UPDATE wordmate.ai_family_wallets SET balance_micros=20000000,gift_remaining_micros=20000000;UPDATE wordmate.generation_jobs SET payload=payload-'billing_id'-'audio_tariff' WHERE kind='audio';");
+  assert.equal((await f.newCore().audio.create(f.dad,'reuse-old',f.request)).status,'succeeded');assert.deepEqual(await f.core.audio.content(f.dad,job.audio_id),f.bytes);assert.equal(f.calls(),1);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.ai_calls')).rows[0].n,0);
+ }finally{await f.close();}
+});
+test('audio: insufficient balance stops synthesis; forbidden storage access does not regenerate; missing object can retry',async()=>{
  const f=await fixture();try{
   const job=await f.core.audio.create(f.dad,'a',f.request);await f.core.audio.processOne();
   f.readFail(true);await assert.rejects(f.core.audio.content(f.dad,job.audio_id),{code:'AUDIO_STORAGE_UNAVAILABLE'});
@@ -64,8 +106,8 @@ test('audio: quota stops synthesis; forbidden storage access does not regenerate
   assert.equal((await f.core.audio.get(f.dad,job.job_id)).status,'failed');
   await f.core.audio.retry(f.dad,'retry',job.job_id);await f.core.audio.processOne();assert.equal(f.calls(),2);
   assert.equal((await f.core.audio.get(f.dad,job.job_id)).status,'succeeded');
-  f.runtime.childDaily=2;const next=await f.core.audio.create(f.dad,'next',{...f.request,word_id:f.words[1].id});await f.core.audio.processOne();
-  assert.equal((await f.core.audio.get(f.dad,next.job_id)).error_code,'AUDIO_DAILY_LIMIT');assert.equal(f.calls(),2);
+  await f.pg.query('UPDATE wordmate.ai_family_wallets SET balance_micros=0,gift_remaining_micros=0 WHERE family_id=$1',[f.child.family_id]);const next=await f.core.audio.create(f.dad,'next',{...f.request,word_id:f.words[1].id});await f.core.audio.processOne();
+  assert.equal((await f.core.audio.get(f.dad,next.job_id)).error_code,'AI_INSUFFICIENT_BALANCE');assert.equal(f.calls(),2);
  }finally{await f.close();}
 });
 test('audio: revoked membership during synthesis cannot commit; changed sentence cannot generate',async()=>{

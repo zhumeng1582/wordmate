@@ -8,11 +8,26 @@ CREATE TABLE users (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  wx_app_id text NOT NULL, wx_open_id text NOT NULL,
  display_name varchar(40) NOT NULL,
+ profile_version integer NOT NULL DEFAULT 1 CHECK(profile_version>0),
+ avatar_revision integer NOT NULL DEFAULT 0 CHECK(avatar_revision>=0),
+ avatar_mime text CHECK(avatar_mime IN ('image/jpeg','image/png')),
+ avatar_bytes bytea CHECK(octet_length(avatar_bytes)<=131072),
+ referral_code text NOT NULL UNIQUE DEFAULT lower(substr(replace(gen_random_uuid()::text,'-',''),1,16)),
  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted')),
  created_at timestamptz NOT NULL DEFAULT now(),
  UNIQUE(wx_app_id, wx_open_id)
 );
 COMMENT ON TABLE users IS '登录家长；账号注销时清除微信身份，孩子记录不级联删除';
+
+CREATE TABLE user_referrals (
+ invited_user_id uuid PRIMARY KEY REFERENCES users(id),
+ inviter_user_id uuid NOT NULL REFERENCES users(id),
+ referral_code text NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CHECK(invited_user_id <> inviter_user_id)
+);
+CREATE INDEX user_referrals_inviter_created_idx ON user_referrals(inviter_user_id,created_at DESC);
+COMMENT ON TABLE user_referrals IS '首次注册归因关系；每个受邀账号最多记录一个邀请人';
 
 CREATE TABLE auth_sessions (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,7 +75,7 @@ COMMENT ON TABLE family_invites IS '一次性邀请及待审批申请；领取�
 
 CREATE TABLE children (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), family_id uuid NOT NULL REFERENCES families(id),
- nickname varchar(40) NOT NULL, timezone text NOT NULL DEFAULT 'Asia/Shanghai',
+ nickname varchar(40) NOT NULL, school_grade text NOT NULL DEFAULT '', gender text NOT NULL DEFAULT 'unspecified' CHECK(gender IN ('unspecified','girl','boy')), timezone text NOT NULL DEFAULT 'Asia/Shanghai',
  accent text NOT NULL DEFAULT 'en-US' CHECK(accent IN ('en-US','en-GB')),
  voice_id text, speech_rate numeric(3,2) NOT NULL DEFAULT 1 CHECK(speech_rate BETWEEN 0.5 AND 1.5),
  level text NOT NULL DEFAULT 'A2' CHECK(level IN ('A1','A2','B1','B2','C1','C2')),
@@ -76,6 +91,7 @@ CREATE TABLE wordbooks (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
  name varchar(60) NOT NULL, created_by uuid REFERENCES users(id),
  version integer NOT NULL DEFAULT 1 CHECK(version > 0), archived_at timestamptz,
+ shared_source_id uuid, shared_source_version integer, read_only boolean NOT NULL DEFAULT false,
  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(id,child_id)
 );
 COMMENT ON TABLE wordbooks IS '孩子的单词本；跨本复用同一孩子的词与卡';
@@ -380,6 +396,49 @@ CREATE INDEX quizzes_by_month ON monthly_quizzes(child_id,month,created_at,id);
 CREATE INDEX mistakes_by_day ON mistake_events(child_id,local_date,child_word_id);
 CREATE INDEX mistakes_by_word ON mistake_events(child_id,child_word_id,occurred_at,id);
 CREATE INDEX daily_words_by_month ON daily_word_activity(child_id,local_date,child_word_id);
+CREATE TABLE shared_wordbooks (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_wordbook_id uuid NOT NULL, source_child_id uuid NOT NULL,
+ publisher_user_id uuid NOT NULL REFERENCES users(id), title varchar(60) NOT NULL,
+ description varchar(300) NOT NULL DEFAULT '', target_level varchar(40) NOT NULL DEFAULT '',
+ version integer NOT NULL DEFAULT 1 CHECK(version>0), published boolean NOT NULL DEFAULT false,
+ word_count integer NOT NULL DEFAULT 0 CHECK(word_count>=0), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(source_wordbook_id), UNIQUE(id,source_child_id),
+ FOREIGN KEY(source_wordbook_id,source_child_id) REFERENCES wordbooks(id,child_id)
+);
+CREATE TABLE shared_wordbook_items (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), shared_wordbook_id uuid NOT NULL REFERENCES shared_wordbooks(id) ON DELETE CASCADE,
+ ordinal integer NOT NULL CHECK(ordinal>0), lemma varchar(120) NOT NULL, normalized_lemma varchar(120) NOT NULL,
+ part_of_speech varchar(24) NOT NULL, sense_key text NOT NULL, meaning_zh varchar(500) NOT NULL,
+ ipa_gb text, ipa_us text, example_en text, example_zh text,
+ UNIQUE(shared_wordbook_id,ordinal), UNIQUE(shared_wordbook_id,normalized_lemma,part_of_speech,sense_key)
+);
+CREATE TABLE shared_wordbook_subscriptions (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), shared_wordbook_id uuid NOT NULL REFERENCES shared_wordbooks(id),
+ child_id uuid NOT NULL REFERENCES children(id), local_wordbook_id uuid NOT NULL, shared_version integer NOT NULL,
+ active boolean NOT NULL DEFAULT true, joined_by uuid NOT NULL REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(shared_wordbook_id,child_id), FOREIGN KEY(local_wordbook_id,child_id) REFERENCES wordbooks(id,child_id)
+);
+ALTER TABLE wordbooks ADD FOREIGN KEY(shared_source_id) REFERENCES shared_wordbooks(id);
+CREATE INDEX shared_wordbooks_public_search ON shared_wordbooks(published,updated_at DESC);
+CREATE INDEX shared_wordbook_subscriptions_child ON shared_wordbook_subscriptions(child_id,active);
+CREATE TABLE checkin_makeup_credits (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ child_id uuid NOT NULL REFERENCES children(id),
+ streak_start date NOT NULL,
+ milestone_days integer NOT NULL CHECK(milestone_days>=15 AND milestone_days%15=0),
+ milestone_date date NOT NULL,
+ earned_at timestamptz NOT NULL DEFAULT now(),
+ used_for_date date,
+ used_at timestamptz,
+ used_by uuid REFERENCES users(id),
+ UNIQUE(child_id,streak_start,milestone_days),
+ CHECK((used_for_date IS NULL AND used_at IS NULL AND used_by IS NULL) OR
+       (used_for_date IS NOT NULL AND used_at IS NOT NULL AND used_by IS NOT NULL))
+);
+CREATE UNIQUE INDEX checkin_makeup_once_per_day
+ ON checkin_makeup_credits(child_id,used_for_date) WHERE used_for_date IS NOT NULL;
+CREATE INDEX checkin_makeup_available
+ ON checkin_makeup_credits(child_id,earned_at,id) WHERE used_for_date IS NULL;
 -- 行级业务权限由服务端检查；不可变事件、选项合法性、状态转换及精确词关联还需事务业务层。
 
 COMMIT;

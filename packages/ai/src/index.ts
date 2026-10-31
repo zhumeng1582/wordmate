@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 export type Provider = 'openai' | 'qwen' | 'deepseek';
 export type Fetch = typeof globalThis.fetch;
 export type JsonRequest<T> = {
+  images?: string[];
   name: string;
   schema: Record<string, unknown>;
   instructions: string;
@@ -44,14 +45,16 @@ async function json(response: Response): Promise<any> {
   catch { throw new ProviderError('UPSTREAM_INVALID_JSON', true); }
 }
 export function createTextGenerator(env: Record<string, string | undefined> = process.env, fetcher: Fetch = fetch): TextGenerator {
-  const provider = env.LLM_PROVIDER || 'deepseek';
+  const provider = env.LLM_PROVIDER || 'qwen';
   if (provider !== 'openai' && provider !== 'qwen' && provider !== 'deepseek') throw new ProviderError('UNSUPPORTED_LLM_PROVIDER');
   const prefix = provider === 'openai' ? 'OPENAI' : provider === 'deepseek' ? 'DEEPSEEK' : 'QWEN';
-  const apiKey = required(env, `${prefix}_API_KEY`);
-  const model = required(env, `${prefix}_MODEL`);
+  // The Qwen OCR and vocabulary services may share one Bailian workspace key.
+  // Explicit QWEN_* values still take precedence when the two services diverge.
+  const apiKey = provider === 'qwen' ? (env.QWEN_API_KEY || env.OCR_API_KEY || required(env, 'QWEN_API_KEY')) : required(env, `${prefix}_API_KEY`);
+  const model = provider === 'qwen' ? (env.QWEN_MODEL || env.OCR_MODEL || required(env, 'QWEN_MODEL')) : required(env, `${prefix}_MODEL`);
   let base = provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com/v1';
   if (provider === 'qwen') {
-    base = required(env, 'QWEN_BASE_URL').replace(/\/$/, '');
+    base = (env.QWEN_BASE_URL || (env.OCR_WORKSPACE_ID ? `https://${env.OCR_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` : required(env, 'QWEN_BASE_URL'))).replace(/\/$/, '');
     const url = new URL(base);
     if (url.protocol !== 'https:' || !url.hostname.endsWith('.aliyuncs.com') || url.username || url.password || url.search || url.hash || url.port)
       throw new ProviderError('INVALID_QWEN_BASE_URL');
@@ -59,13 +62,14 @@ export function createTextGenerator(env: Record<string, string | undefined> = pr
   return {
     async generate<T>(r: JsonRequest<T>) {
       if (typeof r.validate !== 'function') throw new ProviderError('VALIDATOR_REQUIRED');
+      if(r.images?.length && provider==='deepseek')throw new ProviderError('VISION_NOT_SUPPORTED');
       const format = { type: 'json_schema', name: r.name, strict: true, schema: r.schema };
       const userInput = JSON.stringify(r.input);
       const body = provider === 'openai'
-        ? { model, store: false, instructions: r.instructions, input: userInput, text: { format }, max_output_tokens: 8192 }
+        ? { model, store: false, instructions: r.instructions, input:r.images?.length?[{role:'user',content:[{type:'input_text',text:userInput},...r.images.map(image_url=>({type:'input_image',image_url,detail:'auto'}))]}]:userInput, text: { format }, max_output_tokens: 8192 }
          : provider === 'deepseek'
         ? { model, thinking: { type: 'disabled' }, messages: [{ role: 'system', content: `${r.instructions}\nReturn only a JSON object. Follow this JSON Schema exactly: ${JSON.stringify(r.schema)}` }, { role: 'user', content: userInput }], response_format: { type: 'json_object' }, max_tokens: 8192 }
-        : { model, enable_thinking: false, messages: [{ role: 'system', content: r.instructions }, { role: 'user', content: userInput }],
+        : { model, enable_thinking: false, messages: [{ role: 'system', content: r.instructions }, { role: 'user', content:r.images?.length?[{type:'text',text:userInput},...r.images.map(url=>({type:'image_url',image_url:{url}}))]:userInput }],
             response_format: { type: 'json_schema', json_schema: { name: r.name, strict: true, schema: r.schema } }, max_tokens: 8192 };
       const response = await request(fetcher, `${base}/${provider === 'openai' ? 'responses' : 'chat/completions'}`, {
         method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),

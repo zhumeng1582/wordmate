@@ -3,7 +3,7 @@
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["oss:GetObject", "oss:PutObject"],
+      "Action": ["oss:GetObject", "oss:PutObject", "oss:DeleteObject"],
       "Resource": ["acs:oss:*:*:REPLACE_WITH_TEST_BUCKET/staging/audio/*"]
     }
   ]

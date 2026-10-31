@@ -12,7 +12,7 @@ test('grading uses exact integer thresholds, including rounded-display boundarie
  for(const [right,total,expected] of [[90,100,'excellent'],[89,100,'good'],[80,100,'good'],[79,100,'pass'],[60,100,'pass'],[59,100,'needs_work'],[8999,10000,'good'],[0,1,'needs_work'],[1,1,'excellent']] as const)assert.equal(grade(right,total),expected);
 });
 test('monthly scope, frozen questions, leases, answer replay, grading and immutable mistakes',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'test',()=>now),svc=core.quizzes;
  try{
@@ -39,18 +39,22 @@ test('monthly scope, frozen questions, leases, answer replay, grading and immuta
   await svc.prepare(new FixtureQuizBuilder());quiz=await svc.get(dad,quiz.id);assert.equal(quiz.status,'ready');
   const page=await svc.items(dad,quiz.id,{limit:2});assert.equal(page.items.length,2);assert(page.next_cursor);const page2=await svc.items(dad,quiz.id,{limit:2,cursor:page.next_cursor});assert.equal(page2.items.length,2);assert.equal(page2.next_cursor,null);
   assert(!JSON.stringify(page).includes('correct_option_id'));assert(!JSON.stringify(page).includes('meaning_zh'));
+  for(const item of [...page.items,...page2.items]){const word=(await pg.query('SELECT child_word_id,word_snapshot FROM wordmate.monthly_quiz_items WHERE id=$1',[item.id])).rows[0];assert.deepEqual(item.word,{id:word.child_word_id,lemma:word.word_snapshot.lemma,version:word.word_snapshot.version});assert.deepEqual(Object.keys(item.word).sort(),['id','lemma','version']);}
   let started=await svc.resume(dad,'resume',quiz.id,{expected_version:quiz.version});quiz=started.quiz;let session=started.session;
   await assert.rejects(core.startSession(mom,'blocked-review',c.id,{source:'scheduled'}),{code:'CHILD_BUSY'});
   const all=[...page.items,...page2.items],answers=(await pg.query('SELECT id,correct_option_id FROM wordmate.monthly_quiz_items WHERE quiz_id=$1',[quiz.id])).rows;
   const correctId=(id:string)=>answers.find((a:any)=>a.id===id).correct_option_id;
   const b={expected_version:all[0].answer_version,session_id:session.id,lease_generation:session.lease_generation,selected_option_id:correctId(all[0].id)};
   await assert.rejects(svc.answer(dad,'badoption',quiz.id,all[0].id,{...b,selected_option_id:correctId(all[1].id)}),{code:'INVALID_OPTION'});
-  const saved=await svc.answer(dad,'answer0',quiz.id,all[0].id,b);assert.deepEqual(await svc.answer(dad,'answer0',quiz.id,all[0].id,b),saved);
+  const saved=await svc.answer(dad,'answer0',quiz.id,all[0].id,b);assert.equal('is_correct'in saved,false);assert.deepEqual(await svc.answer(dad,'answer0',quiz.id,all[0].id,b),saved);const resumedAnswers=await svc.items(dad,quiz.id,{limit:2});assert.equal(resumedAnswers.items[0].correct_option_id,correctId(all[0].id));assert.equal(resumedAnswers.items[0].selected_option_id,correctId(all[0].id));assert(!('correct_option_id' in resumedAnswers.items[1]));
+  await assert.rejects(svc.answer(dad,'rewrite-locked',quiz.id,all[0].id,{...b,expected_version:saved.item.answer_version,selected_option_id:all[0].options.find((o:any)=>o.id!==correctId(all[0].id)).id}),{code:'ANSWER_LOCKED'});
+  await assert.rejects(svc.answer(dad,'clear-locked',quiz.id,all[0].id,{...b,expected_version:saved.item.answer_version,selected_option_id:null}),{code:'ANSWER_LOCKED'});
+  const flagged=await svc.answer(dad,'flag-after-answer',quiz.id,all[0].id,{expected_version:saved.item.answer_version,session_id:session.id,lease_generation:session.lease_generation,flagged:true});assert.equal(flagged.item.flagged,true);assert.equal(flagged.item.selected_option_id,correctId(all[0].id));
   await assert.rejects(svc.answer(dad,'stale',quiz.id,all[0].id,b),{code:'ANSWER_VERSION_CONFLICT'});
   quiz=await svc.get(dad,quiz.id);
   const takeover=await svc.resume(mom,'takeover',quiz.id,{expected_version:quiz.version,expected_session_id:session.id,confirmed:true},true);quiz=takeover.quiz;
   await assert.rejects(svc.answer(dad,'old-parent',quiz.id,all[1].id,{...b,expected_version:1}),{code:'SESSION_EXPIRED'});session=takeover.session;
-  for(let i=1;i<3;i++){const result=await svc.answer(mom,`answer${i}`,quiz.id,all[i].id,{expected_version:1,session_id:session.id,lease_generation:session.lease_generation,selected_option_id:i===1?correctId(all[i].id):all[i].options.find((o:any)=>o.id!==correctId(all[i].id)).id});quiz.version=result.quiz_version;}
+  for(let i=1;i<3;i++){const result=await svc.answer(mom,`answer${i}`,quiz.id,all[i].id,{expected_version:1,session_id:session.id,lease_generation:session.lease_generation,selected_option_id:i===1?correctId(all[i].id):all[i].options.find((o:any)=>o.id!==correctId(all[i].id)).id});assert.equal('is_correct'in result,false);quiz.version=result.quiz_version;}
   const submit={expected_version:quiz.version,session_id:session.id,lease_generation:session.lease_generation,confirm_unanswered:false};
   await assert.rejects(svc.submit(mom,'submit-no',quiz.id,submit),{code:'CONFIRM_UNANSWERED'});
   assert.equal((await pg.query("SELECT count(*)::int n FROM wordmate.mistake_events WHERE source='monthly_quiz'")).rows[0].n,0);
@@ -67,7 +71,7 @@ test('monthly scope, frozen questions, leases, answer replay, grading and immuta
  }finally{await pg.close();}
 });
 test('full test keeps all 105 eligible entries, pages safely, and expired sessions cannot answer',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'large',()=>now),svc=core.quizzes;
  try{

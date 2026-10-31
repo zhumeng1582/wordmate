@@ -7,10 +7,22 @@ import {Core} from '../src/core.ts';
 import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts';
 import type {Database} from '../src/ports.ts';
 import type {VocabularyProvider} from '../src/vocabulary.ts';
+import {validateVocabularyItems} from '../../../packages/ai/src/vocabulary.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 const result=(word:string,i:number)=>({input_index:i,input:word,status:'ok',lemma:word,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:`测试${word}`,sentence_en:`I see the ${word}.`,sentence_zh:`我看到了${word}。`,reason:null});
+test('vision-prepared vocabulary is revalidated and saved without a second model request',async()=>{
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};let modelCalls=0;
+ const provider:VocabularyProvider={provider:'qwen',model:'vision-test',promptVersion:'test',generate:async()=>{modelCalls++;throw Error('must not call model');},validate:(words,items,theme,level)=>validateVocabularyItems(words,items,theme,level)};
+ const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'vision-test',()=>new Date(),provider);
+ try{const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'vision-family',{name:'Vision'}),c=await core.createChild(dad,'vision-child',f.id,{nickname:'孩子'}),b=await core.createWordbook(dad,'vision-book',c.id,{name:'词本'});
+  const job=await core.vocabulary.create(dad,'vision-create',c.id,{wordbook_id:b.id,raw_text:'airport',source_type:'vision',prepared_items:[result('airport',0)],theme:'travel'});
+  await core.vocabulary.processOne();assert.equal((await core.vocabulary.get(dad,job.id)).status,'succeeded');assert.equal((await core.words(dad,c.id)).items.length,1);assert.equal(modelCalls,0);
+  await assert.rejects(core.vocabulary.create(dad,'bad-vision',c.id,{wordbook_id:b.id,raw_text:'airport',source_type:'vision',prepared_items:[{...result('airport',0),sentence_en:'The plane arrived.'}]}),{code:'GENERATED_CONTENT_REJECTED'});
+ }finally{await pg.close();}
+});
 test('AI jobs: shared permissions, persistent dedupe, partial retry, atomic save and review eligibility',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let mode='partial',calls:string[][]=[];let now=new Date();
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',generate:async words=>{calls.push(words);return {items:words.map((w,i)=>mode==='partial'&&w==='testword'?{input_index:i,input:w,status:'invalid',reason:'无法识别'}:mode==='broken'&&i===1?{...result(w,i),sentence_en:'Missing target.'}:result(w,i))};}};
@@ -42,7 +54,7 @@ test('AI jobs: shared permissions, persistent dedupe, partial retry, atomic save
  }finally{await pg.close();}
 });
 test('AI network calls hold no transaction; membership revoked before completion prevents saving',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let finish!:(v:any)=>void,started!:()=>void;const entered=new Promise<void>(r=>started=r);
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',generate:async()=>{started();return new Promise(r=>finish=r);}};
@@ -58,7 +70,7 @@ test('AI network calls hold no transaction; membership revoked before completion
 test('Chinese list separators are split before persistence; old malformed jobs cannot incur a retry',async()=>{
  const {splitVocabularyInput}=await import('../../miniapp/src/utils/vocabulary-input.ts');
  assert.deepEqual(splitVocabularyInput('airport、 luggage；delay;ice cream，book\r\ncat'),['airport','luggage','delay','ice cream','book','cat']);
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};let calls=0;
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',generate:async words=>{calls++;assert.deepEqual(words,['airport','luggage','delay']);return {items:words.map(result)};}};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'split',()=>new Date(),provider);
@@ -75,7 +87,7 @@ test('Chinese list separators are split before persistence; old malformed jobs c
 });
 
 test('raw text jobs preserve input, reject secrets before calls, enforce quotas and handle empty extraction',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let captured='',calls=0,mode='ok';const raw='编号\t词汇\t意思\n1、cat 猫\n2｜dog 狗';
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',rawPromptVersion:'raw-test',generate:async()=>{throw Error('not expected');},generateRaw:async input=>{calls++;captured=input;return mode==='empty'?{items:[],error:'NO_WORDS_FOUND'}:{items:['cat','dog'].map(result),error:null};}};
@@ -104,6 +116,7 @@ test('raw text jobs preserve input, reject secrets before calls, enforce quotas 
  assert.equal((await core.words(dad,c.id)).items.length,2);
  // Simulate ten prior jobs with three attempts each, without external calls.
  await pg.query(`INSERT INTO wordmate.generation_jobs(child_id,requested_by,kind,dedupe_key,payload,status,attempts,max_attempts) SELECT $1,$2,'sentences','quota:'||n,'{"flow":"vocabulary_v1"}'::jsonb,'failed',3,3 FROM generate_series(1,10) n`,[c.id,dad]);
+ await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const limited=await create('limit','apple');const before=calls;await core.vocabulary.processOne();assert.equal(calls,before);assert.equal((await core.vocabulary.get(dad,limited.id)).error_code,'AI_DAILY_LIMIT');
  }finally{await pg.close();}
 });

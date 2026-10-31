@@ -1,13 +1,13 @@
 Wordmate 0.1 服务端 AI/TTS 适配层
 
-现已实现：DeepSeek Chat Completions（默认，JSON Object）、OpenAI Responses、千问 Chat Completions（JSON Schema）、阿里云CosyVoice北京HTTP。
+现已实现：千问 Chat Completions（默认，JSON Schema）、OpenAI Responses、DeepSeek Chat Completions（显式配置时使用）、阿里云CosyVoice北京HTTP。
 统一 TextGenerator.generate 接口；TtsProvider 独立，不随大模型供应商切换。
 其他供应商必须新增并验证适配器，不能仅换base_url就假设协议兼容。
 文本生成现已接入NestJS后台持久任务与自动保存；TTS/OSS尚未接入。业务边界见 apps/AI-VOCABULARY.txt。
 
 配置
 项目根目录.env.example复制为.env，仅服务器加载；不要提交真实密钥或放进小程序。
-LLM_PROVIDER=deepseek（默认）：读取 DEEPSEEK_API_KEY、DEEPSEEK_MODEL；当前配置 deepseek-flash，固定官方 https://api.deepseek.com/chat/completions。关闭 thinking，使用 json_object，将 Schema 写入提示词，业务 validate 仍必须执行。JSON 模式不保证符合 Schema。
+LLM_PROVIDER=qwen（默认）：读取 QWEN_API_KEY、QWEN_MODEL、QWEN_BASE_URL；也可复用 OCR_API_KEY、OCR_MODEL、OCR_WORKSPACE_ID。当前验证模型为 qwen3.7-flash-2026-07-15，百炼兼容接口使用 JSON Schema，并继续执行业务层 validate。
 LLM_PROVIDER=openai：读取OPENAI_API_KEY和OPENAI_MODEL，调用官方Responses API。
 LLM_PROVIDER=qwen：读取QWEN_API_KEY、QWEN_MODEL、QWEN_BASE_URL。
 三家凭证隔离，模型ID必填；不猜测账号可用模型，不静默切换或降级。

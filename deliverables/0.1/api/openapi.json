@@ -2444,7 +2444,7 @@
         "tags": [
           "孩子"
         ],
-        "description": "\n权限：owner",
+        "description": "仅当前家庭管理员可创建孩子档案，包括旧幂等请求重放；普通有效家长仍可访问和陪学。",
         "x-role": "owner",
         "responses": {
           "201": {
@@ -2581,6 +2581,26 @@
                     "description": "",
                     "minLength": 1,
                     "maxLength": 40
+                  },
+                  "accent": {
+                    "type": "string",
+                    "enum": [
+                      "en-GB",
+                      "en-US"
+                    ]
+                  },
+                  "school_grade": {
+                    "type": "string",
+                    "maxLength": 24,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "enum": [
+                      "unspecified",
+                      "girl",
+                      "boy"
+                    ]
                   }
                 },
                 "required": [
@@ -5592,6 +5612,31 @@
               }
             }
           },
+          "202": {
+            "description": "已排队",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AudioJob"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "description": ""
+                }
+              }
+            }
+          },
           "400": {
             "description": "请求格式错误",
             "content": {
@@ -5668,31 +5713,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "已排队",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "request_id": {
-                      "type": "string",
-                      "description": ""
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/AudioJob"
-                    }
-                  },
-                  "required": [
-                    "request_id",
-                    "data"
-                  ],
-                  "description": ""
                 }
               }
             }
@@ -7373,7 +7393,7 @@
                         "items": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/ReviewCard"
+                            "$ref": "#/components/schemas/StudyCard"
                           }
                         },
                         "next_cursor": {
@@ -7385,11 +7405,22 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "移除不可学习的未答项后的队列总数"
+                        },
+                        "remaining": {
+                          "type": "integer",
+                          "minimum": 0
                         }
                       },
                       "required": [
                         "items",
-                        "next_cursor"
+                        "next_cursor",
+                        "total",
+                        "remaining"
                       ],
                       "description": ""
                     }
@@ -7944,7 +7975,7 @@
           "单词"
         ],
         "x-role": "member",
-        "description": "已实现：按创建时间和ID倒序，cursor为上页最后单词ID，limit默认50且最大100，返回total。当前不支持q、wordbook_id、marks、include_archived；搜索和标注筛选仍待开发。",
+        "description": "按创建时间和ID倒序分页，cursor为上一页最后单词ID，limit默认50且最大100，返回total。支持q匹配英文单词/中文释义，以及mark筛选 easy、error_prone、favorite、needs_correction。标注与待处理纠错状态随词条返回。",
         "parameters": [
           {
             "in": "path",
@@ -7971,6 +8002,29 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "in": "query",
+            "name": "mark",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "easy",
+                "error_prone",
+                "favorite",
+                "needs_correction"
+              ]
             }
           }
         ],
@@ -8060,6 +8114,9 @@
                                     ]
                                   }
                                 ]
+                              },
+                              "annotations": {
+                                "$ref": "#/components/schemas/Annotations"
                               }
                             },
                             "required": [
@@ -8071,7 +8128,8 @@
                               "ipa_gb",
                               "ipa_us",
                               "dictionary_source",
-                              "example"
+                              "example",
+                              "annotations"
                             ]
                           }
                         },
@@ -11856,7 +11914,7 @@
           "月测"
         ],
         "x-role": "member",
-        "description": "准备完成后可读，前后均不在本接口返回答案；答案只能从submitted results接口读取。\n权限：member",
+        "description": "有效家庭成员按页读取。未答题不返回正确选项；in_progress 且首次选择已保存的题可返回即时反馈。结果和词义快照在交卷后使用结果接口读取。",
         "parameters": [
           {
             "in": "path",
@@ -11905,7 +11963,14 @@
                         "items": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/QuizItem"
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/QuizItem"
+                              },
+                              {
+                                "$ref": "#/components/schemas/QuizAnsweredItem"
+                              }
+                            ]
                           }
                         },
                         "next_cursor": {
@@ -12036,7 +12101,7 @@
           "月测"
         ],
         "x-role": "member",
-        "description": "仅in_progress，校验有效持租约人、代次、题版本；null清空答案；选项必须来自该题；递增题与测验版本，同事务完成。\n权限：member",
+        "description": "仅 in_progress，校验有效持租约人、代次及题版本。首次选择在服务端保存后返回该题反馈；已保存的选择不能改成其他选项或清空（409 ANSWER_LOCKED），可继续更新标记。相同请求安全重放，不预发其他未答题答案。",
         "parameters": [
           {
             "in": "path",
@@ -12077,7 +12142,14 @@
                       "additionalProperties": false,
                       "properties": {
                         "item": {
-                          "$ref": "#/components/schemas/QuizItem"
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/QuizItem"
+                            },
+                            {
+                              "$ref": "#/components/schemas/QuizAnsweredItem"
+                            }
+                          ]
                         },
                         "quiz_version": {
                           "type": "integer",
@@ -13186,7 +13258,7 @@
         "tags": [
           "AI"
         ],
-        "description": "仅发起者；failed时置queued、清零attempts，沿用原ID与phase继续。queued/running/succeeded返回当前状态，不重复创建。事务检查与幂等键防并发重试；目标仍冻结。",
+        "description": "仅发起者，撤回后可用；failed 时沿用任务 ID 和已清理的文件记录继续执行，重复重试返回当前状态。目标保持冻结。",
         "x-role": "authenticated",
         "responses": {
           "200": {
@@ -13469,6 +13541,43 @@
                         "maxLength": 80
                       }
                     }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "wordbook_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "source_type": {
+                        "type": "string",
+                        "const": "vision"
+                      },
+                      "raw_text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 8000
+                      },
+                      "prepared_items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 30,
+                        "items": {
+                          "$ref": "#/components/schemas/VocabularyGenerationItem"
+                        }
+                      },
+                      "theme": {
+                        "type": "string",
+                        "maxLength": 80
+                      }
+                    },
+                    "required": [
+                      "wordbook_id",
+                      "source_type",
+                      "raw_text",
+                      "prepared_items"
+                    ]
                   },
                   {
                     "type": "object",
@@ -14390,6 +14499,31 @@
               }
             }
           },
+          "202": {
+            "description": "已排队",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VoicePreview"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "description": ""
+                }
+              }
+            }
+          },
           "400": {
             "description": "请求格式错误",
             "content": {
@@ -14466,31 +14600,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "已排队",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "request_id": {
-                      "type": "string",
-                      "description": ""
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/VoicePreview"
-                    }
-                  },
-                  "required": [
-                    "request_id",
-                    "data"
-                  ],
-                  "description": ""
                 }
               }
             }
@@ -14933,12 +15042,12 @@
     "/children/{child_id}/import-file": {
       "post": {
         "operationId": "post_children_child_id_import_file",
-        "summary": "提取图片或文档中的文字",
+        "summary": "识别图片并生成词条，或提取文档文字",
         "tags": [
           "单词"
         ],
         "x-role": "member",
-        "description": "家庭成员权限；单文件最大4 MiB，base64 JSON请求最大6 MiB。支持JPG/PNG/TXT/CSV/TSV/XLSX/DOCX，UTF-8文本。Office压缩包最多256条目/展开8MiB/单条目2MiB，拒绝宏、嵌入对象、DTD和公式。结果最多8000字符，超限不截断。图片独立OCR，30次/账号/24小时，每相同图片最多3次失败；成功结果按账号/孩子/模型/摘要复用24小时。原文件不落盘，文字缓存按小时清理。返回文字供原AI录词接口使用，不直接创建单词。",
+        "description": "家庭成员权限；单文件最大4 MiB，base64 JSON请求最大6 MiB。支持JPG/PNG/TXT/CSV/TSV/XLSX/DOCX。图片通过一次Qwen视觉请求同时识别文字并生成最多30个完整词条；返回预生成条目供录词接口复用，避免第二次模型调用。可带existing_text与theme。文档只提取文字，后续走常规AI录词。结果最多8000字符；原文件不落盘，识别文本与生成结果按账号/孩子/模型/内容摘要缓存24小时，30次/账号/24小时，同一图片最多3次失败。",
         "parameters": [
           {
             "in": "path",
@@ -14975,6 +15084,14 @@
                             "file",
                             "image"
                           ]
+                        },
+                        "prepared_items": {
+                          "type": "array",
+                          "minItems": 0,
+                          "maxItems": 30,
+                          "items": {
+                            "$ref": "#/components/schemas/VocabularyGenerationItem"
+                          }
                         }
                       },
                       "required": [
@@ -15093,11 +15210,21 @@
                 "properties": {
                   "name": {
                     "type": "string",
+                    "minLength": 1,
                     "maxLength": 120
                   },
                   "base64": {
                     "type": "string",
+                    "minLength": 1,
                     "maxLength": 5592408
+                  },
+                  "existing_text": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "theme": {
+                    "type": "string",
+                    "maxLength": 80
                   }
                 },
                 "required": [
@@ -15109,6 +15236,2670 @@
           }
         },
         "x-implementation": "implemented"
+      }
+    },
+    "/privacy/policy": {
+      "get": {
+        "operationId": "get_privacy_policy",
+        "summary": "当前隐私政策",
+        "tags": [
+          "隐私与数据管理"
+        ],
+        "description": "无需登录。返回同一政策源的版本、内容摘要和正文；publishable 仅表示公开配置齐全，不能代替部署与平台验收。",
+        "x-role": "public",
+        "responses": {
+          "400": {
+            "description": "请求格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色无权操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无访问权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、会话或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务校验未通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "超过限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "外部服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PrivacyPolicy"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/me/privacy-consent": {
+      "get": {
+        "operationId": "get_my_privacy_consent",
+        "summary": "查询同意状态",
+        "tags": [
+          "隐私与数据管理"
+        ],
+        "description": "按服务端最新版本和内容摘要判断，撤回后仍可调用。",
+        "x-role": "authenticated",
+        "responses": {
+          "400": {
+            "description": "请求格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色无权操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无访问权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、会话或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务校验未通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "超过限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "外部服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PrivacyConsentStatus"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "accept_privacy_consent",
+        "summary": "同意隐私政策及监护人声明",
+        "tags": [
+          "隐私与数据管理"
+        ],
+        "description": "版本/摘要必须匹配当前政策，guardian_confirmed 必须为 true；重复同意不新增事件。正式环境配置不完整时拒绝同意。",
+        "x-role": "authenticated",
+        "responses": {
+          "400": {
+            "description": "请求格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色无权操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无访问权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、会话或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务校验未通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "超过限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "外部服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PrivacyConsentStatus"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivacyConsentRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "withdraw_privacy_consent",
+        "summary": "撤回同意",
+        "tags": [
+          "隐私与数据管理"
+        ],
+        "description": "记录撤回事件，停止本人业务访问和未完成任务，保留其他家长共同管理的孩子资料；仍允许数据管理、删除和注销。",
+        "x-role": "authenticated",
+        "responses": {
+          "400": {
+            "description": "请求格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色无权操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无访问权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、会话或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务校验未通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "超过限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "外部服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PrivacyConsentStatus"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "confirm": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "confirm"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/data-management": {
+      "get": {
+        "operationId": "get_data_management",
+        "summary": "可管理的数据与成员",
+        "tags": [
+          "隐私与数据管理"
+        ],
+        "description": "撤回后可用，仅返回当前有效成员可管理的家庭及孩子名称/版本等最少信息；删除任务通过独立接口查询。",
+        "x-role": "authenticated",
+        "responses": {
+          "400": {
+            "description": "请求格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色无权操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无访问权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、会话或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务校验未通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "超过限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "外部服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DataManagement"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lifecycle-jobs": {
+      "get": {
+        "operationId": "list_my_lifecycle_jobs",
+        "summary": "本人删除任务",
+        "tags": [
+          "隐私与数据管理"
+        ],
+        "description": "仅返回发起者本人的最近至多 100 项安全状态，未完成任务优先；不要求仍为家庭成员。",
+        "x-role": "authenticated",
+        "responses": {
+          "400": {
+            "description": "请求格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色无权操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无访问权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本、会话或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务校验未通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "超过限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "外部服务不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/LifecycleJob"
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shared-wordbooks": {
+      "get": {
+        "operationId": "get_shared_wordbooks_disabled",
+        "summary": "公开词本发现（首发关闭）",
+        "tags": [
+          "单词"
+        ],
+        "description": "旧路径明确拒绝访问。有效登录并同意隐私的账号也返回 403 PUBLIC_SHARING_DISABLED，不返回公开词汇。客户端或构建参数不能开启。",
+        "x-role": "member",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "未登录或令牌失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PUBLIC_SHARING_DISABLED 或隐私/会话权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-release-disabled": true
+      }
+    },
+    "/shared-wordbooks/{shared_id}": {
+      "get": {
+        "operationId": "get_shared_wordbook_disabled",
+        "summary": "公开词本预览（首发关闭）",
+        "tags": [
+          "单词"
+        ],
+        "description": "公开快照不再通过此路径返回。历史订阅者在本家庭孩子词本接口继续学习。",
+        "x-role": "member",
+        "parameters": [
+          {
+            "name": "shared_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "未登录或令牌失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PUBLIC_SHARING_DISABLED 或隐私/会话权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-release-disabled": true
+      }
+    },
+    "/children/{child_id}/shared-wordbooks/{shared_id}/join": {
+      "post": {
+        "operationId": "post_shared_wordbook_join_disabled",
+        "summary": "加入公开词本（首发关闭）",
+        "tags": [
+          "单词"
+        ],
+        "description": "新加入和旧成功请求重放均返回 403 PUBLIC_SHARING_DISABLED，不创建词本或订阅，不改变已有副本。",
+        "x-role": "member",
+        "parameters": [
+          {
+            "name": "child_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "shared_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "未登录或令牌失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PUBLIC_SHARING_DISABLED 或隐私/会话权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-release-disabled": true
+      }
+    },
+    "/children/{child_id}/wordbooks/{wordbook_id}/share": {
+      "put": {
+        "operationId": "put_wordbook_share_legacy",
+        "summary": "停止历史词本共享",
+        "tags": [
+          "单词"
+        ],
+        "description": "只允许 published=false，且家庭有效成员须为原发布者；归档源词本也可停止。不创建新草稿，不编辑元数据。published=true 在幂等缓存读取前返回403 PUBLIC_SHARING_DISABLED。停止不移除其他家庭独立副本与进度。",
+        "x-role": "member",
+        "parameters": [
+          {
+            "name": "child_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wordbook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "未登录或令牌失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PUBLIC_SHARING_DISABLED 或隐私/会话权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "published",
+                        "version",
+                        "title",
+                        "description",
+                        "target_level",
+                        "word_count"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "published": {
+                          "const": false
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "target_level": {
+                          "type": "string"
+                        },
+                        "word_count": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "published"
+                ],
+                "properties": {
+                  "published": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/children/{child_id}/shared-wordbooks/{shared_id}/leave": {
+      "post": {
+        "operationId": "post_shared_wordbook_leave_legacy",
+        "summary": "退出历史共享词本",
+        "tags": [
+          "单词"
+        ],
+        "description": "本家庭有效成员可退出孩子此前加入的副本，归档只读词本并停用订阅；不更改其他家庭副本。首发不允许重新加入。",
+        "x-role": "member",
+        "parameters": [
+          {
+            "name": "child_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "shared_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "未登录或令牌失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PUBLIC_SHARING_DISABLED 或隐私/会话权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或无权限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "removed"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "removed": {
+                          "const": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/ai-settings": {
+      "get": {
+        "operationId": "get_my_ai_settings",
+        "summary": "读取当前家长 AI 模式、模型与系统余额",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "文字与图片模型独立配置，未配置时均为系统模式；family_id 指定当前家庭。返回家庭共享余额、一次性 20 元赠送剩余和本人对应模态 Key 状态，不返回 Key。多家庭未选择时只返回家庭列表和零余额。允许管理会话读取。",
+        "x-role": "authenticated",
+        "parameters": [
+          {
+            "name": "family_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "capability",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "text",
+                "vision"
+              ],
+              "default": "text"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiSettings"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "put_my_ai_settings",
+        "summary": "保存当前家长 AI 配置",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "按本人及 capability 分别保存模式、模型、加密 Key 和版本；更改文字设置不更改图片设置。图片只接受千问或 OpenAI 视觉模型。expected_version 控制并发。family_id 用于验证并返回该家庭钱包，不把私有 Key 分享给家庭。",
+        "x-role": "authenticated",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiSettings"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSettingsWrite"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/ai-key": {
+      "delete": {
+        "operationId": "delete_my_ai_key",
+        "summary": "删除当前家长私有 Key",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "仅删除本人指定 capability 的 Key，不删除另一模态 Key；保留 BYOK 模式，不自动回退系统额度。",
+        "x-role": "authenticated",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiSettings"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiKeyDelete"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/ai-test": {
+      "post": {
+        "operationId": "test_my_ai_key",
+        "summary": "用少量供应商用量测试已保存 Key",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "仅自带 Key；文字测试和图片测试分别使用对应配置，vision 请求实际携带测试图片。会产生少量本人供应商用量，不扣家庭额度。",
+        "x-role": "authenticated",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiConnectionTest"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiTestRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/ai-usage": {
+      "get": {
+        "operationId": "get_my_ai_usage",
+        "summary": "读取最近 50 次调用和 50 笔账目",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "最近 50 次家庭系统调用、本人私有调用及 50 笔家庭账目。赠送、充值、消费、退款带发起人 UUID；不包含学习正文或 Key。必须是有效家庭成员。",
+        "x-role": "authenticated",
+        "parameters": [
+          {
+            "name": "family_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "capability",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "text",
+                "vision"
+              ],
+              "default": "text"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiUsage"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/ai-recharges": {
+      "get": {
+        "operationId": "get_my_ai_recharges",
+        "summary": "读取充值开通状态、档位和最近订单",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "当前有效家庭的共享充值档位与最近订单，不含加密付款身份；其他家庭不可访问。",
+        "x-role": "authenticated",
+        "parameters": [
+          {
+            "name": "family_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "capability",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "text",
+                "vision"
+              ],
+              "default": "text"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiRechargeCatalog"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "create_my_ai_recharge",
+        "summary": "创建微信虚拟支付现金道具订单",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "下单须提供明确 family_id，验证有效成员和本人微信身份，金额取固定服务端档位。款项进入原家庭共享钱包；每个家庭一次性赠送 20 元由迁移/创建触发器提供，不经过此支付接口。",
+        "x-role": "authenticated",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiRechargeCreated"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiRechargeCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/ai-recharges/{order_id}": {
+      "get": {
+        "operationId": "check_my_ai_recharge",
+        "summary": "向微信核验本人支付订单并幂等入账",
+        "tags": [
+          "AI 账户"
+        ],
+        "description": "家庭有效成员可以核对同一家庭订单；查微信使用订单原付款身份，入账和退款始终归原家庭。内部后台在成员退出后仍可对账。",
+        "x-role": "authenticated",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AiRechargeOrder"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/virtual/notify": {
+      "get": {
+        "operationId": "verify_virtual_payment_callback",
+        "summary": "微信回调 URL 校验",
+        "tags": [
+          "AI 账户"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "timestamp",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nonce",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "echostr",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "通过 token 签名验证后原样返回 echostr",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "使用配置的 Token 验证微信 URL 校验签名，成功后返回 echostr；不进行入账。"
+      },
+      "post": {
+        "operationId": "notify_virtual_payment",
+        "summary": "微信虚拟支付安全模式 JSON 推送",
+        "tags": [
+          "AI 账户"
+        ],
+        "security": [],
+        "description": "验证 msg_signature、AES 内容与 AppID，仅作为查单唤醒；再次查询微信后才入账或回收额度。重复通知幂等。未核实支付不确认发货。",
+        "parameters": [
+          {
+            "name": "timestamp",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nonce",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "msg_signature",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "Encrypt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "Encrypt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "微信推送已处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "ErrCode": {
+                      "const": 0
+                    },
+                    "ErrMsg": {
+                      "const": "success"
+                    }
+                  },
+                  "required": [
+                    "ErrCode",
+                    "ErrMsg"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "AI 可用余额不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "隐私或付款人权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不属于当前账号",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设置版本、任务或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式或模型能力不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "调用、订单或系统费用限额",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "供应商调用或订单核验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "配置未完成或服务尚未开放",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -15328,6 +18119,19 @@
           "version": {
             "type": "integer",
             "minimum": 1
+          },
+          "school_grade": {
+            "type": "string",
+            "maxLength": 24,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "unspecified",
+              "girl",
+              "boy"
+            ]
           }
         },
         "required": [
@@ -15341,7 +18145,9 @@
           "timezone",
           "daily_new_limit",
           "daily_goal",
-          "version"
+          "version",
+          "school_grade",
+          "gender"
         ],
         "description": ""
       },
@@ -15427,6 +18233,53 @@
           "version": {
             "type": "integer",
             "minimum": 1
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "shared_source_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "shared_source_version": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "shared_published": {
+            "type": "boolean"
+          },
+          "shared_can_unpublish": {
+            "type": "boolean",
+            "description": "仅原发布者为true，仍须服务端鉴权"
+          },
+          "shared_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shared_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shared_target_level": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shared_current_version": {
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "required": [
@@ -16357,6 +19210,10 @@
             "description": "",
             "minLength": 1,
             "maxLength": 512
+          },
+          "management_only": {
+            "type": "boolean",
+            "description": "为 true 时只登录已有账号，不新建账号、不记录邀请归因，令牌仅允许隐私和删除管理；不恢复学习同意。"
           }
         },
         "required": [
@@ -17884,7 +20741,7 @@
           "session_id",
           "lease_generation"
         ],
-        "description": "",
+        "description": "selected_option_id=null 仅在尚未选择时允许；首次选择保存后不能改答/清空，flagged 可独立更新。",
         "anyOf": [
           {
             "required": [
@@ -17951,6 +20808,14 @@
               "string",
               "null"
             ]
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "family_id": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
@@ -17961,7 +20826,9 @@
           "attempts",
           "created_at",
           "completed_at",
-          "error_code"
+          "error_code",
+          "target_id",
+          "family_id"
         ]
       },
       "FamilyDeleteRequest": {
@@ -18089,7 +20956,8 @@
             "type": "string",
             "enum": [
               "text",
-              "words"
+              "words",
+              "prepared"
             ]
           },
           "raw_text": {
@@ -18330,6 +21198,1287 @@
             }
           }
         }
+      },
+      "VocabularyGenerationItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "input_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 29
+          },
+          "input": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "invalid"
+            ]
+          },
+          "lemma": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "part_of_speech": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ipa_gb": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ipa_us": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 140
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meaning_zh": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sentence_en": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sentence_zh": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "input_index",
+          "input",
+          "status",
+          "lemma",
+          "part_of_speech",
+          "ipa_gb",
+          "ipa_us",
+          "meaning_zh",
+          "sentence_en",
+          "sentence_zh",
+          "reason"
+        ]
+      },
+      "PrivacyConsentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "policy_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "guardian_confirmed": {
+            "const": true
+          }
+        },
+        "required": [
+          "policy_version",
+          "policy_hash",
+          "guardian_confirmed"
+        ]
+      },
+      "PrivacyConsentStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "policy_version": {
+            "type": "string"
+          },
+          "policy_hash": {
+            "type": "string"
+          },
+          "last_action": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "accepted",
+              "withdrawn",
+              null
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "management_only": {
+            "type": "boolean",
+            "description": "GET 状态时返回；当前会话仅可用于数据管理，主动同意当前政策后才升级。"
+          }
+        },
+        "required": [
+          "accepted",
+          "policy_version",
+          "policy_hash",
+          "last_action",
+          "updated_at"
+        ]
+      },
+      "PrivacyPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "contact": {
+            "type": "string"
+          },
+          "backup_retention_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 365
+          },
+          "publishable": {
+            "type": "boolean"
+          },
+          "llm_provider": {
+            "type": "string"
+          },
+          "llm_processing_region": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "text"
+              ]
+            }
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "required": [
+                "name",
+                "url"
+              ]
+            }
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "operator",
+          "contact",
+          "backup_retention_days",
+          "publishable",
+          "llm_provider",
+          "llm_processing_region",
+          "sections",
+          "providers",
+          "hash"
+        ]
+      },
+      "DataManagement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "families": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "owner_user_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "role": {
+                  "enum": [
+                    "owner",
+                    "parent"
+                  ]
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "nickname": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "nickname",
+                      "version"
+                    ]
+                  }
+                },
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "user_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "display_name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "user_id",
+                      "display_name"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "version",
+                "owner_user_id",
+                "role",
+                "children",
+                "members"
+              ]
+            }
+          }
+        },
+        "required": [
+          "families"
+        ]
+      },
+      "QuizAnsweredItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuizOption"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "selected_option_id": {
+            "type": "string"
+          },
+          "answer_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "correct_option_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ordinal",
+          "prompt",
+          "options",
+          "selected_option_id",
+          "answer_version",
+          "flagged",
+          "correct_option_id"
+        ],
+        "description": "仅首次选择成功保存后返回的即时反馈；未答题不得包含 correct_option_id。已保存首次答案不能清空或修改，可继续标记。"
+      },
+      "StudyCard": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "state",
+          "due_at",
+          "child_word_id",
+          "word_version",
+          "lemma",
+          "part_of_speech",
+          "ipa_gb",
+          "ipa_us",
+          "example",
+          "practice_only",
+          "ordinal"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "enum": [
+              "new",
+              "learning",
+              "review",
+              "relearning"
+            ]
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "child_word_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "word_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "lemma": {
+            "type": "string"
+          },
+          "part_of_speech": {
+            "type": "string"
+          },
+          "ipa_gb": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ipa_us": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "example": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "content_version",
+                  "text_en"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "content_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "text_en": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          },
+          "practice_only": {
+            "type": "boolean"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "description": "当前运行时队列 DTO，隐藏释义；已归档/暂停的未答卡会从队列移除，已提交历史保持不变。"
+      },
+      "AiModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "qwen",
+              "deepseek",
+              "openai"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "vision": {
+            "type": "boolean"
+          },
+          "system_available": {
+            "type": "boolean"
+          },
+          "input_yuan_per_million": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "output_yuan_per_million": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cached_yuan_per_million": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_charge_micros": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "pricing_tiers": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AiPriceTier"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "provider",
+          "model",
+          "vision",
+          "system_available",
+          "input_yuan_per_million",
+          "output_yuan_per_million",
+          "cached_yuan_per_million",
+          "max_charge_micros",
+          "pricing_tiers"
+        ]
+      },
+      "AiSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "system",
+              "byok"
+            ]
+          },
+          "model_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "has_key": {
+            "type": "boolean"
+          },
+          "key_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "byok_available": {
+            "type": "boolean"
+          },
+          "custom_provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "custom_model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "balance_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元；退款后余额可为负。"
+          },
+          "frozen_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元；退款后余额可为负。"
+          },
+          "available_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元；退款后余额可为负。"
+          },
+          "currency": {
+            "const": "CNY"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiModel"
+            }
+          },
+          "other_services": {
+            "type": "string"
+          },
+          "capability": {
+            "enum": [
+              "text",
+              "vision"
+            ]
+          },
+          "family_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "family_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "families": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          "gift_remaining_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元。"
+          },
+          "welcome_credit_micros": {
+            "const": 20000000
+          },
+          "legacy_balance_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元。"
+          }
+        },
+        "required": [
+          "mode",
+          "model_id",
+          "version",
+          "has_key",
+          "key_hint",
+          "byok_available",
+          "custom_provider",
+          "custom_model",
+          "balance_micros",
+          "frozen_micros",
+          "available_micros",
+          "currency",
+          "models",
+          "other_services",
+          "capability",
+          "family_id",
+          "family_name",
+          "families",
+          "gift_remaining_micros",
+          "welcome_credit_micros",
+          "legacy_balance_micros"
+        ]
+      },
+      "AiSettingsWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "system",
+              "byok"
+            ]
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "custom_provider": {
+            "enum": [
+              "qwen",
+              "deepseek",
+              "openai"
+            ]
+          },
+          "custom_model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "api_key": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 512,
+            "writeOnly": true,
+            "pattern": "^[!-~]+$"
+          },
+          "provider_consent": {
+            "const": true
+          },
+          "capability": {
+            "enum": [
+              "text",
+              "vision"
+            ],
+            "default": "text"
+          },
+          "family_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "mode",
+          "model_id",
+          "expected_version",
+          "provider_consent"
+        ]
+      },
+      "AiKeyDelete": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capability": {
+            "enum": [
+              "text",
+              "vision"
+            ],
+            "default": "text"
+          },
+          "family_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "expected_version"
+        ]
+      },
+      "AiCall": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": [
+              "vocabulary",
+              "vision",
+              "connection_test"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "system",
+              "byok"
+            ]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "ready",
+              "succeeded",
+              "failed",
+              "uncertain"
+            ]
+          },
+          "input_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "output_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "cached_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "charge_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元；退款后余额可为负。"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "family_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "capability": {
+            "enum": [
+              "text",
+              "vision"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "mode",
+          "provider",
+          "model",
+          "state",
+          "input_tokens",
+          "output_tokens",
+          "cached_tokens",
+          "charge_micros",
+          "error_code",
+          "created_at",
+          "family_id",
+          "user_id",
+          "capability"
+        ]
+      },
+      "AiWalletEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": [
+              "gift",
+              "credit",
+              "charge",
+              "refund",
+              "transfer"
+            ]
+          },
+          "amount_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元；退款后余额可为负。"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gift_used_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元。"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "amount_micros",
+          "created_at",
+          "user_id",
+          "gift_used_micros"
+        ]
+      },
+      "AiUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/AiCall"
+            }
+          },
+          "entries": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/AiWalletEntry"
+            }
+          },
+          "family_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "entries",
+          "family_id"
+        ]
+      },
+      "AiRechargeOrder": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "amount_fen": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "credit_micros": {
+            "type": "integer",
+            "description": "整数微元，1000000 微元=1 元；退款后余额可为负。"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "paid",
+              "refunded",
+              "closed"
+            ]
+          },
+          "refunded_fen": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "family_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "amount_fen",
+          "credit_micros",
+          "state",
+          "refunded_fen",
+          "created_at",
+          "family_id",
+          "user_id"
+        ]
+      },
+      "AiRechargeCatalog": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "ios_enabled": {
+            "type": "boolean"
+          },
+          "notice": {
+            "type": "string"
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "amount_fen": {
+                  "type": "integer",
+                  "minimum": 100
+                },
+                "credit_micros": {
+                  "type": "integer",
+                  "description": "整数微元，1000000 微元=1 元；退款后余额可为负。"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "amount_fen",
+                "credit_micros"
+              ]
+            }
+          },
+          "orders": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/AiRechargeOrder"
+            }
+          },
+          "family_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "ios_enabled",
+          "notice",
+          "products",
+          "orders",
+          "family_id"
+        ]
+      },
+      "AiRechargeCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "writeOnly": true
+          },
+          "platform": {
+            "enum": [
+              "ios",
+              "android",
+              "other"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "family_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "product_id",
+          "code",
+          "platform",
+          "request_id",
+          "family_id"
+        ]
+      },
+      "AiPaymentData": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "const": "short_series_goods"
+          },
+          "signData": {
+            "type": "string"
+          },
+          "paySig": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "signData",
+          "paySig",
+          "signature"
+        ]
+      },
+      "AiRechargeCreated": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "paid",
+              "refunded",
+              "closed"
+            ]
+          },
+          "pay_data": {
+            "$ref": "#/components/schemas/AiPaymentData"
+          }
+        },
+        "required": [
+          "id",
+          "state"
+        ]
+      },
+      "AiConnectionTest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connected": {
+            "const": true
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "connected",
+          "provider",
+          "model"
+        ]
+      },
+      "AiPriceTier": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "up_to_input_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input_yuan_per_million": {
+            "type": "string"
+          },
+          "output_yuan_per_million": {
+            "type": "string"
+          },
+          "cached_yuan_per_million": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "up_to_input_tokens",
+          "input_yuan_per_million",
+          "output_yuan_per_million"
+        ]
+      },
+      "AiTestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "enum": [
+              "text",
+              "vision"
+            ],
+            "default": "text"
+          },
+          "family_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": []
       }
     }
   },
@@ -18387,6 +22536,10 @@
     },
     {
       "name": "音频"
+    },
+    {
+      "name": "AI 账户",
+      "description": "账号 AI 配置、用量、系统余额与虚拟支付"
     }
   ]
 }

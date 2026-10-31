@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 export type AudioObjectLocation = Readonly<{profileId:string;key:string}>;
 export interface AudioObjectStorage {
  readonly provider:string;
- put(key:string,bytes:Uint8Array,mimeType:'audio/mpeg'):Promise<void>;
+ put(key:string,bytes:Uint8Array,mimeType:string):Promise<void>;
  get(key:string):Promise<Uint8Array>;
  // Missing returns null; permission/network errors MUST throw instead.
  stat(key:string):Promise<{size:number}|null>;

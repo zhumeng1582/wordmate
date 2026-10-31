@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {vocabularyRequest,generateVocabulary} from '../src/vocabulary.ts';
 import {createTextGenerator} from '../src/index.ts';
 const item={input_index:0,input:'cat',status:'ok',lemma:'cat',part_of_speech:'noun',ipa_gb:'/kæt/',ipa_us:'/kæt/',meaning_zh:'猫',sentence_en:'The cat is on the bed.',sentence_zh:'猫在床上。',reason:null};
-test('batch prompt and DeepSeek adapter return validated vocabulary',async()=>{
- const g=createTextGenerator({DEEPSEEK_API_KEY:'test',DEEPSEEK_MODEL:'test'},async(_url,init)=>{
+test('batch prompt works with an explicitly configured DeepSeek adapter',async()=>{
+ const g=createTextGenerator({LLM_PROVIDER:'deepseek',DEEPSEEK_API_KEY:'test',DEEPSEEK_MODEL:'test'},async(_url,init)=>{
   const body=JSON.parse(init!.body as string);assert.equal(JSON.parse(body.messages[1].content).theme,'宠物');assert(body.messages[0].content.includes('input_index'));
   return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({items:[item]})}}]});
  });assert.deepEqual((await generateVocabulary(g,['cat'],'宠物')).data,{items:[item]});

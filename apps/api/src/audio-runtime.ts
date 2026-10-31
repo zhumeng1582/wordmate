@@ -1,13 +1,14 @@
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
+import {configuredAudioPrice} from './audio-tariff';
 export interface AudioRuntime {
  profile:Record<string,any>;
  voices:{id:string;accent:string;gender:string}[];
  synthesize?: (r:{text:string;accent:'en-GB'|'en-US';voiceId:string;rate:number})=>Promise<{bytes:Uint8Array}>;
  storageProfile:string;
- stores:Record<string,{put(key:string,bytes:Uint8Array,mimeType:'audio/mpeg'):Promise<void>;get(key:string):Promise<Uint8Array>;stat(key:string):Promise<{size:number}|null>}>;
- spoolDir:string;childDaily:number;userDaily:number;
+ stores:Record<string,{put(key:string,bytes:Uint8Array,mimeType:'audio/mpeg'):Promise<void>;get(key:string):Promise<Uint8Array>;stat(key:string):Promise<{size:number}|null>;delete?(key:string):Promise<void>}>;
+ spoolDir:string;pricePer10000Characters?:string;
 }
 export async function audioRuntime(env:Record<string,string|undefined>):Promise<AudioRuntime|undefined>{
  if(!env.OSS_BUCKET)return undefined;
@@ -23,6 +24,5 @@ export async function audioRuntime(env:Record<string,string|undefined>):Promise<
  }
  if(!env.COSYVOICE_API_KEY&&env.TTS_PROVIDER&&env.TTS_PROVIDER!=='cosyvoice')throw Error('UNSUPPORTED_TTS_PROVIDER');
  const tts=env.COSYVOICE_API_KEY?api.createTtsProvider(env):undefined;
- const positive=(key:string,fallback:number)=>{const n=Number(env[key]||fallback);if(!Number.isSafeInteger(n)||n<1||n>10000)throw Error('INVALID_AUDIO_LIMIT');return n;};
- return {profile:tts?.profile??{provider:'cosyvoice',region:'cn-beijing',model:env.COSYVOICE_MODEL||'cosyvoice-v3-flash',revision:'cosy-http-plain-aigc-v1',format:'mp3',sampleRate:24000},voices:tts?await tts.listVoices():env.COSYVOICE_ENABLED_VOICES?api.configuredCosyVoices(env):[],synthesize:tts?(r=>tts.synthesize(r)):undefined,storageProfile,stores,spoolDir:resolve(env.AUDIO_SPOOL_DIR||resolve(__dirname,'../../../.local/audio-spool')),childDaily:positive('AUDIO_CHILD_DAILY_ATTEMPTS',20),userDaily:positive('AUDIO_USER_DAILY_ATTEMPTS',40)};
+ return {profile:tts?.profile??{provider:'cosyvoice',region:'cn-beijing',model:env.COSYVOICE_MODEL||'cosyvoice-v3-flash',revision:'cosy-http-plain-aigc-v1',format:'mp3',sampleRate:24000},voices:tts?await tts.listVoices():env.COSYVOICE_ENABLED_VOICES?api.configuredCosyVoices(env):[],synthesize:tts?(r=>tts.synthesize(r)):undefined,storageProfile,stores,spoolDir:resolve(env.AUDIO_SPOOL_DIR||resolve(__dirname,'../../../.local/audio-spool')),pricePer10000Characters:configuredAudioPrice(env)};
 }

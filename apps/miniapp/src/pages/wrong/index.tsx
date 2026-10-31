@@ -1,15 +1,27 @@
 import {DateRangeCalendar} from '../../components/DateRangeCalendar';
 import {useRef,useState} from 'react';
 import {View,Button,Picker,Text} from '@tarojs/components';
-import Taro,{useDidShow,useRouter} from '@tarojs/taro';
+import Taro,{useDidShow,useDidHide,useRouter} from '@tarojs/taro';
 import {api,storage,message} from '../../services/api';
+import {refreshVisiblePages} from '../../services/visible-pages';
 import '../calendar/index.css';
 export default function Wrong(){
  const router=useRouter(),initial=router.params.date||'';
  const [range,setRange]=useState({start:initial,end:initial}),[calendarOpen,setCalendarOpen]=useState(false),[source,setSource]=useState(''),[items,setItems]=useState<any[]>([]),[cursor,setCursor]=useState<string|null>(null),[selected,setSelected]=useState<string[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[loaded,setLoaded]=useState(false);const serial=useRef(0),loadedScope=useRef('');
  const sources=['全部来源','日常复习','月测'],values=['','review','monthly_quiz'];
- const load=async(d=range,s=source,after?:string)=>{const n=++serial.current;setBusy(true);setError('');const key=`${storage.get('access_token')}:${storage.get('child_id')}:${d.start}:${d.end}:${s}`;if(!after){if(loadedScope.current!==key){setLoaded(false);setItems([]);setCursor(null);}setSelected([]);}try{const query=[d.start&&d.end?`date_from=${d.start}&date_to=${d.end}`:'',s?`source=${s}`:'',after?`cursor=${encodeURIComponent(after)}`:'','limit=50'].filter(Boolean).join('&');const data=await api(`/children/${storage.get('child_id')}/wrong-words?${query}`);if(n!==serial.current)return;setItems(old=>after?[...old,...data.items]:data.items);setCursor(data.next_cursor);setLoaded(true);loadedScope.current=key;}catch(e){if(n===serial.current)setError(message(e));}finally{if(n===serial.current)setBusy(false);}};
- useDidShow(()=>{void load();});
+ const load=async(d=range,s=source,after?:string,quiet=false)=>{
+  const n=++serial.current,child=storage.get('child_id'),key=`${storage.get('access_token')}:${child}:${d.start}:${d.end}:${s}`,changed=loadedScope.current!==key,current=()=>n===serial.current&&key===`${storage.get('access_token')}:${storage.get('child_id')}:${d.start}:${d.end}:${s}`;
+  if(!quiet||changed||!loaded)setBusy(true);if(!quiet||changed)setError('');
+  if(changed){loadedScope.current=key;setLoaded(false);setItems([]);setCursor(null);setSelected([]);}
+  try{
+   const read=(cursor?:string)=>{const query=[d.start&&d.end?`date_from=${d.start}&date_to=${d.end}`:'',s?`source=${s}`:'',cursor?`cursor=${encodeURIComponent(cursor)}`:'','limit=50'].filter(Boolean).join('&');return api(`/children/${child}/wrong-words?${query}`);};
+   const data=after?await read(after):await refreshVisiblePages(read,changed?50:Math.max(50,items.length),current);
+   if(!data||!current())return;
+   setItems(old=>after?[...old,...data.items.filter((item:any)=>!old.some(previous=>previous.word.id===item.word.id))]:data.items);setCursor(data.next_cursor);setLoaded(true);setError('');
+   if(!after)setSelected(old=>old.filter(id=>data.items.some((item:any)=>item.word.id===id&&!item.word.archived_at)));
+  }catch(e){if(current())setError(message(e));}finally{if(n===serial.current)setBusy(false);}
+ };
+ useDidShow(()=>{void load(range,source,undefined,true);});useDidHide(()=>{serial.current++;});
  const launch=(selection:any)=>{storage.set('review_source',selection);Taro.navigateTo({url:'/pages/review/index'});};
  const toggle=(id:string)=>setSelected(old=>old.includes(id)?old.filter(x=>x!==id):old.length<100?[...old,id]:old);
  return <View className='page history-page'><View className='row'><Button className='text-action' onClick={()=>setCalendarOpen(true)}>{range.start?(range.start===range.end?range.start:`${range.start} 至 ${range.end}`):'全部日期'} ▾</Button><Picker mode='selector' range={sources} value={values.indexOf(source)} onChange={e=>{const s=values[Number(e.detail.value)];setSource(s);void load(range,s);}}><Text>{sources[values.indexOf(source)]} ▾</Text></Picker></View>

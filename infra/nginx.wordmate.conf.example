@@ -1,0 +1,94 @@
+# Replace the domain and certificate paths, then install this in the TLS virtual host.
+# Keep the API process bound to 127.0.0.1:3000; do not expose its port publicly.
+limit_req_zone $binary_remote_addr zone=wordmate_api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=wordmate_auth:10m rate=5r/m;
+limit_conn_zone $binary_remote_addr zone=wordmate_conn:10m;
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name REPLACE_WITH备案域名;
+
+    ssl_certificate     /etc/letsencrypt/live/REPLACE_WITH备案域名/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/REPLACE_WITH备案域名/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    server_tokens off;
+
+    client_max_body_size 7m;
+    client_body_timeout 20s;
+    access_log /var/log/nginx/wordmate-access.log combined;
+    error_log  /var/log/nginx/wordmate-error.log warn;
+
+    location = /api/health {
+        proxy_pass http://127.0.0.1:3000/api/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    location ~ ^/api/(auth/wechat|auth/dev)$ {
+        limit_req zone=wordmate_auth burst=3 nodelay;
+        limit_req_status 429;
+        limit_conn wordmate_conn 10;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 75s;
+        proxy_read_timeout 75s;
+    }
+
+    location ~ ^/api/children/[^/]+/import-file/?$ {
+        limit_req zone=wordmate_api burst=5 nodelay;
+        limit_req_status 429;
+        limit_conn wordmate_conn 5;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_request_buffering on;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 75s;
+        proxy_read_timeout 75s;
+    }
+
+    location /api/ {
+        limit_req zone=wordmate_api burst=30 nodelay;
+        limit_req_status 429;
+        limit_conn wordmate_conn 20;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 75s;
+        proxy_read_timeout 75s;
+    }
+
+    location / {
+        return 404;
+    }
+}
+
+server {
+    listen 80;
+    server_name REPLACE_WITH备案域名;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/letsencrypt;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

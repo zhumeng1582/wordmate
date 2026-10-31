@@ -5,4 +5,5 @@ if(!url||url.protocol!=='https:'||url.username||url.password||url.search||url.ha
  console.error('请先设置 MINIAPP_API_BASE=https://你的已备案域名/api；发布构建禁止 localhost、IP、明文 HTTP 和密钥参数。');process.exit(1);
 }
 const result=spawnSync('corepack',['pnpm','--filter','@wordmate/miniapp','build'],{stdio:'inherit',env:{...process.env,NODE_ENV:'production',MINIAPP_DEV_AUTH:'false'}});
-process.exitCode=result.status??1;
+if(result.status!==0)process.exitCode=result.status??1;
+else process.exitCode=spawnSync(process.execPath,['scripts/check-miniapp.cjs'],{stdio:'inherit'}).status??1;

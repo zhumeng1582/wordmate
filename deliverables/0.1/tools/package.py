@@ -2,7 +2,7 @@ from pathlib import Path
 import zipfile,json,hashlib,shutil
 R=Path(__file__).resolve().parents[1];base=R.parent
 files=[p for p in R.rglob('*') if p.is_file() and p.name not in ['.DS_Store','manifest.json'] and '__pycache__' not in p.parts]
-manifest={'version':'0.1','date':'2026-10-20','files':{p.relative_to(R).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}}
+manifest={'version':'0.1','date':'2026-10-26','files':{p.relative_to(R).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}}
 (R/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
 files.append(R/'manifest.json')
 with zipfile.ZipFile(base/'wordmate-0.1.zip','w',zipfile.ZIP_DEFLATED) as z:

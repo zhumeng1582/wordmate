@@ -1,7 +1,9 @@
 import Taro from '@tarojs/taro';
-import {storage} from './api';
+import {api,storage} from './api';
 const fs=()=>Taro.getFileSystemManager();
-export async function extractFile(child:string,kind:'camera'|'album'|'file'){
+export async function extractFile(child:string,kind:'camera'|'album'|'file',existingText='',theme=''){
+ const token=storage.get('access_token'),selectedChild=storage.get('child_id'),family=storage.get('family_id');
+ const checkScope=()=>{if(token!==storage.get('access_token')||selectedChild!==storage.get('child_id')||family!==storage.get('family_id'))throw Error('SESSION_CHANGED');};
  if(Taro.canIUse('requirePrivacyAuthorize'))await new Promise<void>((resolve,reject)=>Taro.requirePrivacyAuthorize({success:()=>resolve(),fail:()=>reject(Error('IMPORT_PRIVACY_REQUIRED'))}));
  let path:string,name:string,size:number;
  if(kind==='file'){
@@ -15,8 +17,9 @@ export async function extractFile(child:string,kind:'camera'|'album'|'file'){
  }
  if(size>4*1024*1024)throw Error('IMPORT_FILE_TOO_LARGE');
  const data=await new Promise<string>((resolve,reject)=>fs().readFile({filePath:path,encoding:'base64',success:r=>resolve(r.data as string),fail:reject}));
- const response=await Taro.request<any>({url:`${API_BASE}/children/${child}/import-file`,method:'POST',timeout:60000,header:{'Content-Type':'application/json',Authorization:`Bearer ${storage.get('access_token')}`},data:{name,base64:data}});
- if(response.statusCode>=400)throw Error(response.data?.error?.code??'IMPORT_FAILED');return response.data.data.text as string;
+ checkScope();
+ const result=await api<{text:string;prepared_items?:any[];source:'image'|'file'}>(`/children/${child}/import-file`,'POST',{name,base64:data,existing_text:existingText,theme},undefined,60000);
+ checkScope();return result;
 }
 export async function shareCsv(content:string){
  // A fixed private sandbox path avoids accumulating exports containing learning data.

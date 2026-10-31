@@ -1,0 +1,48 @@
+Wordmate / 单词共学：安全与功能修复
+日期：2026-10-24
+对应复查：SECURITY-AND-LOGIC-REVIEW-2026-10-24.txt。
+状态：R01–R10 均已落地修复；S01 家庭切换、S02 标注锁顺序也已调整。下列结果为本地代码和回归验证，不代表生产部署完成。
+
+验证结果
+107/107 项自动测试通过；API/AI 编译、Nest/Express 路由烟测、小程序类型检查与 16 页构建产物检查通过；真实本机 HTTP 的畸形压缩请求验证通过；108 个 API 操作、71 个 Schema 与交付链接检查通过。
+
+逐项变更
+R01：body-parser 从 2.3.0 锁定到 2.4.0。API 在鉴权和解码前返回 415 拒绝压缩请求，两处 JSON 解析器同时设置 inflate:false。真实本机 HTTP 验证 gzip/deflate/br 加尾随字节均被拒绝，后续普通登录和健康检查正常；官方 npm 复核不再命中该公告。
+R02：新增 provider_usage_events 最小用量账本，消费计数不依赖可删除的孩子/任务表；按微信账号摘要识别同一账号，删除孩子、注销后重新注册均不能重置 24 小时额度。仅保存摘要、随机资源标识、类别和时间，约 48 小时留存并按小时清理，不保存录入内容。保留原有业务用量记录供学习数据删除，后台仍在实际调用前原子计数。新增每账号最多 40 个待处理音频任务的入队上限；缓存命中不受影响。
+R03：OSS 适配器支持 ecs_ram_role。固定 ECS 元数据地址、IMDSv2 token、凭证过期校验、并发刷新合并、缓存与提前续期，不回退 IMDSv1 或长期密钥；元数据响应有超时/体积限制且错误不泄露凭证。生产检查的角色名规则与适配器统一。回归验证“生产检查通过的角色配置可初始化实际适配器”，全程用替身元数据。
+R04：海报过期清理只有在存储删除成功或明确对象不存在后才删除数据库记录；其他错误保留追踪。孩子删除遇到相同错误保持失败和冻结，重试成功后才完成。此前旧代码已经遗失元数据的孤儿文件需要维护清点，新迁移不能恢复这些不存在的记录。
+R05：未答题不再返回正确选项；服务端保存首次选择后才返回该题即时反馈。首次选择不能修改或清空，可继续更新标记；重复请求安全重放，题版本/租约继续校验。小程序不再预先计算正确与否，等待保存响应后显示反馈。与既有即时反馈体验一致，接口契约与 PRD 已同步。
+R06：新答案重新校验单词归档/卡片暂停状态；读取队列时移除不可学习的未答项，并返回最新 total/remaining，小程序不把移除项算作已学。其他词本仍保留的词可继续学习，已成功提交答案仍可安全重放历史结果。
+R07：补签恢复展示连续性，奖励只按实际达标学习日计算，不再随补签改变起点重新发卡。016 清理无实际学习支持的未使用历史奖励；已使用的历史补签不撤回。
+R08：另一位有授权家长编辑重提任务后，将 requested_by 更新为当前提交者；原家长撤回后的请求不自动恢复。回归确认新请求可完成，原家长仍不能访问学习资料。
+R09：创建孩子在服务端 scope 内校验当前管理员，发生在幂等重放之前；转交后的原管理员也不能重放旧创建请求。普通家长页面不再提供添加入口。
+R10：所有通用 API 响应绑定请求时 token 和会话代次；旧 200/401/500 均不能向新账号交付数据或清掉新账号存储。同 token 的破坏性重置也会改变代次，当前会话的 401 仍正常清理本机数据。
+S01：切换家庭清空旧孩子，刷新时校验孩子归属；过时异步结果不覆盖当前家庭，继续学习前校验孩子存在，避免 undefined.id。
+S02：标注改为先确定归属、锁家庭/孩子，再锁并重新校验单词，与归档/删除统一顺序。回归记录实际执行 SQL，确认家庭锁先于单词锁；真实 PostgreSQL 双连接死锁专项仍待部署环境验证。
+
+数据库升级与上线顺序
+1. 备份并停止旧 API/Worker，避免旧版本继续按旧用量表消费。
+2. corepack pnpm build:api。
+3. 已有 015 的 PostgreSQL：corepack pnpm --filter @wordmate/api migrate:security。
+   该命令只执行 016_security_integrity.sql；完整 migrate、migrate:audio、migrate:release-fixes、migrate:privacy 已串联到 016。本地 PGlite 重启自动应用。
+4. 确认新表与回填成功，再启动新版 API/Worker、发布新小程序。
+5. 验证真实 ECS 角色权限、续期与私有桶读写删除；复核历史孤儿文件、PostgreSQL 并发和 Android/iOS 操作。
+016 在现存历史数据上回填近期音频/词汇用量；此前已删除的数据无法回填。应在维护窗口迁移，不能先启动依赖新表的 Worker。用量账本无用户/孩子业务外键，不应在孩子或账号删除中联带清除；到期统一定时清理。
+
+政策与契约
+政策版本更新为 2026-10-24.3，增加短期额度账本披露；运营者公开信息仍按用户要求暂不配置，生产草案保护保持有效。政策内容摘要变化后按原机制重新确认。
+OpenAPI 保留 108 个操作，补充独立已答反馈 DTO 与实际学习队列 DTO；设计文档同步管理员建档、即时反馈/首次答案锁定和实际学习奖励规则。
+
+验证入口
+corepack pnpm test:security：编译 API，执行费用/删除/归档/奖励/接力/权限/锁顺序/客户端与角色凭证回归，再跑真实 Nest/Express 进程内路由。
+corepack pnpm test:security:http：临时监听本机随机端口，验证真实 HTTP 压缩请求和正常登录；使用隔离开发数据库，完成后清理，不调用真实供应商。
+全量：node --experimental-strip-types --test apps/api/test/*.test.ts apps/api/test/*.test.cjs apps/miniapp/test/*.test.ts packages/ai/test/*.test.ts scripts/test/*.test.cjs。
+小程序：corepack pnpm --filter @wordmate/miniapp typecheck；corepack pnpm build:miniapp；node scripts/check-miniapp.cjs。
+契约/交付：node deliverables/0.1/checks/validate.cjs；python3 deliverables/0.1/build.py；python3 deliverables/0.1/tools/check_delivery.py。
+
+剩余边界
+未向生产应用迁移、未部署服务、未调用真实付费模型或删除真实用户数据。真实 ECS 元数据与 RAM 权限、PostgreSQL 多连接和真机 UI 需在对应环境验收。
+依赖审计从 34 项降为 33 项（Critical 1、High 12、Moderate 16、Low 4）；已消除实际 JSON 请求解析器的公告。其余涉及 Swiper、Multer、构建工具或特定未接入调用条件，继续按复查中的可达性判断处理，本次未强制跨大版本覆盖前端依赖，也不宣称依赖零告警。
+官方依据：
+https://github.com/expressjs/body-parser/security/advisories/GHSA-27r3-jxmh-p828
+https://help.aliyun.com/en/ecs/user-guide/attach-an-instance-ram-role-to-an-ecs-instance

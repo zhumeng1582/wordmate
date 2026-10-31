@@ -9,7 +9,7 @@ const root=path.resolve(__dirname,"..");
  const report={database:[],api:[],limitations:["使用内嵌 PostgreSQL 16.4 验证 DDL 与约束；未验证正式服务端、鉴权中间件或多连接并发。","OpenAPI 进行结构、引用、Schema 编译与样例校验；未运行完整 OpenAPI 规范元 Schema 校验器。"]};
  const db=new PGlite();
  await db.exec(fs.readFileSync(path.join(root,"database/001_schema.sql"),"utf8"));
- report.database.push("29 张表初始迁移执行成功");
+ report.database.push("34 张表初始迁移执行成功");
  const one=async(sql,args=[]) => (await db.query(sql,args)).rows[0];
  const a=await one("insert into wordmate.users(wx_app_id,wx_open_id,display_name) values('app','dad','爸爸') returning id");
  const b=await one("insert into wordmate.users(wx_app_id,wx_open_id,display_name) values('app','mom','妈妈') returning id");
@@ -107,7 +107,8 @@ const root=path.resolve(__dirname,"..");
   assert(!ids.has(op.operationId));ids.add(op.operationId);n++;
   const ps=(op.parameters||[]).filter(x=>x.in==="path").map(x=>x.name).sort();
   assert.deepEqual(ps,[...p.matchAll(/{(\w+)}/g)].map(x=>x[1]).sort());
-  assert(Object.keys(op.responses).some(x=>x.startsWith("2")));
+  if(op["x-release-disabled"]===true){assert(op.responses["403"]);assert(!Object.keys(op.responses).some(x=>x.startsWith("2")));}
+  else assert(Object.keys(op.responses).some(x=>x.startsWith("2")));
  }
  const ajv=new Ajv({strict:false,validateFormats:false,allErrors:true});
  ajv.addSchema(api,"wordmate");
@@ -138,13 +139,15 @@ const root=path.resolve(__dirname,"..");
  const ann=ajv.getSchema("wordmate#/components/schemas/AnnotationsPatch");
  assert(ann({expected_version:0,favorite:true}));assert(!ann({expected_version:0}));assert(!ann({expected_version:1,easy:true,error_prone:true}));
  const safe=api.components.schemas.QuizItem;
+ assert(api.components.schemas.QuizAnsweredItem.required.includes('correct_option_id'));
+ assert.equal(api.components.schemas.QuizAnsweredItem.properties.selected_option_id.type,'string');
  assert(!('correct_option_id' in safe.properties));assert(!('word' in safe.properties));
- report.api.push("月测模式、月份格式、样本数必填、复习来源互斥及标注互斥Schema校验通过","未交卷题目DTO不含答案或词义快照");
+ report.api.push("月测模式、月份格式、样本数必填、复习来源互斥及标注互斥Schema校验通过","未答题DTO不含答案或词义快照；已保存首次选择的题型使用独立反馈Schema");
  report.api.push(n+" 个操作路径、参数和 operationId 校验通过",refs+" 个本地引用解析通过",Object.keys(api.components.schemas).length+" 个 JSON Schema 编译通过","基础请求合法样例、非法评分和双音频目标拒绝通过");
  examples.quiz_create={month:"2026-10",mode:"sample",sample_count:20};
  examples.quiz_submit={expected_version:21,confirm_unanswered:true,session_id:u,lease_generation:1};
  examples.annotations_patch={expected_version:0,easy:false,error_prone:true,favorite:true};
- examples.word_export={format:"csv",filter:{marks:["error_prone"]},include_sentences:false};
+ examples.word_export={word_ids:[u]};
  examples.quiz_mistake_review={source:"quiz",quiz_id:u};
  for(const [pathName,sample] of [["/children/{child_id}/monthly-quizzes",examples.quiz_create],["/monthly-quizzes/{quiz_id}/submit",examples.quiz_submit],["/children/{child_id}/word-exports",examples.word_export]]){
   const schema=api.paths[pathName].post.requestBody.content['application/json'].schema;

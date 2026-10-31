@@ -63,13 +63,9 @@
     "favorite": true
   },
   "word_export": {
-    "format": "csv",
-    "filter": {
-      "marks": [
-        "error_prone"
-      ]
-    },
-    "include_sentences": false
+    "word_ids": [
+      "11111111-1111-4111-8111-111111111111"
+    ]
   },
   "quiz_mistake_review": {
     "source": "quiz",

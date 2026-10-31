@@ -1,3 +1,6 @@
+import {reserveAudio} from './audio-billing.ts';
+import {audioTariff,audioCharacters} from './audio-tariff.ts';
+import {settleAiCall,releaseAiCall} from './ai-wallet.ts';
 import {VoicePreviews} from './voice-previews.ts';
 import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile,unlink,stat,readdir} from 'node:fs/promises';
@@ -41,14 +44,16 @@ export class AudioService {
   const cache=hash(JSON.stringify([s.child,b.word_id||b.sentence_id,b.content_version,s.text,s.pronunciation,profileKey,b.accent,b.voice_id,b.speech_rate]));
   const existing=await one(q,"SELECT * FROM generation_jobs WHERE child_id=$1 AND kind='audio' AND dedupe_key=$2",[s.child,cache]);if(existing)return this.dto(q,existing);
   ensure(runtime.synthesize,503,'AUDIO_NOT_CONFIGURED');ensure(runtime.voices.some(v=>v.id===b.voice_id&&v.accent===b.accent),422,'VOICE_ACCENT_UNAVAILABLE');
+  ensure(Number((await one(q,"SELECT count(*)::int n FROM generation_jobs WHERE requested_by=$1 AND kind='audio' AND status IN ('queued','running')",[actor])).n)<40,429,'AUDIO_QUEUE_LIMIT');
   const asset=await one(q,"INSERT INTO audio_assets(child_id,child_word_id,sentence_id,content_version,content_hash,pronunciation_key,accent,voice_id,speech_rate,provider,provider_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id",[s.child,b.word_id??null,b.sentence_id??null,b.content_version,cache,s.pronunciation,b.accent,b.voice_id,b.speech_rate,profile.provider,profileKey]);
-  const job=await one(q,"INSERT INTO generation_jobs(child_id,requested_by,kind,dedupe_key,payload,max_attempts,run_after) VALUES($1,$2,'audio',$3,$4,3,$5) RETURNING *",[s.child,actor,cache,JSON.stringify({flow:'audio_0.1',audio_id:asset.id,request:b,profile,storage_profile:runtime.storageProfile,text:s.text}),this.a.now()]);return this.dto(q,job);
+  const tariff=audioTariff(String(profile.model),runtime.pricePer10000Characters);
+  const job=await one(q,"INSERT INTO generation_jobs(child_id,requested_by,kind,dedupe_key,payload,max_attempts,run_after) VALUES($1,$2,'audio',$3,$4,3,$5) RETURNING *",[s.child,actor,cache,JSON.stringify({flow:'audio_0.1',audio_id:asset.id,request:b,profile,storage_profile:runtime.storageProfile,text:s.text,audio_tariff:tariff}),this.a.now()]);return this.dto(q,job);
  });}
  async get(actor:string,id:string){return this.a.tx(async q=>this.dto(q,await this.scope(q,actor,id)));}
  async retry(actor:string,key:string,id:string){return this.a.write(actor,key,`audio:retry:${id}`,{},q=>this.scope(q,actor,id),async(q,j)=>{
   ensure(j.status==='failed'&&j.attempts<j.max_attempts,409,'AUDIO_NOT_RETRYABLE');
   await q.query("UPDATE audio_assets SET status='queued',error_code=NULL WHERE id=$1",[j.payload.audio_id]);
-  return this.dto(q,await one(q,"UPDATE generation_jobs SET status='queued',error_code=NULL,run_after=$2,updated_at=$2 WHERE id=$1 RETURNING *",[id,this.a.now()]));
+  return this.dto(q,await one(q,"UPDATE generation_jobs SET status='queued',requested_by=$3,error_code=NULL,run_after=$2,updated_at=$2 WHERE id=$1 RETURNING *",[id,this.a.now(),actor]));
  });}
  async content(actor:string,id:string){
   const asset=await this.a.tx(async q=>{const r=await one(q,'SELECT * FROM audio_assets WHERE id=$1',[uuid(id)]);ensure(r,404,'AUDIO_RESOURCE_NOT_FOUND');await this.source(q,actor,{word_id:r.child_word_id,sentence_id:r.sentence_id,content_version:r.content_version});ensure(r.status==='succeeded',409,'AUDIO_NOT_READY');return r;});
@@ -87,31 +92,37 @@ export class AudioService {
   let renewing:Promise<any>|undefined;
   const timer=setInterval(()=>{if(renewing)return;renewing=this.a.tx(q=>q.query("UPDATE generation_jobs SET lease_until=$3 WHERE id=$1 AND attempts=$2 AND status='running' AND lease_until>$4",[j.id,j.attempts,new Date(this.a.now().getTime()+180000),this.a.now()])).catch(()=>{}).finally(()=>{renewing=undefined;});},30000);timer.unref();
   try{
+   await this.a.tx(async q=>{
+    this.owned(await this.scope(q,j.requested_by,j.id),j);
+    j.payload.audio_tariff??=audioTariff(String(r.profile.model),r.pricePer10000Characters);
+    j.payload.billing_id=await reserveAudio(q,j.requested_by,j.child_id,j.id,j.payload.text,j.payload.audio_tariff);
+    await q.query('UPDATE generation_jobs SET payload=$2 WHERE id=$1',[j.id,JSON.stringify(j.payload)]);
+   });
    let bytes=await this.cachedSpool(j);
    if(!bytes){
     ensure(r.synthesize&&canonical(r.profile)===canonical(j.payload.profile),503,'AUDIO_TTS_CONFIGURATION_CHANGED');
-    await this.a.tx(async q=>{const current=await this.scope(q,j.requested_by,j.id);this.owned(current,j);await q.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[j.requested_by]);const since=new Date(this.a.now().getTime()-86400000);const usage=await one(q,'SELECT count(*) FILTER(WHERE child_id=$1)::int child_count,count(*) FILTER(WHERE actor_id=$2)::int user_count FROM audio_usage_events WHERE created_at>=$3',[j.child_id,j.requested_by,since]);ensure(usage.child_count<r.childDaily&&usage.user_count<r.userDaily,429,'AUDIO_DAILY_LIMIT');await q.query('INSERT INTO audio_usage_events(job_id,child_id,actor_id,attempt,characters,created_at) VALUES($1,$2,$3,$4,$5,$6)',[j.id,j.child_id,j.requested_by,j.attempts,j.payload.text.length,this.a.now()]);});
+    await this.a.tx(async q=>{this.owned(await this.scope(q,j.requested_by,j.id),j);await q.query('INSERT INTO audio_usage_events(job_id,child_id,actor_id,attempt,characters,created_at) VALUES($1,$2,$3,$4,$5,$6)',[j.id,j.child_id,j.requested_by,j.attempts,audioCharacters(j.payload.text),this.a.now()]);});
     const b=j.payload.request;const result=await r.synthesize!({text:j.payload.text,accent:b.accent,voiceId:b.voice_id,rate:b.speech_rate});ensure(mp3(result.bytes),503,'INVALID_AUDIO_RESPONSE');bytes=Buffer.from(result.bytes);
     j.payload.spool_attempt=j.attempts;j.payload.spool_sha=hash(bytes);
-    await writeFile(this.spool(j),bytes,{mode:0o600});
-    await this.a.tx(async q=>{this.owned(await this.scope(q,j.requested_by,j.id),j);await q.query('UPDATE generation_jobs SET payload=$2 WHERE id=$1',[j.id,JSON.stringify(j.payload)]);});
+    await this.a.tx(async q=>{this.owned(await this.scope(q,j.requested_by,j.id),j);await writeFile(this.spool(j),bytes!,{mode:0o600});await q.query('UPDATE generation_jobs SET payload=$2 WHERE id=$1',[j.id,JSON.stringify(j.payload)]);});
    }
    const key=`private/${j.child_id}/${j.id}/${j.payload.spool_attempt}.mp3`,store=r.stores[j.payload.storage_profile];
-   const existing=await store.stat(key);if(!existing)await store.put(key,bytes,'audio/mpeg');
-   ensure(hash(await store.get(key))===j.payload.spool_sha,503,'AUDIO_INTEGRITY_FAILED');
-   await this.a.tx(async q=>{this.owned(await this.scope(q,j.requested_by,j.id),j);await q.query("UPDATE audio_assets SET status='succeeded',storage_key=$2,storage_profile_id=$3,sha256=$4,size_bytes=$5,mime_type='audio/mpeg',error_code=NULL WHERE id=$1",[j.payload.audio_id,key,j.payload.storage_profile,j.payload.spool_sha,bytes!.length]);await q.query("UPDATE generation_jobs SET status='succeeded',result=$2,lease_until=NULL,updated_at=$3,error_code=NULL WHERE id=$1",[j.id,JSON.stringify({audio_id:j.payload.audio_id}),this.a.now()]);});
+   // Serialize bounded storage writes with deletion's family/child freeze. TTS stays outside transactions.
+   await this.a.tx(async q=>{this.owned(await this.scope(q,j.requested_by,j.id),j);const existing=await store.stat(key);if(!existing)await store.put(key,bytes!,'audio/mpeg');ensure(hash(await store.get(key))===j.payload.spool_sha,503,'AUDIO_INTEGRITY_FAILED');await q.query("UPDATE ai_calls SET state='ready',updated_at=now() WHERE id=$1 AND state='running'",[j.payload.billing_id]);await settleAiCall(q,j.payload.billing_id);await q.query("UPDATE audio_assets SET status='succeeded',storage_key=$2,storage_profile_id=$3,sha256=$4,size_bytes=$5,mime_type='audio/mpeg',error_code=NULL WHERE id=$1",[j.payload.audio_id,key,j.payload.storage_profile,j.payload.spool_sha,bytes!.length]);await q.query("UPDATE generation_jobs SET status='succeeded',result=$2,lease_until=NULL,updated_at=$3,error_code=NULL WHERE id=$1",[j.id,JSON.stringify({audio_id:j.payload.audio_id}),this.a.now()]);});
    await unlink(this.spool(j)).catch(()=>{});
-  }catch(e){await this.fail(j.id,j.attempts,e);}finally{clearInterval(timer);await renewing;}
+  }catch(e){if(['CHILD_NOT_FOUND','FAMILY_NOT_FOUND','ACCOUNT_UNAVAILABLE','PRIVACY_CONSENT_REQUIRED'].includes((e as any)?.code))await unlink(this.spool(j)).catch(()=>{});await this.fail(j.id,j.attempts,e);}finally{clearInterval(timer);await renewing;}
  }
  private owned(current:Row,claimed:Row){ensure(current.status==='running'&&current.attempts===claimed.attempts&&new Date(current.lease_until)>this.a.now(),409,'AUDIO_LEASE_LOST');}
  private async fail(id:string,attempt:number|undefined,e:any){
-  const allowed=['ACCOUNT_UNAVAILABLE','FAMILY_NOT_FOUND','CHILD_NOT_FOUND','AUDIO_CONTENT_CHANGED','AUDIO_RESOURCE_NOT_FOUND','AUDIO_ATTEMPTS_EXHAUSTED','AUDIO_STORAGE_PROFILE_UNAVAILABLE','AUDIO_TTS_CONFIGURATION_CHANGED','AUDIO_DAILY_LIMIT','INVALID_AUDIO_RESPONSE','AUDIO_STORAGE_ACCESS_DENIED','AUDIO_STORAGE_UNAVAILABLE','AUDIO_INTEGRITY_FAILED'];
+  const allowed=['ACCOUNT_UNAVAILABLE','FAMILY_NOT_FOUND','CHILD_NOT_FOUND','PRIVACY_CONSENT_REQUIRED','AI_INSUFFICIENT_BALANCE','AUDIO_PRICE_NOT_CONFIGURED','AI_CALL_EXPIRED','AUDIO_CONTENT_CHANGED','AUDIO_RESOURCE_NOT_FOUND','AUDIO_ATTEMPTS_EXHAUSTED','AUDIO_STORAGE_PROFILE_UNAVAILABLE','AUDIO_TTS_CONFIGURATION_CHANGED','INVALID_AUDIO_RESPONSE','AUDIO_STORAGE_ACCESS_DENIED','AUDIO_STORAGE_UNAVAILABLE','AUDIO_INTEGRITY_FAILED'];
   if(e?.code==='AUDIO_LEASE_LOST')return;
   const code=allowed.includes(e?.code)?e.code:'AUDIO_SYNTHESIS_FAILED';
-  await this.a.tx(async q=>{const j=await one(q,'SELECT * FROM generation_jobs WHERE id=$1 FOR UPDATE',[id]);if(!j||attempt!==undefined&&(j.attempts!==attempt||j.status!=='running')||attempt===undefined&&!(j.status==='queued'&&new Date(j.run_after)<=this.a.now()||j.status==='running'&&new Date(j.lease_until)<=this.a.now()))return;
+  await this.a.tx(async q=>{const j=await one(q,'SELECT * FROM generation_jobs WHERE id=$1 FOR UPDATE',[id]);if(!j||attempt!==undefined&&(j.attempts!==attempt||!['running','failed','cancelled'].includes(j.status))||attempt===undefined&&!(j.status==='queued'&&new Date(j.run_after)<=this.a.now()||j.status==='running'&&new Date(j.lease_until)<=this.a.now()))return;
+   if(j.payload.billing_id)await releaseAiCall(q,j.payload.billing_id,code);
+   if(['failed','cancelled'].includes(j.status))return;
    const cancelled=['ACCOUNT_UNAVAILABLE','FAMILY_NOT_FOUND','CHILD_NOT_FOUND','AUDIO_CONTENT_CHANGED','AUDIO_RESOURCE_NOT_FOUND'].includes(code);
    const auto=!cancelled&&e?.retryable===true&&j.attempts<j.max_attempts;
-   await q.query("UPDATE generation_jobs SET status=$2,error_code=$3,lease_until=NULL,run_after=$4,updated_at=$5 WHERE id=$1",[id,cancelled?'cancelled':auto?'queued':'failed',code,new Date(this.a.now().getTime()+(j.attempts===1?5000:30000)),this.a.now()]);await q.query("UPDATE audio_assets SET status=$2,error_code=$3 WHERE id=$1",[j.payload.audio_id,auto?'queued':'failed',code]);
+   await q.query("UPDATE generation_jobs SET status=$2,error_code=$3,lease_until=NULL,run_after=$4,updated_at=$5,attempts=CASE WHEN $6 THEN GREATEST(attempts-1,0) ELSE attempts END WHERE id=$1",[id,cancelled?'cancelled':auto?'queued':'failed',code,new Date(this.a.now().getTime()+(j.attempts===1?5000:30000)),this.a.now(),['AI_INSUFFICIENT_BALANCE','AUDIO_PRICE_NOT_CONFIGURED'].includes(code)]);await q.query("UPDATE audio_assets SET status=$2,error_code=$3 WHERE id=$1",[j.payload.audio_id,auto?'queued':'failed',code]);
   });
  }
 }

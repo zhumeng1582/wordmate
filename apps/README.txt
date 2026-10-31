@@ -1,3 +1,16 @@
+2026-10-24 隐私与删除能力
+设置和家庭账号面板新增“隐私与数据管理”。首次登录前阅读政策并主动确认监护人授权；服务端按政策版本/内容摘要记同意与撤回。撤回后业务访问停止，删除、退出家庭、管理权转交和注销仍可用。用户无需重新同意即可仅登录已有账号进行数据管理，受限令牌不能用于学习。
+已实现孩子/家庭冻结删除、文件与记录清理、本人进度查询/失败重试、成员退出/移除、管理权转交、账号注销及本机数据清除。新迁移为 015_privacy_lifecycle.sql，存量 PostgreSQL 使用 migrate:privacy；本地 PGlite 重启自动补齐。
+完整配置、存储删除权限、备份删除清单与恢复步骤见根目录 PRIVACY-AND-DELETION.txt。政策运营者/联系渠道/备份期限未填时，正式环境拒绝接受草案；此前说明中的隐私/删除“尚未实现”项以本条更新为准。真实云端权限、备份清理和微信真机尚待验收。
+
+2026-10-24 三项上线缺陷修复
+- 家庭页创建孩子的 school_grade/gender 已与严格 DTO 和 OpenAPI 对齐，覆盖空选项、非法值及真实路由持久化。
+- 删除源词本会在同一事务下架公开快照；公共搜索、预览和加入同时拒绝已归档源词本，已加入用户保留本地快照。
+- 账号海报和公共背景池使用 10 分钟领取租约及独立领取标识；迟到的成功/失败不能覆盖新领取，上传按领取隔离并清理落败对象。
+- 新增 apps/api/migrations/014_release_fixes.sql：增加租约列并下架旧代码遗留的已归档公开源词本。可重复执行；不删除学习记录。
+- 本地 PGlite 重启后端会自动应用 014。已有 PostgreSQL 已完成 002–013 时，先停止旧后端/Worker，执行 corepack pnpm build:api 和 corepack pnpm --filter @wordmate/api migrate:release-fixes，再启动新后端。更旧数据库可用 migrate:audio 按顺序补齐 002–014；空库使用 migrate。请勿让旧 Worker 与新版本并行处理迁移后的任务。
+- 修复验证使用隔离数据库与假生成器，没有调用收费服务或迁移真实生产库。其他上线条件仍见根目录 RELEASE-READINESS-2026-10-24.txt。
+
 最新变更（2026-10-21）：图片/拍照/文档导入和任选CSV导出已接入，配置与格式边界见 deliverables/0.1/technical/import-export.txt。正式上线审核结论：未达标，阻断项见 deliverables/0.1/technical/release-audit.txt。本地仍为开发构建，不能直接提交发布。OCR当前配置为已授权的 qwen3.7-flash-2026-07-15。
 
 本地运行更新：优先参阅根目录 LOCAL-RUN.txt。新增 PGlite 持久化开发数据库和 node scripts/local-dev.cjs 一键构建启动，不再要求本地安装 Docker/PostgreSQL。持久化适配器已测试，前后端编译与类型检查已通过；真实 FSRS 及 Nest 路由测试通过，端口连接与微信模拟器操作尚待用户终端联调。
@@ -17,7 +30,7 @@ apps/api/src/main.ts：HTTP 入口、服务端登录、错误脱敏。
 apps/api/src/validation.ts：本轮已实现请求的严格 DTO 校验。
 apps/api/test/core.test.ts：真实 SQL 引擎的端到端业务事务测试。
 apps/miniapp：首页、设置、家庭、词本、复习、月测、日历和错题等10个页面；AppID 已填入 project.config.json。
-packages/ai：DeepSeek（默认）/OpenAI/Qwen 和阿里云 CosyVoice 适配器。
+packages/ai：Qwen（默认）/OpenAI/DeepSeek 和阿里云 CosyVoice 适配器。
 infra/compose.yaml：只绑定本机的 PostgreSQL 开发配置。
 deliverables/0.1/database/001_schema.sql：数据库的初始迁移唯一来源。
 
@@ -163,13 +176,19 @@ AppSecret、OpenAI Key、阿里云 CosyVoice Key、OSS/数据库凭证只能在�
 - 分享卡片使用 600×480 封面，保存图片使用 600×800 海报，两者导出2倍分辨率；中英文字自动换行。
 - POST /children/{id}/checkin-share {date:YYYY-MM-DD}，需要登录和家庭成员权限。
 - 服务端读取当天实际学习数、目标快照、截至该日期的连续天数（历史日期未达标则为0，当天仍可延续昨日连续记录）；仅 checked_in 布尔值发送给已有 LLM 服务。
-- 同孩子同日期最多生成一次3句，父母共享缓存；每账号24小时最多准备20个不同日期的文案缓存。
+- 同孩子同日期的鼓励语缓存8小时，父母共享；每账号24小时最多准备20个不同日期的文案缓存。过期后按当天学习数据重新生成。
 - AI约6.5秒超时或校验失败用内置原创鼓励语，不阻塞分享，不伪造名人署名。换一句只切换缓存。
-- 006_checkin_shares.sql 本地启动自动应用；已有生产库执行 migrate:audio（包含增量迁移006）。
+- 生产后端每天补齐10张共享风景背景，按鼓励语主题优先挑选；首次部署或当日背景池尚未生成时，后台会优先生成背景池，全部失败时再按需生成。最多3个后台任务并行。
+- 打开分享时小程序每次请求服务端；鼓励语按孩子和日期缓存8小时，背景选择按账号、孩子和日期缓存8小时。小程序不内置主题背景，使用服务器选出的私有OSS图片叠加日期、鼓励语和学习数据。
+- 背景池图片保存35天，分享缓存到期由后台清理；OSS对象仅经登录鉴权读取，不公开临时供应商URL。本地开发不预生成背景池，避免运行开发服务就触发每日图片生成费用。
+- 默认复用 `QWEN_API_KEY`（或 `OCR_API_KEY`）和 `OCR_WORKSPACE_ID` 调用 Qwen Image；仅需隔离密钥/工作空间时才配置 `POSTER_IMAGE_API_KEY`、`POSTER_IMAGE_WORKSPACE_ID` 覆盖。配置 `POSTER_IMAGE_REGION`、`OSS_POSTER_PREFIX`，并复用 `OSS_BUCKET`、OSS地域/端点和服务端凭证；模型默认为 `qwen-image-2.1-turbo`。保持OSS桶为私有。
+- OSS RAM授权模板：`config/oss-share-poster-policy.template.json`，只授予海报前缀的读取、写入和过期清理权限。
+- `010_checkin_share_images.sql`、`011_checkin_poster_pool.sql` 本地启动自动应用；生产库执行 `corepack pnpm --filter @wordmate/api migrate` 应用完整业务迁移，或更新版 `migrate:audio`。
+- 本地手动生成今日最多 10 张共享海报背景：`corepack pnpm generate:poster-pool:local`。脚本固定连接 `.local/dev-db`，读取项目根目录 `.env` 中的图片模型和 OSS 配置；会调用付费图片模型并上传到配置的 OSS 私有桶，不会连接 `.env` 中的数据库地址。首次建议先执行 `corepack pnpm build:api`，再用 `node scripts/generate-poster-pool-local.cjs --limit=1` 验证单张；成功后运行完整命令。生成完成后重新打开分享预览即可使用池内背景。
 - 好友收到的链接固定为 /pages/home/index，无姓名、孩子ID、家庭口令；图片不含具体单词/错题。
 - 点击保存时才申请相册权限；拒绝后可打开设置重试。没有上报“分享成功”或更改打卡数据。
 - 当前海报未附小程序码；可直接通过好友卡片进入小程序。
-- 已用替身模型验证AI流程及回退，不在自动测试中消耗真实AI额度。
-- 测试：node --experimental-strip-types --test apps/api/test/checkin-share.test.ts；node --test scripts/test/share-poster.test.cjs。
+- 已用替身模型验证服务端图片队列、OSS存取隔离和主题提示词，不在自动测试中消耗真实AI额度。
+- 测试：`corepack pnpm test:checkin-share-images`；`node --test scripts/test/share-poster.test.cjs`。
 - 微信验收：分享当天/历史日期、切换文案、关闭重开、未达标记录、好友点击隐私隔离、保存相册及拒绝权限重试。
 - Canvas导出遵循 draw 回调后调用：https://docs.taro.zone/docs/apis/canvas/canvasToTempFilePath 。

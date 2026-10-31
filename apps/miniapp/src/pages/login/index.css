@@ -1,0 +1,14 @@
+.login-page{box-sizing:border-box;min-height:100vh;display:flex;flex-direction:column;padding:80px 54px 28px;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+.login-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;padding:12px 0 48px}
+.login-mark{display:flex;align-items:center;justify-content:center;width:112px;height:112px;border-radius:32px;background:var(--soft);color:var(--primary);font-size:52px;font-weight:600;line-height:1}
+.login-title{margin-top:30px;font-size:54px;font-weight:600;line-height:1.4;color:var(--text)}
+.login-subtitle{margin-top:12px;font-size:26px;color:var(--muted)}
+.login-actions{width:100%;max-width:620px;margin-top:78px}
+.login-button{min-height:100px;margin:0 0 24px;font-size:30px}
+.login-consent{display:flex;align-items:flex-start;gap:8px;font-size:23px;line-height:1.8;color:var(--muted)}
+.login-checkbox{flex-shrink:0;padding:8px;margin:-8px 0 0 -8px}
+.login-consent-copy{flex:1;min-width:0}
+.login-policy-link{color:var(--primary)}
+.login-later{margin:18px 0 0;font-size:25px;color:var(--muted)}
+.login-footer{flex-shrink:0;margin:0;font-size:23px;color:var(--muted)}
+.login-avatar-page{height:100vh}

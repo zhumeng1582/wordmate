@@ -1,0 +1,3 @@
+.help-heading{font-size:30px;font-weight:600;margin-bottom:18px}
+.help-text{font-size:27px;line-height:1.85;color:var(--secondary-text)}
+.help-text+.help-text{margin-top:20px}

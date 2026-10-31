@@ -11,6 +11,7 @@
     "test:core": "node --experimental-strip-types --test apps/api/test/core.test.ts",
     "test:ai": "node --experimental-strip-types --test packages/ai/test/*.test.ts",
     "local": "node scripts/local-dev.cjs",
+    "generate:poster-pool:local": "corepack pnpm build:api && node scripts/generate-poster-pool-local.cjs",
     "test:smoke": "node scripts/smoke-local.cjs",
     "test:local-db": "node --test apps/api/test/local-database.test.cjs",
     "test:routes": "node scripts/smoke-inprocess.cjs",
@@ -22,13 +23,25 @@
     "test:tts:live": "node --experimental-strip-types scripts/verify-tts.cjs",
     "test:oss:live": "node --experimental-strip-types scripts/verify-oss.cjs",
     "test:audio": "node --experimental-strip-types --test apps/api/test/audio.test.ts",
+    "test:checkin-share-images": "node --experimental-strip-types --test apps/api/test/checkin-share-images.test.ts apps/api/test/checkin-share.test.ts",
     "test:audio:flow": "corepack pnpm build:api && node scripts/verify-audio-flow.cjs",
     "test:import-export": "node --experimental-strip-types --test apps/api/test/import-export.test.ts",
     "test:ocr:live": "corepack pnpm build:api && node scripts/verify-ocr.cjs",
-    "build:release": "node scripts/build-release.cjs"
+    "test:ocr:flow": "corepack pnpm build:api && node scripts/verify-ocr-flow.cjs",
+    "build:release": "node scripts/build-release.cjs",
+    "check:production-env": "node scripts/check-production-env.cjs",
+    "test:release-scope": "node --experimental-strip-types --test apps/api/test/shared-wordbooks.test.ts",
+    "test:security": "node scripts/review-functional-security.cjs",
+    "test:security:http": "node scripts/security-http.cjs",
+    "test:ai-accounts": "corepack pnpm build:api && node --experimental-strip-types --test apps/api/test/ai-accounts.test.ts apps/api/test/ai-payments.test.ts apps/api/test/family-ai.test.ts && node scripts/test-ai-accounts-http.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",
     "typescript": "5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "body-parser@2.3.0": "2.4.0"
+    }
   }
 }

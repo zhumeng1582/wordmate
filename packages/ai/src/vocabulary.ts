@@ -35,6 +35,11 @@ export function vocabularyRequest(words:string[],theme='',level='小学英语'):
  }};
 }
 export function generateVocabulary(generator:TextGenerator,words:string[],theme='',level='小学英语'){return generator.generate(vocabularyRequest(words,theme,level));}
+// Re-validate vision results after they cross the miniapp boundary. This prevents
+// edited client payloads from bypassing the same word and sentence checks.
+export function validateVocabularyItems(words:string[],items:unknown,theme='',level='小学英语'){
+ return vocabularyRequest(words,theme,level).validate({items});
+}
 
 export const RAW_VOCABULARY_PROMPT_VERSION='vocabulary-raw-0.1-1';
 export type RawVocabularyBatch=VocabularyBatch&{error:null|'NO_WORDS_FOUND'|'TOO_MANY_WORDS'|'UNSAFE_INPUT'};

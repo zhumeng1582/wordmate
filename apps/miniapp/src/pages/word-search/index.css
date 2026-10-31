@@ -1,0 +1,13 @@
+.search-fields{display:grid;gap:8px}
+.search-fields .field{margin:8px 0}
+.search-count{margin:22px 4px}
+.search-result{padding:20px 24px;margin:14px 0}
+.search-result-heading{display:flex;align-items:center;gap:14px;min-height:72px}
+.search-result-lemma{font-size:30px;font-weight:650;flex-shrink:0}
+.search-result-heading .audio-text{flex:1;min-width:0;font-size:23px;padding:0;min-height:60px;align-items:center}
+.search-result-chevron{font-size:28px;color:var(--muted)}
+.search-result-detail{border-top:1px solid var(--border);padding-top:14px}
+.search-result-meaning{font-size:27px;margin-left:14px}
+.search-result-example{background:var(--field);border-radius:14px;padding:10px 16px;margin-top:14px}
+.search-result-example .audio-text{font-size:24px;padding:2px 0;min-height:60px}
+.search-result-example .muted{margin-left:38px}

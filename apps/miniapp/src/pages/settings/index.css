@@ -6,5 +6,6 @@
 .settings-entry[disabled]{background:transparent;color:var(--disabled-text);opacity:.65}
 .settings-entry-copy{flex:1}
 .settings-entry-title{font-weight:500}
+.settings-entry-description{margin-top:4px;font-size:23px;color:var(--muted);font-weight:400}
 .settings-chevron{font-size:38px;color:var(--muted)}
 .settings-hint{margin-top:16px}

@@ -1,0 +1,76 @@
+词伴服务器域名与部署
+
+当前证据
+.local/current-status.md（2026-10-23）记录：小程序备案已通过，ECS 的 API 曾通过
+systemd 运行，公网 HTTPS 域名和反向代理未完成。该记录不是当前服务器检查结果。
+部署前须核对：实际域名、域名备案、ECS IP、SSH 身份、系统和 Nginx/Node 版本、
+现有服务名/安装路径、RDS schema 版本及备份。保留现有生产环境变量和存储 profile。
+
+准备部署包（本机）
+  node scripts/prepare-server-release.cjs
+已确定域名时，可使用：
+  node scripts/prepare-server-release.cjs api.example.com
+脚本先编译 API/AI，再按白名单打包到 .local/server-releases/。
+包含编译产物、迁移 SQL、初始化 schema、锁文件、配置检查和删除清单工具。
+不包含本机 .env、数据库、node_modules 或真实凭证。不是从 Git HEAD 打包，
+会包含当前源码编译后的未提交改动，清单记录这一点。发布前仍须审阅并固定版本。
+
+服务器部署顺序
+1. 只读核对现有部署；不要直接用示例 unit 覆盖正在运行的服务。
+2. 服务器使用受支持且经验证的 Node LTS 和 pnpm 10.11.0。当前本机编译器版本
+   写入 release-manifest.json；服务器上安装生产依赖并验证启动才算服务器验收。
+3. 把包解压到新的版本目录，例如 /opt/wordmate/releases/版本号；校验 SHA-256。
+   在该目录运行：corepack pnpm install --prod --filter @wordmate/api... --frozen-lockfile
+4. 安全保存生产环境变量；infra/production.env.example 仅供核对，留空项必须补齐。
+   保留原 AI_CREDENTIAL_KEY 和所有仍被文件引用的存储 profile/prefix。
+   node --env-file=/etc/wordmate/api.env scripts/check-production-env.cjs
+5. 升级已有数据库前，停止旧 API/Worker，备份数据库并导出最新删除清单。
+   空库：node --env-file=/etc/wordmate/api.env apps/api/dist/migrate.js（001–018）
+   已有库：按实际版本补齐；migrate-audio.js 补 002–016，随后
+   node --env-file=/etc/wordmate/api.env apps/api/dist/migrate-ai-accounts.js（017–018）。
+   018 发现未清冻结会拒绝升级；先查明并处理，不能绕过检查。不要对旧库执行空库迁移。
+6. 按现有服务账户和目录适配 infra/wordmate-api.service.example。
+   /usr/bin/node 必须替换为服务器实际的 Node 路径；状态目录需可写。
+   新版先验证生产配置和本机 /api/health，再切换现有服务；保留上版和备份。
+
+域名和 HTTPS
+1. 域名在实际 DNS 服务商处添加 API 子域名 A 记录，指向确认后的 ECS 公网 IP；
+   检查是否有旧 AAAA/CNAME，避免部分网络访问旧服务器。
+2. 为该完整子域名申请 TLS 证书并安装完整链与私钥。生成的 Nginx 配置使用
+   /etc/letsencrypt/live/完整域名/fullchain.pem 与 privkey.pem；按实际证书位置适配。
+   配置证书续期和到期告警；首次签发方式依证书服务商而定。
+3. ECS 安全组和系统防火墙按实际需要允许 80/443；API 3000 仅绑定回环。
+4. nginx.wordmate.conf 需装入 Nginx 的 http 配置上下文，再执行 nginx -t。
+   不重复安装同名限流 zone；检查旧 server_name，避免重复虚拟主机。
+5. 验证证书域名、有效期、完整链、HTTP 跳转、HTTPS /api/health 和未授权请求拒绝。
+   health 只证明 HTTP 进程可用；数据库、OSS、登录和 AI 仍需各自验证。
+6. 微信公众平台的服务器域名填写 https://完整API域名（不含 /api）；按实际调用配置
+   request/uploadFile/downloadFile。小程序构建 MINIAPP_API_BASE 才带 /api。
+   在开启合法域名校验的微信真机上验收后才算完成域名接入。
+
+回滚
+先停止新版 Worker；如有数据库结构变更，不直接换旧代码重启。保持维护状态，
+按经过验证的兼容性方案或备份恢复，恢复后重放独立保存的最新删除清单。
+保留原生产配置和加密密钥；确认文件、账务和已删除资料状态后再开放访问。
+
+2026-10-30 实际部署
+正式 API：https://api.dancigongxue.world/api；ECS：8.137.113.116。
+当前版本 /var/www/wordmate-current 指向 /var/www/wordmate-releases/2026-10-30-domain-01。
+systemd 使用 wordmate 用户、Node 22、production.env，启动前检查生产配置。
+配置文件含密钥，0600 权限；原部署 /var/www/wordmate 与部署备份保留。
+OSS 使用 WordmateEcsOssProduction 实例角色和 IMDSv2 临时凭证。
+POSTER_POOL_PREWARM=false，海报按需生成。
+已完成 002–018 正式迁移和生产配置检查，数据库当前 52 张 wordmate 表。
+备份脚本 scripts/server-backup.cjs：每日上海时间 04:15；删除清单每小时第 7 分钟；
+私有备份目录 /var/backups/wordmate，按配置 365 天保留和清理，计划在 /etc/cron.d/wordmate-backup。
+证书 certbot.timer 已启用，续期演练通过，续期后验证并重载 Nginx。
+完整验收记录见仓库根目录 SERVER-DEPLOYMENT-2026-10-30.txt。
+
+官方入口
+DNS：https://dns.console.aliyun.com/
+ECS：https://ecs.console.aliyun.com/
+备案：https://beian.aliyun.com/
+证书：https://yundun.console.aliyun.com/?p=cas
+微信：https://mp.weixin.qq.com/
+阿里云证书部署说明：
+https://help.aliyun.com/zh/ssl-certificate/manually-deploy-certificates-to-alibaba-cloud-lightweight-application-servers-or-ecs-instances

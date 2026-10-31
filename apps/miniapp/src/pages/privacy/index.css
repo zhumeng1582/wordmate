@@ -1,0 +1,2 @@
+.privacy-confirm-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:36px}.privacy-confirm{width:100%;max-height:80vh;overflow:auto;margin:0}.privacy-confirm .field{margin-top:16px}
+.privacy-policy-entry{justify-content:space-between;text-align:left}.privacy-policy-entry text{font-size:24px;color:var(--muted)}

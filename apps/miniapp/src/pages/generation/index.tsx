@@ -6,11 +6,12 @@ const statusNames:Record<string,string>={queued:'等待生成',running:'正在�
 export default function Generation(){
  const child=storage.get('child_id'),scope=`${storage.get('access_token')}:${child}`,editKey=`vocabulary-edit:${scope}`;
  const [jobs,setJobs]=useState<any[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[visible,setVisible]=useState(true);
- const inFlight=useRef(false),polling=useRef(false);
+ const inFlight=useRef(false),polling=useRef(false),serial=useRef(0),context=useRef('');
  const pending=storage.get(`vocabulary-submit:${scope}`);
  const run=async(fn:()=>Promise<any>)=>{if(inFlight.current)return;inFlight.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(message(e));}finally{inFlight.current=false;setBusy(false);}};
- const refresh=async()=>{const result=await api(`/children/${child}/ai-batches`);setJobs(result.items);setLoaded(true);};
- useDidShow(()=>{setVisible(true);if(child)void run(refresh);});useDidHide(()=>setVisible(false));
+ const refresh=async()=>{const ticket=++serial.current,key=`${storage.get('access_token')}:${storage.get('child_id')}`,result=await api(`/children/${storage.get('child_id')}/ai-batches`);if(ticket!==serial.current||key!==`${storage.get('access_token')}:${storage.get('child_id')}`)return;setJobs(result.items);setLoaded(true);};
+ const load=async()=>{const key=`${storage.get('access_token')}:${storage.get('child_id')}`,changed=context.current!==key;if(changed){context.current=key;setJobs([]);setLoaded(false);}if(!loaded||changed)setBusy(true);try{await refresh();setError('');}catch(e){setError(message(e));}finally{if(!inFlight.current)setBusy(false);}};
+ useDidShow(()=>{setVisible(true);if(storage.get('child_id')&&!inFlight.current)void load();});useDidHide(()=>{setVisible(false);serial.current++;});
  const active=jobs.some(j=>['queued','running'].includes(j.status));
  useEffect(()=>{if(!visible||!active)return;const timer=setInterval(async()=>{if(polling.current||inFlight.current)return;polling.current=true;try{await refresh();setError('');}catch(e){setError(message(e));}finally{polling.current=false;}},2000);return()=>clearInterval(timer);},[visible,active,child]);
  return <View className='page'><View className='title'>生成记录</View><View className='muted'>显示当前孩子最近的 20 个任务。生成完成后自动保存，离开页面不会取消任务。</View>

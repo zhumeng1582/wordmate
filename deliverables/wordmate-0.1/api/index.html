@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>完整 API 接口契约 · 词伴0.1</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f4f6f0;color:#203e34;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:1180px;margin:auto;padding:45px 30px 100px}h1{font-size:36px;line-height:1.3;margin:15px 0 25px}h2{font-size:25px;margin:0 0 18px}h3{font-size:18px}a{color:#23634c}section{background:white;border:1px solid #e0e6db;border-radius:19px;padding:26px;margin:22px 0}p{overflow-wrap:anywhere}small,.muted{color:#647568}.eyebrow{font-size:12px;letter-spacing:2px;color:#57795b}nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #dce4d7;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf1e5}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5ee;border-radius:12px;padding:18px;font:13px/1.65 ui-monospace,monospace}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.grid section{margin:0}.button{display:inline-block;padding:11px 17px;background:#255d48;color:white;border-radius:12px;text-decoration:none;margin:5px 5px 5px 0}.notice{border-left:4px solid #b7873c;background:#fff7e8;padding:16px 20px;margin:20px 0}.screen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}.screen-grid img{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 10px 25px #203e3415}.screen-grid h3{font-size:16px;margin:8px 0}.screen-grid p{font-size:12px;color:#67796e}.pill{font-size:12px;background:#e4eedc;padding:4px 8px;border-radius:6px}details{border:1px solid #e0e6db;border-radius:10px;padding:12px;margin:10px 0}summary{cursor:pointer;font-weight:600}input{width:100%;padding:14px;border:1px solid #d1dcc9;border-radius:10px;font:inherit}.flow{display:flex;gap:10px;flex-wrap:wrap}.flow span{background:#e8f1e4;padding:12px;border-radius:9px}@media print{body{background:white}main{max-width:none;padding:0}section{break-inside:avoid;border-color:#ccc}nav,.noprint{display:none}h1{font-size:26px}h2{font-size:20px}a{color:inherit}pre{font-size:10px}.screen-grid{grid-template-columns:repeat(3,1fr)}}</style><main><div class="eyebrow">WORDMATE / 词伴 · 0.1 · 2026-10-20</div><h1>完整 API 接口契约</h1><nav><a href="../index.html">交付总览</a><a href="../requirements/index.html">需求文档</a><a href="../design/index.html">页面设计</a><a href="../technical/index.html">技术方案</a><a href="../database/index.html">数据库</a><a href="../api/index.html">接口契约</a><a href="../checks/index.html">验证报告</a></nav><p>97个接口操作，64个Schema；OpenAPI版本3.1.1，产品版本0.1。API域名为占位，尚未部署。</p><a class="button" href="openapi.json">OpenAPI JSON</a><a class="button" href="examples.json">请求样例</a><section><h2>统一协议</h2><p>Authorization: Bearer；时间ISO8601 UTC，日期YYYY-MM-DD，月份YYYY-MM；UUID资源标识。跨家庭404，角色不足403；业务资源读写检查有效成员；删除任务仅按发起者本人鉴权，目标删除后仍可查询。</p><p>列表默认limit20，上限100，不透明cursor绑定筛选。写请求带Idempotency-Key，登录/只读POST例外；event_id持久去重。版本冲突409，过期资源410，业务校验422，限流429。</p><p>日志与月测结果响应用安全DTO；错误响应含request_id/code/message/retryable，可含details。查任务不得透传payload和未交卷题目答案。完整规则见每个operation的description。</p></section><input class="noprint" id="filter" placeholder="搜索接口用途、路径或权限"><div id="operations"><details class="operation"><summary><span class="pill">POST</span> /auth/wechat · 微信登录</summary><p>code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。<br>权限：公开</p><pre>{
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>完整 API 接口契约 · 词伴0.1</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f4f6f0;color:#203e34;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:1180px;margin:auto;padding:45px 30px 100px}h1{font-size:36px;line-height:1.3;margin:15px 0 25px}h2{font-size:25px;margin:0 0 18px}h3{font-size:18px}a{color:#23634c}section{background:white;border:1px solid #e0e6db;border-radius:19px;padding:26px;margin:22px 0}p{overflow-wrap:anywhere}small,.muted{color:#647568}.eyebrow{font-size:12px;letter-spacing:2px;color:#57795b}nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #dce4d7;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf1e5}pre{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5ee;border-radius:12px;padding:18px;font:13px/1.65 ui-monospace,monospace}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}.grid section{margin:0}.button{display:inline-block;padding:11px 17px;background:#255d48;color:white;border-radius:12px;text-decoration:none;margin:5px 5px 5px 0}.notice{border-left:4px solid #b7873c;background:#fff7e8;padding:16px 20px;margin:20px 0}.screen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px}.screen-grid img{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 10px 25px #203e3415}.screen-grid h3{font-size:16px;margin:8px 0}.screen-grid p{font-size:12px;color:#67796e}.pill{font-size:12px;background:#e4eedc;padding:4px 8px;border-radius:6px}details{border:1px solid #e0e6db;border-radius:10px;padding:12px;margin:10px 0}summary{cursor:pointer;font-weight:600}input{width:100%;padding:14px;border:1px solid #d1dcc9;border-radius:10px;font:inherit}.flow{display:flex;gap:10px;flex-wrap:wrap}.flow span{background:#e8f1e4;padding:12px;border-radius:9px}@media print{body{background:white}main{max-width:none;padding:0}section{break-inside:avoid;border-color:#ccc}nav,.noprint{display:none}h1{font-size:26px}h2{font-size:20px}a{color:inherit}pre{font-size:10px}.screen-grid{grid-template-columns:repeat(3,1fr)}}</style><main><div class="eyebrow">WORDMATE / 词伴 · 0.1 · 2026-10-20</div><h1>完整 API 接口契约</h1><nav><a href="../index.html">交付总览</a><a href="../requirements/index.html">需求文档</a><a href="../design/index.html">页面设计</a><a href="../technical/index.html">技术方案</a><a href="../database/index.html">数据库</a><a href="../api/index.html">接口契约</a><a href="../checks/index.html">验证报告</a><a href="../legal/index.html">合规与发布准备</a></nav><p>118个接口操作，86个Schema；OpenAPI版本3.1.1，产品版本0.1。API域名为占位，尚未部署。</p><a class="button" href="openapi.json">OpenAPI JSON</a><a class="button" href="examples.json">请求样例</a><section><h2>统一协议</h2><p>Authorization: Bearer；时间ISO8601 UTC，日期YYYY-MM-DD，月份YYYY-MM；UUID资源标识。跨家庭404，角色不足403；业务资源读写检查有效成员；删除任务仅按发起者本人鉴权，目标删除后仍可查询。</p><p>列表默认limit20，上限100，不透明cursor绑定筛选。写请求带Idempotency-Key，登录/只读POST例外；event_id持久去重。版本冲突409，过期资源410，业务校验422，限流429。</p><p>日志与月测结果响应用安全DTO；错误响应含request_id/code/message/retryable，可含details。查任务不得透传payload和未交卷题目答案。完整规则见每个operation的description。</p></section><input class="noprint" id="filter" placeholder="搜索接口用途、路径或权限"><div id="operations"><details class="operation"><summary><span class="pill">POST</span> /auth/wechat · 微信登录</summary><p>code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。<br>权限：公开</p><pre>{
   &quot;description&quot;: &quot;code 在服务端换取身份，自有会话初值 7 天；微信流程上线前复核。\n权限：公开&quot;,
   &quot;x-role&quot;: &quot;公开&quot;,
   &quot;responses&quot;: {
@@ -2290,8 +2290,8 @@
       }
     }
   ]
-}</pre></details><details class="operation"><summary><span class="pill">POST</span> /families/{family_id}/children · 创建孩子</summary><p><br>权限：owner</p><pre>{
-  &quot;description&quot;: &quot;\n权限：owner&quot;,
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /families/{family_id}/children · 创建孩子</summary><p>仅当前家庭管理员可创建孩子档案，包括旧幂等请求重放；普通有效家长仍可访问和陪学。</p><pre>{
+  &quot;description&quot;: &quot;仅当前家庭管理员可创建孩子档案，包括旧幂等请求重放；普通有效家长仍可访问和陪学。&quot;,
   &quot;x-role&quot;: &quot;owner&quot;,
   &quot;responses&quot;: {
     &quot;201&quot;: {
@@ -2428,6 +2428,26 @@
               &quot;description&quot;: &quot;&quot;,
               &quot;minLength&quot;: 1,
               &quot;maxLength&quot;: 40
+            },
+            &quot;accent&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;enum&quot;: [
+                &quot;en-GB&quot;,
+                &quot;en-US&quot;
+              ]
+            },
+            &quot;school_grade&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;maxLength&quot;: 24,
+              &quot;pattern&quot;: &quot;^[^\\u0000-\\u001f\\u007f]*$&quot;
+            },
+            &quot;gender&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;enum&quot;: [
+                &quot;unspecified&quot;,
+                &quot;girl&quot;,
+                &quot;boy&quot;
+              ]
             }
           },
           &quot;required&quot;: [
@@ -5277,6 +5297,31 @@
         }
       }
     },
+    &quot;202&quot;: {
+      &quot;description&quot;: &quot;已排队&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;description&quot;: &quot;&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AudioJob&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ],
+            &quot;description&quot;: &quot;&quot;
+          }
+        }
+      }
+    },
     &quot;400&quot;: {
       &quot;description&quot;: &quot;请求格式错误&quot;,
       &quot;content&quot;: {
@@ -5353,31 +5398,6 @@
         &quot;application/json&quot;: {
           &quot;schema&quot;: {
             &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
-          }
-        }
-      }
-    },
-    &quot;202&quot;: {
-      &quot;description&quot;: &quot;已排队&quot;,
-      &quot;content&quot;: {
-        &quot;application/json&quot;: {
-          &quot;schema&quot;: {
-            &quot;type&quot;: &quot;object&quot;,
-            &quot;additionalProperties&quot;: false,
-            &quot;properties&quot;: {
-              &quot;request_id&quot;: {
-                &quot;type&quot;: &quot;string&quot;,
-                &quot;description&quot;: &quot;&quot;
-              },
-              &quot;data&quot;: {
-                &quot;$ref&quot;: &quot;#/components/schemas/AudioJob&quot;
-              }
-            },
-            &quot;required&quot;: [
-              &quot;request_id&quot;,
-              &quot;data&quot;
-            ],
-            &quot;description&quot;: &quot;&quot;
           }
         }
       }
@@ -6962,7 +6982,7 @@
                   &quot;items&quot;: {
                     &quot;type&quot;: &quot;array&quot;,
                     &quot;items&quot;: {
-                      &quot;$ref&quot;: &quot;#/components/schemas/ReviewCard&quot;
+                      &quot;$ref&quot;: &quot;#/components/schemas/StudyCard&quot;
                     }
                   },
                   &quot;next_cursor&quot;: {
@@ -6974,11 +6994,22 @@
                         &quot;type&quot;: &quot;null&quot;
                       }
                     ]
+                  },
+                  &quot;total&quot;: {
+                    &quot;type&quot;: &quot;integer&quot;,
+                    &quot;minimum&quot;: 0,
+                    &quot;description&quot;: &quot;移除不可学习的未答项后的队列总数&quot;
+                  },
+                  &quot;remaining&quot;: {
+                    &quot;type&quot;: &quot;integer&quot;,
+                    &quot;minimum&quot;: 0
                   }
                 },
                 &quot;required&quot;: [
                   &quot;items&quot;,
-                  &quot;next_cursor&quot;
+                  &quot;next_cursor&quot;,
+                  &quot;total&quot;,
+                  &quot;remaining&quot;
                 ],
                 &quot;description&quot;: &quot;&quot;
               }
@@ -7499,9 +7530,9 @@
       }
     }
   }
-}</pre></details><details class="operation"><summary><span class="pill">GET</span> /children/{child_id}/words · 孩子词本分页列表</summary><p>已实现：按创建时间和ID倒序，cursor为上页最后单词ID，limit默认50且最大100，返回total。当前不支持q、wordbook_id、marks、include_archived；搜索和标注筛选仍待开发。</p><pre>{
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /children/{child_id}/words · 孩子词本分页列表</summary><p>按创建时间和ID倒序分页，cursor为上一页最后单词ID，limit默认50且最大100，返回total。支持q匹配英文单词/中文释义，以及mark筛选 easy、error_prone、favorite、needs_correction。标注与待处理纠错状态随词条返回。</p><pre>{
   &quot;x-role&quot;: &quot;member&quot;,
-  &quot;description&quot;: &quot;已实现：按创建时间和ID倒序，cursor为上页最后单词ID，limit默认50且最大100，返回total。当前不支持q、wordbook_id、marks、include_archived；搜索和标注筛选仍待开发。&quot;,
+  &quot;description&quot;: &quot;按创建时间和ID倒序分页，cursor为上一页最后单词ID，limit默认50且最大100，返回total。支持q匹配英文单词/中文释义，以及mark筛选 easy、error_prone、favorite、needs_correction。标注与待处理纠错状态随词条返回。&quot;,
   &quot;parameters&quot;: [
     {
       &quot;in&quot;: &quot;path&quot;,
@@ -7528,6 +7559,29 @@
         &quot;type&quot;: &quot;integer&quot;,
         &quot;minimum&quot;: 1,
         &quot;maximum&quot;: 100
+      }
+    },
+    {
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;name&quot;: &quot;q&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;maxLength&quot;: 120
+      }
+    },
+    {
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;name&quot;: &quot;mark&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;enum&quot;: [
+          &quot;easy&quot;,
+          &quot;error_prone&quot;,
+          &quot;favorite&quot;,
+          &quot;needs_correction&quot;
+        ]
       }
     }
   ],
@@ -7617,6 +7671,9 @@
                               ]
                             }
                           ]
+                        },
+                        &quot;annotations&quot;: {
+                          &quot;$ref&quot;: &quot;#/components/schemas/Annotations&quot;
                         }
                       },
                       &quot;required&quot;: [
@@ -7628,7 +7685,8 @@
                         &quot;ipa_gb&quot;,
                         &quot;ipa_us&quot;,
                         &quot;dictionary_source&quot;,
-                        &quot;example&quot;
+                        &quot;example&quot;,
+                        &quot;annotations&quot;
                       ]
                     }
                   },
@@ -11239,9 +11297,9 @@
       }
     }
   }
-}</pre></details><details class="operation"><summary><span class="pill">GET</span> /monthly-quizzes/{quiz_id}/items · 读取月测题目</summary><p>准备完成后可读，前后均不在本接口返回答案；答案只能从submitted results接口读取。<br>权限：member</p><pre>{
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /monthly-quizzes/{quiz_id}/items · 读取月测题目</summary><p>有效家庭成员按页读取。未答题不返回正确选项；in_progress 且首次选择已保存的题可返回即时反馈。结果和词义快照在交卷后使用结果接口读取。</p><pre>{
   &quot;x-role&quot;: &quot;member&quot;,
-  &quot;description&quot;: &quot;准备完成后可读，前后均不在本接口返回答案；答案只能从submitted results接口读取。\n权限：member&quot;,
+  &quot;description&quot;: &quot;有效家庭成员按页读取。未答题不返回正确选项；in_progress 且首次选择已保存的题可返回即时反馈。结果和词义快照在交卷后使用结果接口读取。&quot;,
   &quot;parameters&quot;: [
     {
       &quot;in&quot;: &quot;path&quot;,
@@ -11290,7 +11348,14 @@
                   &quot;items&quot;: {
                     &quot;type&quot;: &quot;array&quot;,
                     &quot;items&quot;: {
-                      &quot;$ref&quot;: &quot;#/components/schemas/QuizItem&quot;
+                      &quot;oneOf&quot;: [
+                        {
+                          &quot;$ref&quot;: &quot;#/components/schemas/QuizItem&quot;
+                        },
+                        {
+                          &quot;$ref&quot;: &quot;#/components/schemas/QuizAnsweredItem&quot;
+                        }
+                      ]
                     }
                   },
                   &quot;next_cursor&quot;: {
@@ -11411,9 +11476,9 @@
       }
     }
   }
-}</pre></details><details class="operation"><summary><span class="pill">PUT</span> /monthly-quizzes/{quiz_id}/items/{item_id}/answer · 保存月测答案或标记</summary><p>仅in_progress，校验有效持租约人、代次、题版本；null清空答案；选项必须来自该题；递增题与测验版本，同事务完成。<br>权限：member</p><pre>{
+}</pre></details><details class="operation"><summary><span class="pill">PUT</span> /monthly-quizzes/{quiz_id}/items/{item_id}/answer · 保存月测答案或标记</summary><p>仅 in_progress，校验有效持租约人、代次及题版本。首次选择在服务端保存后返回该题反馈；已保存的选择不能改成其他选项或清空（409 ANSWER_LOCKED），可继续更新标记。相同请求安全重放，不预发其他未答题答案。</p><pre>{
   &quot;x-role&quot;: &quot;member&quot;,
-  &quot;description&quot;: &quot;仅in_progress，校验有效持租约人、代次、题版本；null清空答案；选项必须来自该题；递增题与测验版本，同事务完成。\n权限：member&quot;,
+  &quot;description&quot;: &quot;仅 in_progress，校验有效持租约人、代次及题版本。首次选择在服务端保存后返回该题反馈；已保存的选择不能改成其他选项或清空（409 ANSWER_LOCKED），可继续更新标记。相同请求安全重放，不预发其他未答题答案。&quot;,
   &quot;parameters&quot;: [
     {
       &quot;in&quot;: &quot;path&quot;,
@@ -11454,7 +11519,14 @@
                 &quot;additionalProperties&quot;: false,
                 &quot;properties&quot;: {
                   &quot;item&quot;: {
-                    &quot;$ref&quot;: &quot;#/components/schemas/QuizItem&quot;
+                    &quot;oneOf&quot;: [
+                      {
+                        &quot;$ref&quot;: &quot;#/components/schemas/QuizItem&quot;
+                      },
+                      {
+                        &quot;$ref&quot;: &quot;#/components/schemas/QuizAnsweredItem&quot;
+                      }
+                    ]
                   },
                   &quot;quiz_version&quot;: {
                     &quot;type&quot;: &quot;integer&quot;,
@@ -12506,8 +12578,8 @@
       }
     }
   ]
-}</pre></details><details class="operation"><summary><span class="pill">POST</span> /lifecycle-jobs/{job_id}/retry · 重试删除任务</summary><p>仅发起者；failed时置queued、清零attempts，沿用原ID与phase继续。queued/running/succeeded返回当前状态，不重复创建。事务检查与幂等键防并发重试；目标仍冻结。</p><pre>{
-  &quot;description&quot;: &quot;仅发起者；failed时置queued、清零attempts，沿用原ID与phase继续。queued/running/succeeded返回当前状态，不重复创建。事务检查与幂等键防并发重试；目标仍冻结。&quot;,
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /lifecycle-jobs/{job_id}/retry · 重试删除任务</summary><p>仅发起者，撤回后可用；failed 时沿用任务 ID 和已清理的文件记录继续执行，重复重试返回当前状态。目标保持冻结。</p><pre>{
+  &quot;description&quot;: &quot;仅发起者，撤回后可用；failed 时沿用任务 ID 和已清理的文件记录继续执行，重复重试返回当前状态。目标保持冻结。&quot;,
   &quot;x-role&quot;: &quot;authenticated&quot;,
   &quot;responses&quot;: {
     &quot;200&quot;: {
@@ -12782,6 +12854,43 @@
                   &quot;maxLength&quot;: 80
                 }
               }
+            },
+            {
+              &quot;type&quot;: &quot;object&quot;,
+              &quot;additionalProperties&quot;: false,
+              &quot;properties&quot;: {
+                &quot;wordbook_id&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;format&quot;: &quot;uuid&quot;
+                },
+                &quot;source_type&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;const&quot;: &quot;vision&quot;
+                },
+                &quot;raw_text&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;minLength&quot;: 1,
+                  &quot;maxLength&quot;: 8000
+                },
+                &quot;prepared_items&quot;: {
+                  &quot;type&quot;: &quot;array&quot;,
+                  &quot;minItems&quot;: 1,
+                  &quot;maxItems&quot;: 30,
+                  &quot;items&quot;: {
+                    &quot;$ref&quot;: &quot;#/components/schemas/VocabularyGenerationItem&quot;
+                  }
+                },
+                &quot;theme&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;maxLength&quot;: 80
+                }
+              },
+              &quot;required&quot;: [
+                &quot;wordbook_id&quot;,
+                &quot;source_type&quot;,
+                &quot;raw_text&quot;,
+                &quot;prepared_items&quot;
+              ]
             },
             {
               &quot;type&quot;: &quot;object&quot;,
@@ -13653,6 +13762,31 @@
         }
       }
     },
+    &quot;202&quot;: {
+      &quot;description&quot;: &quot;已排队&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;description&quot;: &quot;&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/VoicePreview&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ],
+            &quot;description&quot;: &quot;&quot;
+          }
+        }
+      }
+    },
     &quot;400&quot;: {
       &quot;description&quot;: &quot;请求格式错误&quot;,
       &quot;content&quot;: {
@@ -13729,31 +13863,6 @@
         &quot;application/json&quot;: {
           &quot;schema&quot;: {
             &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
-          }
-        }
-      }
-    },
-    &quot;202&quot;: {
-      &quot;description&quot;: &quot;已排队&quot;,
-      &quot;content&quot;: {
-        &quot;application/json&quot;: {
-          &quot;schema&quot;: {
-            &quot;type&quot;: &quot;object&quot;,
-            &quot;additionalProperties&quot;: false,
-            &quot;properties&quot;: {
-              &quot;request_id&quot;: {
-                &quot;type&quot;: &quot;string&quot;,
-                &quot;description&quot;: &quot;&quot;
-              },
-              &quot;data&quot;: {
-                &quot;$ref&quot;: &quot;#/components/schemas/VoicePreview&quot;
-              }
-            },
-            &quot;required&quot;: [
-              &quot;request_id&quot;,
-              &quot;data&quot;
-            ],
-            &quot;description&quot;: &quot;&quot;
           }
         }
       }
@@ -14167,9 +14276,9 @@
       }
     }
   }
-}</pre></details><details class="operation"><summary><span class="pill">POST</span> /children/{child_id}/import-file · 提取图片或文档中的文字</summary><p>家庭成员权限；单文件最大4 MiB，base64 JSON请求最大6 MiB。支持JPG/PNG/TXT/CSV/TSV/XLSX/DOCX，UTF-8文本。Office压缩包最多256条目/展开8MiB/单条目2MiB，拒绝宏、嵌入对象、DTD和公式。结果最多8000字符，超限不截断。图片独立OCR，30次/账号/24小时，每相同图片最多3次失败；成功结果按账号/孩子/模型/摘要复用24小时。原文件不落盘，文字缓存按小时清理。返回文字供原AI录词接口使用，不直接创建单词。</p><pre>{
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /children/{child_id}/import-file · 识别图片并生成词条，或提取文档文字</summary><p>家庭成员权限；单文件最大4 MiB，base64 JSON请求最大6 MiB。支持JPG/PNG/TXT/CSV/TSV/XLSX/DOCX。图片通过一次Qwen视觉请求同时识别文字并生成最多30个完整词条；返回预生成条目供录词接口复用，避免第二次模型调用。可带existing_text与theme。文档只提取文字，后续走常规AI录词。结果最多8000字符；原文件不落盘，识别文本与生成结果按账号/孩子/模型/内容摘要缓存24小时，30次/账号/24小时，同一图片最多3次失败。</p><pre>{
   &quot;x-role&quot;: &quot;member&quot;,
-  &quot;description&quot;: &quot;家庭成员权限；单文件最大4 MiB，base64 JSON请求最大6 MiB。支持JPG/PNG/TXT/CSV/TSV/XLSX/DOCX，UTF-8文本。Office压缩包最多256条目/展开8MiB/单条目2MiB，拒绝宏、嵌入对象、DTD和公式。结果最多8000字符，超限不截断。图片独立OCR，30次/账号/24小时，每相同图片最多3次失败；成功结果按账号/孩子/模型/摘要复用24小时。原文件不落盘，文字缓存按小时清理。返回文字供原AI录词接口使用，不直接创建单词。&quot;,
+  &quot;description&quot;: &quot;家庭成员权限；单文件最大4 MiB，base64 JSON请求最大6 MiB。支持JPG/PNG/TXT/CSV/TSV/XLSX/DOCX。图片通过一次Qwen视觉请求同时识别文字并生成最多30个完整词条；返回预生成条目供录词接口复用，避免第二次模型调用。可带existing_text与theme。文档只提取文字，后续走常规AI录词。结果最多8000字符；原文件不落盘，识别文本与生成结果按账号/孩子/模型/内容摘要缓存24小时，30次/账号/24小时，同一图片最多3次失败。&quot;,
   &quot;parameters&quot;: [
     {
       &quot;in&quot;: &quot;path&quot;,
@@ -14206,6 +14315,14 @@
                       &quot;file&quot;,
                       &quot;image&quot;
                     ]
+                  },
+                  &quot;prepared_items&quot;: {
+                    &quot;type&quot;: &quot;array&quot;,
+                    &quot;minItems&quot;: 0,
+                    &quot;maxItems&quot;: 30,
+                    &quot;items&quot;: {
+                      &quot;$ref&quot;: &quot;#/components/schemas/VocabularyGenerationItem&quot;
+                    }
                   }
                 },
                 &quot;required&quot;: [
@@ -14324,11 +14441,21 @@
           &quot;properties&quot;: {
             &quot;name&quot;: {
               &quot;type&quot;: &quot;string&quot;,
+              &quot;minLength&quot;: 1,
               &quot;maxLength&quot;: 120
             },
             &quot;base64&quot;: {
               &quot;type&quot;: &quot;string&quot;,
+              &quot;minLength&quot;: 1,
               &quot;maxLength&quot;: 5592408
+            },
+            &quot;existing_text&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;maxLength&quot;: 8000
+            },
+            &quot;theme&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;maxLength&quot;: 80
             }
           },
           &quot;required&quot;: [
@@ -14340,6 +14467,2512 @@
     }
   },
   &quot;x-implementation&quot;: &quot;implemented&quot;
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /privacy/policy · 当前隐私政策</summary><p>无需登录。返回同一政策源的版本、内容摘要和正文；publishable 仅表示公开配置齐全，不能代替部署与平台验收。</p><pre>{
+  &quot;description&quot;: &quot;无需登录。返回同一政策源的版本、内容摘要和正文；publishable 仅表示公开配置齐全，不能代替部署与平台验收。&quot;,
+  &quot;x-role&quot;: &quot;public&quot;,
+  &quot;responses&quot;: {
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/PrivacyPolicy&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    }
+  },
+  &quot;security&quot;: []
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /me/privacy-consent · 查询同意状态</summary><p>按服务端最新版本和内容摘要判断，撤回后仍可调用。</p><pre>{
+  &quot;description&quot;: &quot;按服务端最新版本和内容摘要判断，撤回后仍可调用。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/PrivacyConsentStatus&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">PUT</span> /me/privacy-consent · 同意隐私政策及监护人声明</summary><p>版本/摘要必须匹配当前政策，guardian_confirmed 必须为 true；重复同意不新增事件。正式环境配置不完整时拒绝同意。</p><pre>{
+  &quot;description&quot;: &quot;版本/摘要必须匹配当前政策，guardian_confirmed 必须为 true；重复同意不新增事件。正式环境配置不完整时拒绝同意。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/PrivacyConsentStatus&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    }
+  },
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;$ref&quot;: &quot;#/components/schemas/PrivacyConsentRequest&quot;
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">DELETE</span> /me/privacy-consent · 撤回同意</summary><p>记录撤回事件，停止本人业务访问和未完成任务，保留其他家长共同管理的孩子资料；仍允许数据管理、删除和注销。</p><pre>{
+  &quot;description&quot;: &quot;记录撤回事件，停止本人业务访问和未完成任务，保留其他家长共同管理的孩子资料；仍允许数据管理、删除和注销。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/PrivacyConsentStatus&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    }
+  },
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;type&quot;: &quot;object&quot;,
+          &quot;additionalProperties&quot;: false,
+          &quot;properties&quot;: {
+            &quot;confirm&quot;: {
+              &quot;const&quot;: true
+            }
+          },
+          &quot;required&quot;: [
+            &quot;confirm&quot;
+          ]
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /me/data-management · 可管理的数据与成员</summary><p>撤回后可用，仅返回当前有效成员可管理的家庭及孩子名称/版本等最少信息；删除任务通过独立接口查询。</p><pre>{
+  &quot;description&quot;: &quot;撤回后可用，仅返回当前有效成员可管理的家庭及孩子名称/版本等最少信息；删除任务通过独立接口查询。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/DataManagement&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /lifecycle-jobs · 本人删除任务</summary><p>仅返回发起者本人的最近至多 100 项安全状态，未完成任务优先；不要求仍为家庭成员。</p><pre>{
+  &quot;description&quot;: &quot;仅返回发起者本人的最近至多 100 项安全状态，未完成任务优先；不要求仍为家庭成员。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;responses&quot;: {
+    &quot;400&quot;: {
+      &quot;description&quot;: &quot;请求格式错误&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;角色无权操作&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无访问权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;版本、会话或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;业务校验未通过&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;超过限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;外部服务不可用&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;type&quot;: &quot;object&quot;,
+                &quot;additionalProperties&quot;: false,
+                &quot;properties&quot;: {
+                  &quot;items&quot;: {
+                    &quot;type&quot;: &quot;array&quot;,
+                    &quot;items&quot;: {
+                      &quot;$ref&quot;: &quot;#/components/schemas/LifecycleJob&quot;
+                    }
+                  }
+                },
+                &quot;required&quot;: [
+                  &quot;items&quot;
+                ]
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /shared-wordbooks · 公开词本发现（首发关闭）</summary><p>旧路径明确拒绝访问。有效登录并同意隐私的账号也返回 403 PUBLIC_SHARING_DISABLED，不返回公开词汇。客户端或构建参数不能开启。</p><pre>{
+  &quot;description&quot;: &quot;旧路径明确拒绝访问。有效登录并同意隐私的账号也返回 403 PUBLIC_SHARING_DISABLED，不返回公开词汇。客户端或构建参数不能开启。&quot;,
+  &quot;x-role&quot;: &quot;member&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;q&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;limit&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;integer&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;offset&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;integer&quot;
+      }
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;未登录或令牌失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;PUBLIC_SHARING_DISABLED 或隐私/会话权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求校验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;x-release-disabled&quot;: true
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /shared-wordbooks/{shared_id} · 公开词本预览（首发关闭）</summary><p>公开快照不再通过此路径返回。历史订阅者在本家庭孩子词本接口继续学习。</p><pre>{
+  &quot;description&quot;: &quot;公开快照不再通过此路径返回。历史订阅者在本家庭孩子词本接口继续学习。&quot;,
+  &quot;x-role&quot;: &quot;member&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;shared_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;未登录或令牌失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;PUBLIC_SHARING_DISABLED 或隐私/会话权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求校验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;x-release-disabled&quot;: true
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /children/{child_id}/shared-wordbooks/{shared_id}/join · 加入公开词本（首发关闭）</summary><p>新加入和旧成功请求重放均返回 403 PUBLIC_SHARING_DISABLED，不创建词本或订阅，不改变已有副本。</p><pre>{
+  &quot;description&quot;: &quot;新加入和旧成功请求重放均返回 403 PUBLIC_SHARING_DISABLED，不创建词本或订阅，不改变已有副本。&quot;,
+  &quot;x-role&quot;: &quot;member&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;child_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;shared_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;$ref&quot;: &quot;#/components/parameters/IdempotencyKey&quot;
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;未登录或令牌失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;PUBLIC_SHARING_DISABLED 或隐私/会话权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求校验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;x-release-disabled&quot;: true
+}</pre></details><details class="operation"><summary><span class="pill">PUT</span> /children/{child_id}/wordbooks/{wordbook_id}/share · 停止历史词本共享</summary><p>只允许 published=false，且家庭有效成员须为原发布者；归档源词本也可停止。不创建新草稿，不编辑元数据。published=true 在幂等缓存读取前返回403 PUBLIC_SHARING_DISABLED。停止不移除其他家庭独立副本与进度。</p><pre>{
+  &quot;description&quot;: &quot;只允许 published=false，且家庭有效成员须为原发布者；归档源词本也可停止。不创建新草稿，不编辑元数据。published=true 在幂等缓存读取前返回403 PUBLIC_SHARING_DISABLED。停止不移除其他家庭独立副本与进度。&quot;,
+  &quot;x-role&quot;: &quot;member&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;child_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;wordbook_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;$ref&quot;: &quot;#/components/parameters/IdempotencyKey&quot;
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;未登录或令牌失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;PUBLIC_SHARING_DISABLED 或隐私/会话权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求校验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ],
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;type&quot;: &quot;object&quot;,
+                &quot;required&quot;: [
+                  &quot;id&quot;,
+                  &quot;published&quot;,
+                  &quot;version&quot;,
+                  &quot;title&quot;,
+                  &quot;description&quot;,
+                  &quot;target_level&quot;,
+                  &quot;word_count&quot;
+                ],
+                &quot;additionalProperties&quot;: false,
+                &quot;properties&quot;: {
+                  &quot;id&quot;: {
+                    &quot;type&quot;: &quot;string&quot;,
+                    &quot;format&quot;: &quot;uuid&quot;
+                  },
+                  &quot;published&quot;: {
+                    &quot;const&quot;: false
+                  },
+                  &quot;version&quot;: {
+                    &quot;type&quot;: &quot;integer&quot;,
+                    &quot;minimum&quot;: 1
+                  },
+                  &quot;title&quot;: {
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;description&quot;: {
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;target_level&quot;: {
+                    &quot;type&quot;: &quot;string&quot;
+                  },
+                  &quot;word_count&quot;: {
+                    &quot;type&quot;: &quot;integer&quot;,
+                    &quot;minimum&quot;: 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;type&quot;: &quot;object&quot;,
+          &quot;additionalProperties&quot;: false,
+          &quot;required&quot;: [
+            &quot;published&quot;
+          ],
+          &quot;properties&quot;: {
+            &quot;published&quot;: {
+              &quot;const&quot;: false
+            }
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /children/{child_id}/shared-wordbooks/{shared_id}/leave · 退出历史共享词本</summary><p>本家庭有效成员可退出孩子此前加入的副本，归档只读词本并停用订阅；不更改其他家庭副本。首发不允许重新加入。</p><pre>{
+  &quot;description&quot;: &quot;本家庭有效成员可退出孩子此前加入的副本，归档只读词本并停用订阅；不更改其他家庭副本。首发不允许重新加入。&quot;,
+  &quot;x-role&quot;: &quot;member&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;child_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;shared_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;$ref&quot;: &quot;#/components/parameters/IdempotencyKey&quot;
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;未登录或令牌失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;PUBLIC_SHARING_DISABLED 或隐私/会话权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;不存在或无权限&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求校验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ],
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;type&quot;: &quot;object&quot;,
+                &quot;additionalProperties&quot;: false,
+                &quot;required&quot;: [
+                  &quot;id&quot;,
+                  &quot;removed&quot;
+                ],
+                &quot;properties&quot;: {
+                  &quot;id&quot;: {
+                    &quot;type&quot;: &quot;string&quot;,
+                    &quot;format&quot;: &quot;uuid&quot;
+                  },
+                  &quot;removed&quot;: {
+                    &quot;const&quot;: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /me/ai-settings · 读取当前家长 AI 模式、模型与系统余额</summary><p>文字与图片模型独立配置，未配置时均为系统模式；family_id 指定当前家庭。返回家庭共享余额、一次性 20 元赠送剩余和本人对应模态 Key 状态，不返回 Key。多家庭未选择时只返回家庭列表和零余额。允许管理会话读取。</p><pre>{
+  &quot;description&quot;: &quot;文字与图片模型独立配置，未配置时均为系统模式；family_id 指定当前家庭。返回家庭共享余额、一次性 20 元赠送剩余和本人对应模态 Key 状态，不返回 Key。多家庭未选择时只返回家庭列表和零余额。允许管理会话读取。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;family_id&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;capability&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;enum&quot;: [
+          &quot;text&quot;,
+          &quot;vision&quot;
+        ],
+        &quot;default&quot;: &quot;text&quot;
+      }
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiSettings&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">PUT</span> /me/ai-settings · 保存当前家长 AI 配置</summary><p>按本人及 capability 分别保存模式、模型、加密 Key 和版本；更改文字设置不更改图片设置。图片只接受千问或 OpenAI 视觉模型。expected_version 控制并发。family_id 用于验证并返回该家庭钱包，不把私有 Key 分享给家庭。</p><pre>{
+  &quot;description&quot;: &quot;按本人及 capability 分别保存模式、模型、加密 Key 和版本；更改文字设置不更改图片设置。图片只接受千问或 OpenAI 视觉模型。expected_version 控制并发。family_id 用于验证并返回该家庭钱包，不把私有 Key 分享给家庭。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiSettings&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;$ref&quot;: &quot;#/components/schemas/AiSettingsWrite&quot;
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">DELETE</span> /me/ai-key · 删除当前家长私有 Key</summary><p>仅删除本人指定 capability 的 Key，不删除另一模态 Key；保留 BYOK 模式，不自动回退系统额度。</p><pre>{
+  &quot;description&quot;: &quot;仅删除本人指定 capability 的 Key，不删除另一模态 Key；保留 BYOK 模式，不自动回退系统额度。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiSettings&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;$ref&quot;: &quot;#/components/schemas/AiKeyDelete&quot;
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /me/ai-test · 用少量供应商用量测试已保存 Key</summary><p>仅自带 Key；文字测试和图片测试分别使用对应配置，vision 请求实际携带测试图片。会产生少量本人供应商用量，不扣家庭额度。</p><pre>{
+  &quot;description&quot;: &quot;仅自带 Key；文字测试和图片测试分别使用对应配置，vision 请求实际携带测试图片。会产生少量本人供应商用量，不扣家庭额度。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiConnectionTest&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: false,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;$ref&quot;: &quot;#/components/schemas/AiTestRequest&quot;
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /me/ai-usage · 读取最近 50 次调用和 50 笔账目</summary><p>最近 50 次家庭系统调用、本人私有调用及 50 笔家庭账目。赠送、充值、消费、退款带发起人 UUID；不包含学习正文或 Key。必须是有效家庭成员。</p><pre>{
+  &quot;description&quot;: &quot;最近 50 次家庭系统调用、本人私有调用及 50 笔家庭账目。赠送、充值、消费、退款带发起人 UUID；不包含学习正文或 Key。必须是有效家庭成员。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;family_id&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;capability&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;enum&quot;: [
+          &quot;text&quot;,
+          &quot;vision&quot;
+        ],
+        &quot;default&quot;: &quot;text&quot;
+      }
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiUsage&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /me/ai-recharges · 读取充值开通状态、档位和最近订单</summary><p>当前有效家庭的共享充值档位与最近订单，不含加密付款身份；其他家庭不可访问。</p><pre>{
+  &quot;description&quot;: &quot;当前有效家庭的共享充值档位与最近订单，不含加密付款身份；其他家庭不可访问。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;family_id&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;format&quot;: &quot;uuid&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;capability&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: false,
+      &quot;schema&quot;: {
+        &quot;enum&quot;: [
+          &quot;text&quot;,
+          &quot;vision&quot;
+        ],
+        &quot;default&quot;: &quot;text&quot;
+      }
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiRechargeCatalog&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /me/ai-recharges · 创建微信虚拟支付现金道具订单</summary><p>下单须提供明确 family_id，验证有效成员和本人微信身份，金额取固定服务端档位。款项进入原家庭共享钱包；每个家庭一次性赠送 20 元由迁移/创建触发器提供，不经过此支付接口。</p><pre>{
+  &quot;description&quot;: &quot;下单须提供明确 family_id，验证有效成员和本人微信身份，金额取固定服务端档位。款项进入原家庭共享钱包；每个家庭一次性赠送 20 元由迁移/创建触发器提供，不经过此支付接口。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiRechargeCreated&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;$ref&quot;: &quot;#/components/schemas/AiRechargeCreate&quot;
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /me/ai-recharges/{order_id} · 向微信核验本人支付订单并幂等入账</summary><p>家庭有效成员可以核对同一家庭订单；查微信使用订单原付款身份，入账和退款始终归原家庭。内部后台在成员退出后仍可对账。</p><pre>{
+  &quot;description&quot;: &quot;家庭有效成员可以核对同一家庭订单；查微信使用订单原付款身份，入账和退款始终归原家庭。内部后台在成员退出后仍可对账。&quot;,
+  &quot;x-role&quot;: &quot;authenticated&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;order_id&quot;,
+      &quot;in&quot;: &quot;path&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;,
+        &quot;pattern&quot;: &quot;^[a-f0-9]{32}$&quot;
+      }
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;成功&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;request_id&quot;: {
+                &quot;type&quot;: &quot;string&quot;
+              },
+              &quot;data&quot;: {
+                &quot;$ref&quot;: &quot;#/components/schemas/AiRechargeOrder&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;request_id&quot;,
+              &quot;data&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  }
+}</pre></details><details class="operation"><summary><span class="pill">GET</span> /payments/virtual/notify · 微信回调 URL 校验</summary><p>使用配置的 Token 验证微信 URL 校验签名，成功后返回 echostr；不进行入账。</p><pre>{
+  &quot;security&quot;: [],
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;timestamp&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;nonce&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;signature&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;echostr&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    }
+  ],
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;通过 token 签名验证后原样返回 echostr&quot;,
+      &quot;content&quot;: {
+        &quot;text/plain&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  },
+  &quot;description&quot;: &quot;使用配置的 Token 验证微信 URL 校验签名，成功后返回 echostr；不进行入账。&quot;
+}</pre></details><details class="operation"><summary><span class="pill">POST</span> /payments/virtual/notify · 微信虚拟支付安全模式 JSON 推送</summary><p>验证 msg_signature、AES 内容与 AppID，仅作为查单唤醒；再次查询微信后才入账或回收额度。重复通知幂等。未核实支付不确认发货。</p><pre>{
+  &quot;security&quot;: [],
+  &quot;description&quot;: &quot;验证 msg_signature、AES 内容与 AppID，仅作为查单唤醒；再次查询微信后才入账或回收额度。重复通知幂等。未核实支付不确认发货。&quot;,
+  &quot;parameters&quot;: [
+    {
+      &quot;name&quot;: &quot;timestamp&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;nonce&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;msg_signature&quot;,
+      &quot;in&quot;: &quot;query&quot;,
+      &quot;required&quot;: true,
+      &quot;schema&quot;: {
+        &quot;type&quot;: &quot;string&quot;
+      }
+    }
+  ],
+  &quot;requestBody&quot;: {
+    &quot;required&quot;: true,
+    &quot;content&quot;: {
+      &quot;application/json&quot;: {
+        &quot;schema&quot;: {
+          &quot;type&quot;: &quot;object&quot;,
+          &quot;additionalProperties&quot;: false,
+          &quot;properties&quot;: {
+            &quot;Encrypt&quot;: {
+              &quot;type&quot;: &quot;string&quot;
+            }
+          },
+          &quot;required&quot;: [
+            &quot;Encrypt&quot;
+          ]
+        }
+      }
+    }
+  },
+  &quot;responses&quot;: {
+    &quot;200&quot;: {
+      &quot;description&quot;: &quot;微信推送已处理&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;additionalProperties&quot;: false,
+            &quot;properties&quot;: {
+              &quot;ErrCode&quot;: {
+                &quot;const&quot;: 0
+              },
+              &quot;ErrMsg&quot;: {
+                &quot;const&quot;: &quot;success&quot;
+              }
+            },
+            &quot;required&quot;: [
+              &quot;ErrCode&quot;,
+              &quot;ErrMsg&quot;
+            ]
+          }
+        }
+      }
+    },
+    &quot;401&quot;: {
+      &quot;description&quot;: &quot;会话失效&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;402&quot;: {
+      &quot;description&quot;: &quot;AI 可用余额不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;403&quot;: {
+      &quot;description&quot;: &quot;隐私或付款人权限不足&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;404&quot;: {
+      &quot;description&quot;: &quot;资源不存在或不属于当前账号&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;409&quot;: {
+      &quot;description&quot;: &quot;设置版本、任务或幂等冲突&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;422&quot;: {
+      &quot;description&quot;: &quot;请求格式或模型能力不支持&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;429&quot;: {
+      &quot;description&quot;: &quot;调用、订单或系统费用限额&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;502&quot;: {
+      &quot;description&quot;: &quot;供应商调用或订单核验失败&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    },
+    &quot;503&quot;: {
+      &quot;description&quot;: &quot;配置未完成或服务尚未开放&quot;,
+      &quot;content&quot;: {
+        &quot;application/json&quot;: {
+          &quot;schema&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/Error&quot;
+          }
+        }
+      }
+    }
+  }
 }</pre></details></div><h2>数据模型</h2><details id="Error"><summary>Error</summary><pre>{
   &quot;type&quot;: &quot;object&quot;,
   &quot;additionalProperties&quot;: false,
@@ -14530,6 +17163,19 @@
     &quot;version&quot;: {
       &quot;type&quot;: &quot;integer&quot;,
       &quot;minimum&quot;: 1
+    },
+    &quot;school_grade&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;maxLength&quot;: 24,
+      &quot;pattern&quot;: &quot;^[^\\u0000-\\u001f\\u007f]*$&quot;
+    },
+    &quot;gender&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;enum&quot;: [
+        &quot;unspecified&quot;,
+        &quot;girl&quot;,
+        &quot;boy&quot;
+      ]
     }
   },
   &quot;required&quot;: [
@@ -14543,7 +17189,9 @@
     &quot;timezone&quot;,
     &quot;daily_new_limit&quot;,
     &quot;daily_goal&quot;,
-    &quot;version&quot;
+    &quot;version&quot;,
+    &quot;school_grade&quot;,
+    &quot;gender&quot;
   ],
   &quot;description&quot;: &quot;&quot;
 }</pre></details><details id="SettingsPatch"><summary>SettingsPatch</summary><pre>{
@@ -14627,6 +17275,53 @@
     &quot;version&quot;: {
       &quot;type&quot;: &quot;integer&quot;,
       &quot;minimum&quot;: 1
+    },
+    &quot;read_only&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;shared_source_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;shared_source_version&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;shared_published&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;shared_can_unpublish&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;,
+      &quot;description&quot;: &quot;仅原发布者为true，仍须服务端鉴权&quot;
+    },
+    &quot;shared_title&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;shared_description&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;shared_target_level&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;shared_current_version&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ]
     }
   },
   &quot;required&quot;: [
@@ -15537,6 +18232,10 @@
       &quot;description&quot;: &quot;&quot;,
       &quot;minLength&quot;: 1,
       &quot;maxLength&quot;: 512
+    },
+    &quot;management_only&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;,
+      &quot;description&quot;: &quot;为 true 时只登录已有账号，不新建账号、不记录邀请归因，令牌仅允许隐私和删除管理；不恢复学习同意。&quot;
     }
   },
   &quot;required&quot;: [
@@ -17035,7 +19734,7 @@
     &quot;session_id&quot;,
     &quot;lease_generation&quot;
   ],
-  &quot;description&quot;: &quot;&quot;,
+  &quot;description&quot;: &quot;selected_option_id=null 仅在尚未选择时允许；首次选择保存后不能改答/清空，flagged 可独立更新。&quot;,
   &quot;anyOf&quot;: [
     {
       &quot;required&quot;: [
@@ -17101,6 +19800,14 @@
         &quot;string&quot;,
         &quot;null&quot;
       ]
+    },
+    &quot;target_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
     }
   },
   &quot;required&quot;: [
@@ -17111,7 +19818,9 @@
     &quot;attempts&quot;,
     &quot;created_at&quot;,
     &quot;completed_at&quot;,
-    &quot;error_code&quot;
+    &quot;error_code&quot;,
+    &quot;target_id&quot;,
+    &quot;family_id&quot;
   ]
 }</pre></details><details id="FamilyDeleteRequest"><summary>FamilyDeleteRequest</summary><pre>{
   &quot;type&quot;: &quot;object&quot;,
@@ -17236,7 +19945,8 @@
       &quot;type&quot;: &quot;string&quot;,
       &quot;enum&quot;: [
         &quot;text&quot;,
-        &quot;words&quot;
+        &quot;words&quot;,
+        &quot;prepared&quot;
       ]
     },
     &quot;raw_text&quot;: {
@@ -17473,4 +20183,1263 @@
       }
     }
   }
+}</pre></details><details id="VocabularyGenerationItem"><summary>VocabularyGenerationItem</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;input_index&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0,
+      &quot;maximum&quot;: 29
+    },
+    &quot;input&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 1,
+      &quot;maxLength&quot;: 120
+    },
+    &quot;status&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;enum&quot;: [
+        &quot;ok&quot;,
+        &quot;invalid&quot;
+      ]
+    },
+    &quot;lemma&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 120
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    },
+    &quot;part_of_speech&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 80
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    },
+    &quot;ipa_gb&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 140
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    },
+    &quot;ipa_us&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 140
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    },
+    &quot;meaning_zh&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 500
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    },
+    &quot;sentence_en&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 1000
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    },
+    &quot;sentence_zh&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 1000
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    },
+    &quot;reason&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;string&quot;,
+          &quot;maxLength&quot;: 500
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    }
+  },
+  &quot;required&quot;: [
+    &quot;input_index&quot;,
+    &quot;input&quot;,
+    &quot;status&quot;,
+    &quot;lemma&quot;,
+    &quot;part_of_speech&quot;,
+    &quot;ipa_gb&quot;,
+    &quot;ipa_us&quot;,
+    &quot;meaning_zh&quot;,
+    &quot;sentence_en&quot;,
+    &quot;sentence_zh&quot;,
+    &quot;reason&quot;
+  ]
+}</pre></details><details id="PrivacyConsentRequest"><summary>PrivacyConsentRequest</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;policy_version&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 1,
+      &quot;maxLength&quot;: 80
+    },
+    &quot;policy_hash&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;pattern&quot;: &quot;^[a-f0-9]{64}$&quot;
+    },
+    &quot;guardian_confirmed&quot;: {
+      &quot;const&quot;: true
+    }
+  },
+  &quot;required&quot;: [
+    &quot;policy_version&quot;,
+    &quot;policy_hash&quot;,
+    &quot;guardian_confirmed&quot;
+  ]
+}</pre></details><details id="PrivacyConsentStatus"><summary>PrivacyConsentStatus</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;accepted&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;policy_version&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;policy_hash&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;last_action&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;enum&quot;: [
+        &quot;accepted&quot;,
+        &quot;withdrawn&quot;,
+        null
+      ]
+    },
+    &quot;updated_at&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ],
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;management_only&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;,
+      &quot;description&quot;: &quot;GET 状态时返回；当前会话仅可用于数据管理，主动同意当前政策后才升级。&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;accepted&quot;,
+    &quot;policy_version&quot;,
+    &quot;policy_hash&quot;,
+    &quot;last_action&quot;,
+    &quot;updated_at&quot;
+  ]
+}</pre></details><details id="PrivacyPolicy"><summary>PrivacyPolicy</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;version&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;operator&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;contact&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;backup_retention_days&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ],
+      &quot;minimum&quot;: 1,
+      &quot;maximum&quot;: 365
+    },
+    &quot;publishable&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;llm_provider&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;llm_processing_region&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;sections&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;additionalProperties&quot;: false,
+        &quot;properties&quot;: {
+          &quot;title&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          },
+          &quot;text&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          }
+        },
+        &quot;required&quot;: [
+          &quot;title&quot;,
+          &quot;text&quot;
+        ]
+      }
+    },
+    &quot;providers&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;additionalProperties&quot;: false,
+        &quot;properties&quot;: {
+          &quot;name&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          },
+          &quot;url&quot;: {
+            &quot;type&quot;: &quot;string&quot;,
+            &quot;format&quot;: &quot;uri&quot;
+          }
+        },
+        &quot;required&quot;: [
+          &quot;name&quot;,
+          &quot;url&quot;
+        ]
+      }
+    },
+    &quot;hash&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;version&quot;,
+    &quot;operator&quot;,
+    &quot;contact&quot;,
+    &quot;backup_retention_days&quot;,
+    &quot;publishable&quot;,
+    &quot;llm_provider&quot;,
+    &quot;llm_processing_region&quot;,
+    &quot;sections&quot;,
+    &quot;providers&quot;,
+    &quot;hash&quot;
+  ]
+}</pre></details><details id="DataManagement"><summary>DataManagement</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;families&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;additionalProperties&quot;: false,
+        &quot;properties&quot;: {
+          &quot;id&quot;: {
+            &quot;type&quot;: &quot;string&quot;,
+            &quot;format&quot;: &quot;uuid&quot;
+          },
+          &quot;name&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          },
+          &quot;version&quot;: {
+            &quot;type&quot;: &quot;integer&quot;,
+            &quot;minimum&quot;: 1
+          },
+          &quot;owner_user_id&quot;: {
+            &quot;type&quot;: &quot;string&quot;,
+            &quot;format&quot;: &quot;uuid&quot;
+          },
+          &quot;role&quot;: {
+            &quot;enum&quot;: [
+              &quot;owner&quot;,
+              &quot;parent&quot;
+            ]
+          },
+          &quot;children&quot;: {
+            &quot;type&quot;: &quot;array&quot;,
+            &quot;items&quot;: {
+              &quot;type&quot;: &quot;object&quot;,
+              &quot;additionalProperties&quot;: false,
+              &quot;properties&quot;: {
+                &quot;id&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;format&quot;: &quot;uuid&quot;
+                },
+                &quot;nickname&quot;: {
+                  &quot;type&quot;: &quot;string&quot;
+                },
+                &quot;version&quot;: {
+                  &quot;type&quot;: &quot;integer&quot;,
+                  &quot;minimum&quot;: 1
+                }
+              },
+              &quot;required&quot;: [
+                &quot;id&quot;,
+                &quot;nickname&quot;,
+                &quot;version&quot;
+              ]
+            }
+          },
+          &quot;members&quot;: {
+            &quot;type&quot;: &quot;array&quot;,
+            &quot;items&quot;: {
+              &quot;type&quot;: &quot;object&quot;,
+              &quot;additionalProperties&quot;: false,
+              &quot;properties&quot;: {
+                &quot;user_id&quot;: {
+                  &quot;type&quot;: &quot;string&quot;,
+                  &quot;format&quot;: &quot;uuid&quot;
+                },
+                &quot;display_name&quot;: {
+                  &quot;type&quot;: &quot;string&quot;
+                }
+              },
+              &quot;required&quot;: [
+                &quot;user_id&quot;,
+                &quot;display_name&quot;
+              ]
+            }
+          }
+        },
+        &quot;required&quot;: [
+          &quot;id&quot;,
+          &quot;name&quot;,
+          &quot;version&quot;,
+          &quot;owner_user_id&quot;,
+          &quot;role&quot;,
+          &quot;children&quot;,
+          &quot;members&quot;
+        ]
+      }
+    }
+  },
+  &quot;required&quot;: [
+    &quot;families&quot;
+  ]
+}</pre></details><details id="QuizAnsweredItem"><summary>QuizAnsweredItem</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;ordinal&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;prompt&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;options&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;$ref&quot;: &quot;#/components/schemas/QuizOption&quot;
+      },
+      &quot;minItems&quot;: 4,
+      &quot;maxItems&quot;: 4
+    },
+    &quot;selected_option_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;answer_version&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;flagged&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;correct_option_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;id&quot;,
+    &quot;ordinal&quot;,
+    &quot;prompt&quot;,
+    &quot;options&quot;,
+    &quot;selected_option_id&quot;,
+    &quot;answer_version&quot;,
+    &quot;flagged&quot;,
+    &quot;correct_option_id&quot;
+  ],
+  &quot;description&quot;: &quot;仅首次选择成功保存后返回的即时反馈；未答题不得包含 correct_option_id。已保存首次答案不能清空或修改，可继续标记。&quot;
+}</pre></details><details id="StudyCard"><summary>StudyCard</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;required&quot;: [
+    &quot;id&quot;,
+    &quot;version&quot;,
+    &quot;state&quot;,
+    &quot;due_at&quot;,
+    &quot;child_word_id&quot;,
+    &quot;word_version&quot;,
+    &quot;lemma&quot;,
+    &quot;part_of_speech&quot;,
+    &quot;ipa_gb&quot;,
+    &quot;ipa_us&quot;,
+    &quot;example&quot;,
+    &quot;practice_only&quot;,
+    &quot;ordinal&quot;
+  ],
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;version&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;state&quot;: {
+      &quot;enum&quot;: [
+        &quot;new&quot;,
+        &quot;learning&quot;,
+        &quot;review&quot;,
+        &quot;relearning&quot;
+      ]
+    },
+    &quot;due_at&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;child_word_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;word_version&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;lemma&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;part_of_speech&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;ipa_gb&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;ipa_us&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;example&quot;: {
+      &quot;oneOf&quot;: [
+        {
+          &quot;type&quot;: &quot;null&quot;
+        },
+        {
+          &quot;type&quot;: &quot;object&quot;,
+          &quot;additionalProperties&quot;: false,
+          &quot;required&quot;: [
+            &quot;id&quot;,
+            &quot;content_version&quot;,
+            &quot;text_en&quot;
+          ],
+          &quot;properties&quot;: {
+            &quot;id&quot;: {
+              &quot;type&quot;: &quot;string&quot;,
+              &quot;format&quot;: &quot;uuid&quot;
+            },
+            &quot;content_version&quot;: {
+              &quot;type&quot;: &quot;integer&quot;,
+              &quot;minimum&quot;: 1
+            },
+            &quot;text_en&quot;: {
+              &quot;type&quot;: &quot;string&quot;
+            }
+          }
+        }
+      ]
+    },
+    &quot;practice_only&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;ordinal&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    }
+  },
+  &quot;description&quot;: &quot;当前运行时队列 DTO，隐藏释义；已归档/暂停的未答卡会从队列移除，已提交历史保持不变。&quot;
+}</pre></details><details id="AiModel"><summary>AiModel</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;label&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;provider&quot;: {
+      &quot;enum&quot;: [
+        &quot;qwen&quot;,
+        &quot;deepseek&quot;,
+        &quot;openai&quot;
+      ]
+    },
+    &quot;model&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;vision&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;system_available&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;input_yuan_per_million&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;output_yuan_per_million&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;cached_yuan_per_million&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;max_charge_micros&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;pricing_tiers&quot;: {
+      &quot;anyOf&quot;: [
+        {
+          &quot;type&quot;: &quot;array&quot;,
+          &quot;items&quot;: {
+            &quot;$ref&quot;: &quot;#/components/schemas/AiPriceTier&quot;
+          }
+        },
+        {
+          &quot;type&quot;: &quot;null&quot;
+        }
+      ]
+    }
+  },
+  &quot;required&quot;: [
+    &quot;id&quot;,
+    &quot;label&quot;,
+    &quot;provider&quot;,
+    &quot;model&quot;,
+    &quot;vision&quot;,
+    &quot;system_available&quot;,
+    &quot;input_yuan_per_million&quot;,
+    &quot;output_yuan_per_million&quot;,
+    &quot;cached_yuan_per_million&quot;,
+    &quot;max_charge_micros&quot;,
+    &quot;pricing_tiers&quot;
+  ]
+}</pre></details><details id="AiSettings"><summary>AiSettings</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;mode&quot;: {
+      &quot;enum&quot;: [
+        &quot;system&quot;,
+        &quot;byok&quot;
+      ]
+    },
+    &quot;model_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;version&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;has_key&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;key_hint&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;byok_available&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;custom_provider&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;custom_model&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;balance_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元；退款后余额可为负。&quot;
+    },
+    &quot;frozen_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元；退款后余额可为负。&quot;
+    },
+    &quot;available_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元；退款后余额可为负。&quot;
+    },
+    &quot;currency&quot;: {
+      &quot;const&quot;: &quot;CNY&quot;
+    },
+    &quot;models&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;$ref&quot;: &quot;#/components/schemas/AiModel&quot;
+      }
+    },
+    &quot;other_services&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;capability&quot;: {
+      &quot;enum&quot;: [
+        &quot;text&quot;,
+        &quot;vision&quot;
+      ]
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;family_name&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;families&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;additionalProperties&quot;: false,
+        &quot;properties&quot;: {
+          &quot;id&quot;: {
+            &quot;type&quot;: &quot;string&quot;,
+            &quot;format&quot;: &quot;uuid&quot;
+          },
+          &quot;name&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          }
+        },
+        &quot;required&quot;: [
+          &quot;id&quot;,
+          &quot;name&quot;
+        ]
+      }
+    },
+    &quot;gift_remaining_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元。&quot;
+    },
+    &quot;welcome_credit_micros&quot;: {
+      &quot;const&quot;: 20000000
+    },
+    &quot;legacy_balance_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元。&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;mode&quot;,
+    &quot;model_id&quot;,
+    &quot;version&quot;,
+    &quot;has_key&quot;,
+    &quot;key_hint&quot;,
+    &quot;byok_available&quot;,
+    &quot;custom_provider&quot;,
+    &quot;custom_model&quot;,
+    &quot;balance_micros&quot;,
+    &quot;frozen_micros&quot;,
+    &quot;available_micros&quot;,
+    &quot;currency&quot;,
+    &quot;models&quot;,
+    &quot;other_services&quot;,
+    &quot;capability&quot;,
+    &quot;family_id&quot;,
+    &quot;family_name&quot;,
+    &quot;families&quot;,
+    &quot;gift_remaining_micros&quot;,
+    &quot;welcome_credit_micros&quot;,
+    &quot;legacy_balance_micros&quot;
+  ]
+}</pre></details><details id="AiSettingsWrite"><summary>AiSettingsWrite</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;mode&quot;: {
+      &quot;enum&quot;: [
+        &quot;system&quot;,
+        &quot;byok&quot;
+      ]
+    },
+    &quot;model_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 1,
+      &quot;maxLength&quot;: 60
+    },
+    &quot;custom_provider&quot;: {
+      &quot;enum&quot;: [
+        &quot;qwen&quot;,
+        &quot;deepseek&quot;,
+        &quot;openai&quot;
+      ]
+    },
+    &quot;custom_model&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 1,
+      &quot;maxLength&quot;: 120,
+      &quot;pattern&quot;: &quot;^[A-Za-z0-9][A-Za-z0-9._:/-]*$&quot;
+    },
+    &quot;expected_version&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;api_key&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 8,
+      &quot;maxLength&quot;: 512,
+      &quot;writeOnly&quot;: true,
+      &quot;pattern&quot;: &quot;^[!-~]+$&quot;
+    },
+    &quot;provider_consent&quot;: {
+      &quot;const&quot;: true
+    },
+    &quot;capability&quot;: {
+      &quot;enum&quot;: [
+        &quot;text&quot;,
+        &quot;vision&quot;
+      ],
+      &quot;default&quot;: &quot;text&quot;
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;mode&quot;,
+    &quot;model_id&quot;,
+    &quot;expected_version&quot;,
+    &quot;provider_consent&quot;
+  ]
+}</pre></details><details id="AiKeyDelete"><summary>AiKeyDelete</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;expected_version&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;capability&quot;: {
+      &quot;enum&quot;: [
+        &quot;text&quot;,
+        &quot;vision&quot;
+      ],
+      &quot;default&quot;: &quot;text&quot;
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;expected_version&quot;
+  ]
+}</pre></details><details id="AiCall"><summary>AiCall</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;kind&quot;: {
+      &quot;enum&quot;: [
+        &quot;vocabulary&quot;,
+        &quot;vision&quot;,
+        &quot;connection_test&quot;
+      ]
+    },
+    &quot;mode&quot;: {
+      &quot;enum&quot;: [
+        &quot;system&quot;,
+        &quot;byok&quot;
+      ]
+    },
+    &quot;provider&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;model&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;state&quot;: {
+      &quot;enum&quot;: [
+        &quot;running&quot;,
+        &quot;ready&quot;,
+        &quot;succeeded&quot;,
+        &quot;failed&quot;,
+        &quot;uncertain&quot;
+      ]
+    },
+    &quot;input_tokens&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;output_tokens&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;cached_tokens&quot;: {
+      &quot;type&quot;: [
+        &quot;integer&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;charge_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元；退款后余额可为负。&quot;
+    },
+    &quot;error_code&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;created_at&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;user_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;capability&quot;: {
+      &quot;enum&quot;: [
+        &quot;text&quot;,
+        &quot;vision&quot;
+      ]
+    }
+  },
+  &quot;required&quot;: [
+    &quot;id&quot;,
+    &quot;kind&quot;,
+    &quot;mode&quot;,
+    &quot;provider&quot;,
+    &quot;model&quot;,
+    &quot;state&quot;,
+    &quot;input_tokens&quot;,
+    &quot;output_tokens&quot;,
+    &quot;cached_tokens&quot;,
+    &quot;charge_micros&quot;,
+    &quot;error_code&quot;,
+    &quot;created_at&quot;,
+    &quot;family_id&quot;,
+    &quot;user_id&quot;,
+    &quot;capability&quot;
+  ]
+}</pre></details><details id="AiWalletEntry"><summary>AiWalletEntry</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    },
+    &quot;kind&quot;: {
+      &quot;enum&quot;: [
+        &quot;gift&quot;,
+        &quot;credit&quot;,
+        &quot;charge&quot;,
+        &quot;refund&quot;,
+        &quot;transfer&quot;
+      ]
+    },
+    &quot;amount_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元；退款后余额可为负。&quot;
+    },
+    &quot;created_at&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;user_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;gift_used_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元。&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;id&quot;,
+    &quot;kind&quot;,
+    &quot;amount_micros&quot;,
+    &quot;created_at&quot;,
+    &quot;user_id&quot;,
+    &quot;gift_used_micros&quot;
+  ]
+}</pre></details><details id="AiUsage"><summary>AiUsage</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;items&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;maxItems&quot;: 50,
+      &quot;items&quot;: {
+        &quot;$ref&quot;: &quot;#/components/schemas/AiCall&quot;
+      }
+    },
+    &quot;entries&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;maxItems&quot;: 50,
+      &quot;items&quot;: {
+        &quot;$ref&quot;: &quot;#/components/schemas/AiWalletEntry&quot;
+      }
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  },
+  &quot;required&quot;: [
+    &quot;items&quot;,
+    &quot;entries&quot;,
+    &quot;family_id&quot;
+  ]
+}</pre></details><details id="AiRechargeOrder"><summary>AiRechargeOrder</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;pattern&quot;: &quot;^[a-f0-9]{32}$&quot;
+    },
+    &quot;product_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;amount_fen&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;credit_micros&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;description&quot;: &quot;整数微元，1000000 微元=1 元；退款后余额可为负。&quot;
+    },
+    &quot;state&quot;: {
+      &quot;enum&quot;: [
+        &quot;pending&quot;,
+        &quot;paid&quot;,
+        &quot;refunded&quot;,
+        &quot;closed&quot;
+      ]
+    },
+    &quot;refunded_fen&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 0
+    },
+    &quot;created_at&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;date-time&quot;
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    },
+    &quot;user_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;id&quot;,
+    &quot;product_id&quot;,
+    &quot;amount_fen&quot;,
+    &quot;credit_micros&quot;,
+    &quot;state&quot;,
+    &quot;refunded_fen&quot;,
+    &quot;created_at&quot;,
+    &quot;family_id&quot;,
+    &quot;user_id&quot;
+  ]
+}</pre></details><details id="AiRechargeCatalog"><summary>AiRechargeCatalog</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;enabled&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;ios_enabled&quot;: {
+      &quot;type&quot;: &quot;boolean&quot;
+    },
+    &quot;notice&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;products&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;items&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;additionalProperties&quot;: false,
+        &quot;properties&quot;: {
+          &quot;id&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          },
+          &quot;label&quot;: {
+            &quot;type&quot;: &quot;string&quot;
+          },
+          &quot;amount_fen&quot;: {
+            &quot;type&quot;: &quot;integer&quot;,
+            &quot;minimum&quot;: 100
+          },
+          &quot;credit_micros&quot;: {
+            &quot;type&quot;: &quot;integer&quot;,
+            &quot;description&quot;: &quot;整数微元，1000000 微元=1 元；退款后余额可为负。&quot;
+          }
+        },
+        &quot;required&quot;: [
+          &quot;id&quot;,
+          &quot;label&quot;,
+          &quot;amount_fen&quot;,
+          &quot;credit_micros&quot;
+        ]
+      }
+    },
+    &quot;orders&quot;: {
+      &quot;type&quot;: &quot;array&quot;,
+      &quot;maxItems&quot;: 30,
+      &quot;items&quot;: {
+        &quot;$ref&quot;: &quot;#/components/schemas/AiRechargeOrder&quot;
+      }
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: [
+        &quot;string&quot;,
+        &quot;null&quot;
+      ]
+    }
+  },
+  &quot;required&quot;: [
+    &quot;enabled&quot;,
+    &quot;ios_enabled&quot;,
+    &quot;notice&quot;,
+    &quot;products&quot;,
+    &quot;orders&quot;,
+    &quot;family_id&quot;
+  ]
+}</pre></details><details id="AiRechargeCreate"><summary>AiRechargeCreate</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;product_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 1,
+      &quot;maxLength&quot;: 64
+    },
+    &quot;code&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 1,
+      &quot;maxLength&quot;: 512,
+      &quot;writeOnly&quot;: true
+    },
+    &quot;platform&quot;: {
+      &quot;enum&quot;: [
+        &quot;ios&quot;,
+        &quot;android&quot;,
+        &quot;other&quot;
+      ]
+    },
+    &quot;request_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;minLength&quot;: 8,
+      &quot;maxLength&quot;: 128,
+      &quot;pattern&quot;: &quot;^[a-zA-Z0-9_-]+$&quot;
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;product_id&quot;,
+    &quot;code&quot;,
+    &quot;platform&quot;,
+    &quot;request_id&quot;,
+    &quot;family_id&quot;
+  ]
+}</pre></details><details id="AiPaymentData"><summary>AiPaymentData</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;mode&quot;: {
+      &quot;const&quot;: &quot;short_series_goods&quot;
+    },
+    &quot;signData&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;paySig&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;signature&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;mode&quot;,
+    &quot;signData&quot;,
+    &quot;paySig&quot;,
+    &quot;signature&quot;
+  ]
+}</pre></details><details id="AiRechargeCreated"><summary>AiRechargeCreated</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;id&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;state&quot;: {
+      &quot;enum&quot;: [
+        &quot;pending&quot;,
+        &quot;paid&quot;,
+        &quot;refunded&quot;,
+        &quot;closed&quot;
+      ]
+    },
+    &quot;pay_data&quot;: {
+      &quot;$ref&quot;: &quot;#/components/schemas/AiPaymentData&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;id&quot;,
+    &quot;state&quot;
+  ]
+}</pre></details><details id="AiConnectionTest"><summary>AiConnectionTest</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;connected&quot;: {
+      &quot;const&quot;: true
+    },
+    &quot;provider&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;model&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;connected&quot;,
+    &quot;provider&quot;,
+    &quot;model&quot;
+  ]
+}</pre></details><details id="AiPriceTier"><summary>AiPriceTier</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;up_to_input_tokens&quot;: {
+      &quot;type&quot;: &quot;integer&quot;,
+      &quot;minimum&quot;: 1
+    },
+    &quot;input_yuan_per_million&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;output_yuan_per_million&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    },
+    &quot;cached_yuan_per_million&quot;: {
+      &quot;type&quot;: &quot;string&quot;
+    }
+  },
+  &quot;required&quot;: [
+    &quot;up_to_input_tokens&quot;,
+    &quot;input_yuan_per_million&quot;,
+    &quot;output_yuan_per_million&quot;
+  ]
+}</pre></details><details id="AiTestRequest"><summary>AiTestRequest</summary><pre>{
+  &quot;type&quot;: &quot;object&quot;,
+  &quot;additionalProperties&quot;: false,
+  &quot;properties&quot;: {
+    &quot;capability&quot;: {
+      &quot;enum&quot;: [
+        &quot;text&quot;,
+        &quot;vision&quot;
+      ],
+      &quot;default&quot;: &quot;text&quot;
+    },
+    &quot;family_id&quot;: {
+      &quot;type&quot;: &quot;string&quot;,
+      &quot;format&quot;: &quot;uuid&quot;
+    }
+  },
+  &quot;required&quot;: []
 }</pre></details><script>document.getElementById("filter").addEventListener("input",e=>{const q=e.target.value.toLowerCase();document.querySelectorAll(".operation").forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?"":"none")})</script><p class="muted">本地设计交付。无远程脚本、字体或数据上传；可以用浏览器打印为PDF。全部功能统一属于0.1。</p></main></html>

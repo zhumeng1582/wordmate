@@ -7,7 +7,16 @@
     "build": "tsc -p ../../packages/ai/tsconfig.json && tsc -p tsconfig.json",
     "start": "node --env-file=../../.env dist/main.js",
     "migrate": "node --env-file=../../.env dist/migrate.js",
-    "migrate:audio": "node --env-file=../../.env dist/migrate-audio.js"
+    "migrate:audio": "node --env-file=../../.env dist/migrate-audio.js",
+    "migrate:checkin-makeup": "node --env-file=../../.env dist/migrate-checkin-makeup.js",
+    "migrate:shared-wordbooks": "node --env-file=../../.env dist/migrate-shared-wordbooks.js",
+    "migrate:referrals": "node --env-file=../../.env dist/migrate-referrals.js",
+    "migrate:privacy": "node --env-file=../../.env dist/migrate-privacy.js",
+    "migrate:release-fixes": "node --env-file=../../.env dist/migrate-release-fixes.js",
+    "migrate:security": "node --env-file=../../.env dist/migrate-security.js",
+    "migrate:audio-billing": "node --env-file=../../.env dist/migrate-audio-billing.js",
+    "migrate:profiles": "node --env-file=../../.env dist/migrate-profiles.js",
+    "migrate:ai-accounts": "node --env-file=../../.env dist/migrate-ai-accounts.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.6",

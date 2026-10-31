@@ -7,10 +7,17 @@
 .sample-button::after{border:0}
 .sample-button.selected{background:var(--soft);color:var(--primary)}
 .quiz-counter{font-size:24px;color:var(--muted)}
-.quiz-prompt{font-size:40px;line-height:1.5;font-weight:600;margin:36px 0}
+.quiz-progress-track{height:8px;background:var(--field);border-radius:99px;overflow:hidden;margin:14px 0 24px}
+.quiz-progress-value{height:100%;background:var(--primary);border-radius:99px;transition:width .2s ease}
+.quiz-taking-title{font-size:34px;margin:12px 0 24px}.quiz-question-card{margin-top:18px}.quiz-word-audio{display:flex;align-items:center;justify-content:center;gap:22px;width:100%;min-height:136px;padding:14px 8px;margin:6px 0 0;background:transparent;color:var(--text);font-family:inherit;font-size:72px;font-weight:600;line-height:1.3;text-align:center}.quiz-word-audio text{min-width:0;overflow-wrap:anywhere}.quiz-word-audio::after{border:0}.quiz-word-audio[disabled]{background:transparent;color:var(--text)}.quiz-word-audio .audio-icon{width:32px;height:32px;flex-shrink:0;color:var(--primary)}.quiz-audio-feedback{min-height:32px}.quiz-audio-feedback .audio-status{text-align:center;margin:0;font-size:23px}.quiz-audio-feedback .error{font-size:23px;margin:8px 0;padding:14px}
 .quiz-option{justify-content:flex-start;background:var(--field);color:var(--text);text-align:left;border:2px solid var(--border);padding:24px}
 .option-letter{margin-right:24px;color:var(--muted)}
 .quiz-option.option-selected{background:var(--soft);border-color:var(--primary);color:var(--primary)}
+.quiz-option.option-incorrect{background:var(--error-bg);border-color:var(--error-text);color:var(--error-text)}
+.quiz-option.option-correct{background:var(--soft);border-color:var(--primary);color:var(--primary)}
+.quiz-answer-feedback{font-size:26px;font-weight:600;margin:12px 0 4px}
+.quiz-answer-feedback.feedback-correct{color:var(--primary)}
+.quiz-answer-feedback.feedback-incorrect{color:var(--error-text)}
 .quiz-save{min-height:40px;color:var(--link);font-size:24px;margin-top:20px}
 .quiz-score{text-align:center;padding:48px 24px}
 .score-number{font-size:96px;font-weight:600;color:var(--primary);line-height:1.3;margin-top:30px}
@@ -26,4 +33,9 @@
 /* Explicit classes keep native disabled buttons legible despite variant styles. */
 .quiz-page .btn.is-disabled,.quiz-page .answer-chip.is-disabled{background:var(--disabled-bg);color:var(--disabled-text);border-color:var(--border);opacity:1}
 .quiz-page .btn.is-disabled .option-letter{color:var(--disabled-text)}
+.quiz-page .quiz-option[disabled].option-incorrect{background:var(--error-bg);color:var(--error-text);border-color:var(--error-text);opacity:1}
+.quiz-page .quiz-option[disabled].option-correct{background:var(--soft);color:var(--primary);border-color:var(--primary);opacity:1}
 .quiz-save{height:40px;line-height:40px}
+.quiz-action-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:26px}
+.quiz-action-row .btn{min-height:80px;margin:0;padding:14px 12px;font-size:26px}
+.quiz-abandon{display:flex;align-items:center;justify-content:center;min-height:88px;width:100%;background:transparent;color:var(--muted);font-size:24px;line-height:1.6;padding:18px;margin:8px 0}.quiz-abandon::after{border:0}.quiz-abandon[disabled]{background:transparent;color:var(--disabled-text)}

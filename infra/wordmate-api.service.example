@@ -1,0 +1,33 @@
+# Before installation, match the existing server's service user, release path and node path.
+# /etc/wordmate/api.env must be readable by wordmate and must not be publicly readable.
+[Unit]
+Description=Wordmate API and background workers
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=wordmate
+Group=wordmate
+WorkingDirectory=/opt/wordmate/current
+ExecStartPre=/usr/bin/node --env-file=/etc/wordmate/api.env scripts/check-production-env.cjs
+ExecStart=/usr/bin/node --env-file=/etc/wordmate/api.env apps/api/dist/main.js
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=240
+UMask=0077
+StateDirectory=wordmate
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/wordmate
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

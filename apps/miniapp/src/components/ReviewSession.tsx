@@ -1,51 +1,65 @@
-import {enterReview} from '../services/review-entry';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {View,Button,Text,Switch} from '@tarojs/components';
+import Taro,{useDidShow,useDidHide} from '@tarojs/taro';
+import {api,storage,eventId,message,go} from '../services/api';
 import {useAudio} from '../services/audio';
 import {AudioText,AudioFeedback} from './AudioControls';
-import {useEffect,useRef,useState} from 'react';
-import {View,Button} from '@tarojs/components';
-import Taro,{useDidShow,useDidHide} from '@tarojs/taro';
-import {api,storage,eventId,message} from '../services/api';
+import {StudySessionController} from '../services/study-session';
+import {studyCard,studyCounts,studyOptions,partOfSpeech,type StudySource} from '../services/study-flow';
+import './ReviewSession.css';
+
 export function ReviewSession({onExit}:{onExit?:()=>void}){
  const audio=useAudio();
-  const scope=`${storage.get('access_token')}:${storage.get('child_id')}`,pendingKey=`review_pending:${scope}`,activeKey=`active_review_session:${scope}`;
-  const [visible,setVisible]=useState(true),[rejected,setRejected]=useState(false);
-  useDidShow(()=>setVisible(true));useDidHide(()=>setVisible(false));
-  const [session,setSession]=useState<any>(null),[cards,setCards]=useState<any[]>([]),[meanings,setMeanings]=useState<Record<string,string>>({}),[revealed,setRevealed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(0),[hasPending,setHasPending]=useState(!!storage.get(pendingKey));
-  const [translations,setTranslations]=useState<Record<string,string>>({});
-  const inFlight=useRef(false);
-  const [source]=useState<any>(()=>storage.get('review_source')||{source:'scheduled'}),[remaining,setRemaining]=useState(0);
-  const run=async(fn:()=>Promise<any>)=>{if(inFlight.current)return;inFlight.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(message(e));if(e instanceof Error&&['SESSION_EXPIRED','CARD_CONFLICT'].includes(e.message)){setRejected(true);setSession(null);Taro.removeStorageSync(activeKey);}}finally{inFlight.current=false;setBusy(false);}};
-  useEffect(()=>{if(!session||!visible)return;const beat=()=>{api(`/study-sessions/${session.id}/heartbeat`,'POST',{lease_generation:session.lease_generation}).catch(e=>{setError(message(e));if(e instanceof Error&&e.message==='SESSION_EXPIRED'){setSession(null);Taro.removeStorageSync(activeKey);}});};beat();const timer=setInterval(beat,30000);return()=>clearInterval(timer);},[session,visible]);
-  const load=async(s:any)=>{const data=await api(`/study-sessions/${s.id}/cards`);setCards(data.items);setRemaining(data.remaining);};
-  const send=async(body:any)=>{await api('/reviews','POST',body);Taro.removeStorageSync(pendingKey);setHasPending(false);setRejected(false);setDone(x=>x+1);if(session)await load(session);setRevealed(false);};
-  const start=()=>run(async()=>{
-    const s=await enterReview({read:()=>storage.get(activeKey),clear:()=>Taro.removeStorageSync(activeKey),
-      heartbeat:s=>api(`/study-sessions/${s.id}/heartbeat`,'POST',{lease_generation:s.lease_generation}),
-      create:()=>api(`/children/${storage.get('child_id')}/study-sessions`,'POST',source,eventId()),
-      save:s=>storage.set(activeKey,s)});
-    await load(s);setSession(s);
-  });
-  const entered=useRef(false);
-  useEffect(()=>{if(!entered.current&&!hasPending){entered.current=true;void start();}},[hasPending]);
-  const exit=()=>{audio.stop();if(onExit)onExit();else Taro.navigateBack();};
-  const card=cards[0];
-  const playRef=useRef(audio.play),autoPlayed=useRef('');playRef.current=audio.play;
-  useEffect(()=>{audio.stop();},[card?.id,session?.id,audio.stop]);
-  useEffect(()=>{
-    if(!visible||!card||!session||hasPending)return;
-    const key=`${session.id}:${card.id}`;if(autoPlayed.current===key)return;
-    let cancelled=false;
-    api('/me/audio-settings').then(p=>{if(cancelled)return;autoPlayed.current=key;if(p.auto_play)void playRef.current({word_id:card.child_word_id,content_version:card.word_version});}).catch(()=>{});
-    return()=>{cancelled=true;};
-  },[visible,card?.id,session?.id,hasPending]);
-  return <View className='page'><View className='title'>{(session?.source??source.source)==='scheduled'?'今天的复习':'错词再练一遍'}</View><View className='muted'>先回忆，再查看词义，按真实记忆情况选择。</View>{error&&<View className='error'>{error}</View>}<AudioFeedback audio={audio}/>
-    {hasPending&&!busy&&<View className='card'><View>有一条答案尚未确认保存，请重试。</View><Button className='btn' disabled={busy} onClick={()=>run(()=>send(storage.get(pendingKey)))}>重试保存</Button>{rejected&&<Button className='btn secondary' onClick={()=>{Taro.removeStorageSync(pendingKey);setHasPending(false);setRejected(false);setError('');}}>清除已被服务器拒绝的答案，重新开始</Button>}</View>}
-    {!session&&!hasPending&&<>{busy?<View className='muted'>正在准备单词…</View>:error&&<Button className='btn primary' onClick={start}>重试</Button>}</>}
-    {!session&&!busy&&<Button className='text-action' onClick={exit}>返回</Button>}
-    {session&&<View className='card'>{session.excluded_new_words>0&&<View className='notice'>受每日新词额度限制，已跳过 {session.excluded_new_words} 个新词。</View>}<View className='muted'>本次已完成 {done} · 队列剩余 {remaining}</View>{card?<>{card.practice_only&&<View className='notice'>此词尚未到期：本次只练习，不改变复习计划。</View>}<View className='word'>{card.lemma}</View><View className='review-pronunciation'><AudioText audio={audio} phonetic target={{word_id:card.child_word_id,content_version:card.word_version}} text={(audio.accent==='en-GB'?card.ipa_gb:card.ipa_us)||'听发音'}/><View className='muted review-pos'>{card.part_of_speech}</View></View>{revealed&&<View className='review-meaning'>{meanings[card.child_word_id]}</View>}{card.example?<><AudioText audio={audio} target={{sentence_id:card.example.id,content_version:card.example.content_version}} text={card.example.text_en}/>{revealed&&<View className='muted review-translation'>{translations[card.example.id]||'暂无例句译文'}</View>}</>:<View className='muted small'>暂无例句</View>}{revealed?<><View className='row'>{[['again','忘记了'],['hard','有点难'],['good','记得'],['easy','很简单']].map(([rating,label])=><Button className='btn' key={rating} disabled={busy||hasPending||!meanings[card.child_word_id]} onClick={()=>run(async()=>{const body={session_id:session.id,card_id:card.id,event_id:eventId(),expected_version:card.version,rating,lease_generation:session.lease_generation};storage.set(pendingKey,body);setHasPending(true);await send(body);})}>{label}</Button>)}</View></>:<Button className='btn primary' disabled={busy} onClick={()=>run(async()=>{const w=await api(`/children/${session.child_id}/words/${card.child_word_id}`);setMeanings(m=>({...m,[w.id]:w.meaning_zh}));let example=w.example;
- // Older running servers omit example on the detail response; their word list
- // already includes translations. Only use an exact sentence/version match.
- if(card.example&&example===undefined){const list=await api(`/children/${session.child_id}/words`);example=list.items.find((item:any)=>item.id===card.child_word_id)?.example;}
- if(example&&example.id===card.example?.id&&example.content_version===card.example?.content_version)setTranslations(t=>({...t,[example.id]:example.translation_zh}));setRevealed(true);})}>查看词义</Button>}</>:<View className='meaning'>{busy?'正在加载…':'这组复习完成了'}</View>}<Button className='btn' disabled={busy||hasPending} onClick={()=>run(async()=>{await api(`/study-sessions/${session.id}/end`,'POST',{lease_generation:session.lease_generation});Taro.removeStorageSync(activeKey);exit();})}>{card?'结束本次复习':'完成'}</Button></View>}
-  </View>;
+ const [identity]=useState(()=>({token:String(storage.get('access_token')),child:String(storage.get('child_id'))}));
+ const currentScope=()=>identity.token===String(storage.get('access_token'))&&identity.child===String(storage.get('child_id'));
+ const [controller]=useState(()=>{const source:StudySource=storage.get('review_source')||{source:'review'},intent=storage.get('study_intent')==='resume'?'resume':'start';Taro.removeStorageSync('study_intent');return new StudySessionController({token:identity.token,child:identity.child,source,intent,api,storage:{...storage,remove:key=>Taro.removeStorageSync(key)},eventId,isCurrent:currentScope});});
+ const [screen,setScreen]=useState(controller.state),[visible,setVisible]=useState(true),[menu,setMenu]=useState(false),[autoNext,setAutoNext]=useState(()=>storage.get(`study_auto_next:${identity.token}`)!==false),[held,setHeld]=useState(''),[revealed,setRevealed]=useState(''),[example,setExample]=useState<Record<string,number>>({});
+ const ready=useRef(false),autoTimer=useRef<ReturnType<typeof setTimeout>|null>(null),autoPlayed=useRef(''),touch=useRef<{x:number;y:number}|null>(null);
+ const clearAuto=()=>{if(autoTimer.current){clearTimeout(autoTimer.current);autoTimer.current=null;}};
+ useEffect(()=>{const unsubscribe=controller.subscribe(()=>setScreen(controller.state));setScreen(controller.state);void controller.begin().then(()=>{ready.current=true;});return()=>{clearAuto();unsubscribe();controller.dispose();};},[controller]);
+ useDidShow(()=>{setVisible(true);if(ready.current)void controller.resume();});useDidHide(()=>{clearAuto();setVisible(false);controller.hide();});
+ useEffect(()=>{if(!visible)return;const timer=setInterval(()=>void controller.heartbeat(),30000);return()=>clearInterval(timer);},[controller,visible]);
+ const flow=screen.flow,card=flow&&studyCard(flow),counts=flow?studyCounts(flow):{done:0,correct:0,wrong:0,total:0};
+ const phase=flow?.phase,marker=card?`${flow?.session?.id}:${phase}:${card.id}:${flow?.practiceTurn}`:'';
+ const result=flow&&card?(phase==='practice'?flow.practiceFeedback:flow.results[card.id]):undefined;
+ const options=useMemo(()=>flow&&card?studyOptions(card,flow.pool,`${phase}:${card.id}:${flow.practiceTurn}`):[],[card?.id,card?.meaning_zh,flow?.pool,phase,flow?.practiceTurn]);
+ const selfCheck=options.length<2,isNew=flow?.source.source==='new_words',saved=phase==='practice'||!!(result&&'saved' in result&&result.saved),canAdvance=!!result&&saved&&!screen.busy&&!screen.pending;
+ const hold=()=>{clearAuto();setHeld(marker);};
+ const playRef=useRef(audio.play);playRef.current=audio.play;
+ useEffect(()=>{audio.stop();autoPlayed.current='';void Taro.pageScrollTo({scrollTop:0,duration:0}).catch(()=>{});},[marker,audio.stop]);
+ useEffect(()=>{if(!visible||!card||!audio.autoPlay||!flow?.loaded||screen.pending||screen.conflict||phase==='summary')return;const key=`${flow.session?.id}:${phase}:${card.id}`;if(autoPlayed.current===key)return;autoPlayed.current=key;void playRef.current({word_id:card.child_word_id,content_version:card.word_version});},[visible,card?.id,audio.autoPlay,flow?.loaded,screen.pending,screen.conflict,phase]);
+ useEffect(()=>{clearAuto();if(!visible||!autoNext||!canAdvance||!result?.correct||held===marker||menu)return;const captured=marker;autoTimer.current=setTimeout(()=>{if(captured===marker)controller.advance();},1000);return clearAuto;},[marker,visible,autoNext,canAdvance,result?.correct,held,menu,controller]);
+ const exit=()=>{clearAuto();audio.stop();if(onExit)onExit();else void Taro.navigateBack().catch(()=>Taro.reLaunch({url:'/pages/home/index'}));};
+ const pause=async()=>{clearAuto();audio.stop();if(screen.pending||screen.busy||!flow||screen.conflict){exit();return;}if(await controller.pause())exit();};
+ const finish=async()=>{clearAuto();if(await controller.finish())exit();};
+ const choose=(meaning:string,remembered?:boolean)=>{clearAuto();void controller.answer(meaning,remembered).then(()=>{const current=controller.state.flow,answer=current&&studyCard(current),feedback=current?.phase==='practice'?current.practiceFeedback:answer&&current?.results[answer.id];if(feedback&&!feedback.correct&&Taro.canIUse('vibrateShort'))void Taro.vibrateShort({type:'light'}).catch(()=>{});});};
+ const swipe=(event:any)=>{const start=touch.current;touch.current=null;const end=event.changedTouches?.[0];if(!start||!end)return;const dx=end.clientX-start.x,dy=end.clientY-start.y;if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.3)controller.learn(dx<0?1:-1);};
+ const completedPractice=flow?Object.keys(flow.practiced).length:0,wrongCards=flow?.cards.filter(item=>flow.results[item.id]?.saved&&!flow.results[item.id].correct)??[],toPractice=wrongCards.filter(item=>!flow?.practiced[item.id]);
+ const nextNew=!!(isNew&&flow?.today?.new_count>0&&flow?.today?.remaining_new_limit>0);
+ const progress=phase==='learn'?(flow!.learnIndex+1)/Math.max(1,flow!.cards.length):phase==='practice'?completedPractice/Math.max(1,wrongCards.length):counts.done/Math.max(1,counts.total);
+ if(!currentScope())return <View className='page'><View className='notice'>学习对象已切换，请返回后继续。</View><Button className='btn primary' onClick={exit}>返回</Button></View>;
+ return <View className={`page study-page ${phase==='summary'?'study-summary-page':''} ${phase==='learn'?'study-learning-page':''}`}>
+  <View className='study-toolbar'><Button className='study-toolbar-action' onClick={()=>void (phase==='summary'?finish():pause())}>{phase==='summary'?'返回':'暂存退出'}</Button><Text className='study-phase-label'>{phase==='learn'?'学习新词':phase==='practice'?'错词巩固':phase==='summary'?'本次小结':isNew?'本组小测':'单词复习'}</Text><Button className='study-toolbar-action study-menu-trigger' aria-label='学习选项' onClick={()=>{clearAuto();setMenu(value=>!value);}}>···</Button></View>
+  {menu&&<View className='card study-options'><View className='study-option-row'><View>答对后自动继续<View className='muted small'>答错时停留，确认后再继续</View></View><Switch checked={autoNext} onChange={event=>{storage.set(`study_auto_next:${identity.token}`,event.detail.value);setAutoNext(event.detail.value);}}/></View><Button className='text-action' onClick={()=>go('settings')}>调整发音与自动读音</Button></View>}
+  {!!screen.error&&<View className='error study-error'>{message(screen.error)}{!screen.pending&&<Button className='text-action' disabled={screen.busy} onClick={()=>void (!flow?.loaded?controller.begin():card&&!card.meaning_zh?controller.retryDetail():controller.resume())}>重试</Button>}</View>}
+  {screen.notice&&<View className='notice'>{screen.notice}</View>}
+  {screen.conflict?<View className='card study-resume-choice'><View className='study-section-heading'>还有一组单词没学完</View><View className='muted'>可以接着上次的位置学，已保存的答案会保留。</View><Button className='btn primary' disabled={screen.busy} onClick={()=>void controller.continuePrevious()}>继续上次学习</Button><Button className='btn secondary' disabled={screen.busy||!!screen.pending} onClick={()=>void controller.replacePrevious()}>结束上次，开始这次</Button></View>:!flow?.loaded?<View className='card study-skeleton'><View className='study-skeleton-word'/><View className='study-skeleton-line'/>{[1,2,3].map(index=><View className='study-skeleton-choice' key={index}/>)}<View className='muted'>{screen.error?'暂时无法准备单词，请点击重试。':'正在准备单词…'}</View></View>:phase==='summary'?<>
+   <View className='card study-summary'><View className='study-complete-mark'>✓</View><View className='study-summary-title'>{counts.total?'这一组完成了':'这组已无待学单词'}</View><View className='study-summary-count'>{counts.done}<Text> 词已保存</Text></View><View className='study-summary-stats'><View><Text>{counts.correct}</Text>首次答对</View><View><Text>{counts.wrong}</Text>首次答错</View></View>{flow.baseDone>0&&<View className='muted small'>包含此前已保存的 {flow.baseDone} 词</View>}{flow.today&&<View className='study-today-progress'>当日学习进度 {flow.today.completed_words} / {flow.today.goal}{flow.today.goal_reached?' · 目标已达成':''}</View>}{completedPractice>0&&<View className='study-practice-done'>已巩固 {completedPractice} 个错词</View>}</View>
+   {wrongCards.length>0&&<View className='card'><View className='study-section-heading'>再看一眼</View>{wrongCards.slice(0,8).map(item=><View className='study-summary-word' key={item.id}><Text>{item.lemma}</Text><Text>{item.meaning_zh}</Text></View>)}{wrongCards.length>8&&<View className='muted small'>还有 {wrongCards.length-8} 词，可进入错词巩固。</View>}</View>}
+   <View className='study-footer'>{toPractice.length>0?<><Button className='btn primary' disabled={screen.busy} onClick={()=>controller.practice()}>巩固 {toPractice.length} 个错词</Button><Button className='study-footer-link' disabled={screen.busy} onClick={()=>void finish()}>完成本次学习</Button></>:<><Button className='btn primary' disabled={screen.busy} onClick={()=>void finish()}>完成本次学习</Button>{nextNew&&<Button className='study-footer-link' disabled={screen.busy} onClick={()=>void controller.nextGroup()}>继续下一组新词</Button>}</>}</View>
+  </>:card?<>
+   <View className='study-progress-label'><Text>{phase==='learn'?'本组进度':phase==='practice'?`已巩固 ${completedPractice} / ${wrongCards.length} 词`:`已保存 ${counts.done} / ${counts.total} 词`}</Text><Text>{phase==='learn'?`${flow.learnIndex+1} / ${flow.cards.length}`:phase==='practice'?'额外练习，不重复计分':'选择对应的中文意思'}</Text></View>
+   <View className='review-progress-track study-progress-track'><View className='review-progress-value' style={{width:`${Math.min(100,Math.round(progress*100))}%`}}/></View>
+   <View className={`card study-word-card ${phase==='learn'?'study-learning-card':''}`} onTouchStart={(event:any)=>{if(phase!=='learn')return;const point=event.touches?.[0];touch.current=point?{x:point.clientX,y:point.clientY}:null;}} onTouchEnd={phase==='learn'?swipe:undefined}>
+    <View className='study-headword'><View className='study-word'>{card.lemma}</View><View className='study-pronunciation'><AudioText audio={audio} phonetic suffix={partOfSpeech(card.part_of_speech)} onPlay={hold} target={{word_id:card.child_word_id,content_version:card.word_version}} text={(audio.accent==='en-GB'?card.ipa_gb:card.ipa_us)||'听发音'}/>{phase!=='learn'&&card.example&&<Button className='study-hint-action study-inline-hint' onClick={()=>{hold();setExample(map=>({...map,[marker]:((map[marker]??0)+1)%3}));}}>{(example[marker]??0)===0?'例句提示':(example[marker]??0)===1?'看中文':'收起提示'}</Button>}</View><View className='study-audio-feedback'><AudioFeedback audio={audio}/></View></View>
+    {phase==='learn'?<><View className='study-meaning'>{card.meaning_zh||'正在加载释义…'}</View>{card.example&&<View className='study-learn-example'><View className='study-example-label'>例句</View><AudioText audio={audio} onPlay={hold} target={{sentence_id:card.example.id,content_version:card.example.content_version}} text={card.example.text_en}/><View className='muted study-example-translation'>{card.example.translation_zh}</View></View>}</>:<>
+     {card.example&&(example[marker]??0)>=1&&<View className='study-example-hint'><AudioText audio={audio} onPlay={hold} target={{sentence_id:card.example.id,content_version:card.example.content_version}} text={card.example.text_en}/>{(example[marker]??0)>=2&&<View className='muted study-example-translation'>{card.example.translation_zh||'暂无中文翻译'}</View>}</View>}
+     {selfCheck?<View className='study-self-check'>{revealed===marker||result?<View className='study-meaning'>{card.meaning_zh||'正在准备释义…'}</View>:<><View className='muted'>先在心里回忆中文意思</View><Button className='btn secondary' disabled={screen.busy||!card.meaning_zh} onClick={()=>setRevealed(marker)}>查看释义</Button></>}</View>:<View className='study-choices'>{options.map((meaning,index)=>{const selected=result?.selectedMeaning===meaning,correctOption=!!result&&meaning===card.meaning_zh?.trim();return <Button key={`${card.id}:${index}`} className={`btn study-choice ${correctOption?'is-correct':selected&&result&&!result.correct?'is-incorrect':''}`} disabled={screen.busy||!!screen.pending||!!result||!card.meaning_zh} onClick={()=>choose(meaning)}><Text className='study-choice-letter'>{String.fromCharCode(65+index)}</Text><Text>{meaning}</Text>{correctOption&&<Text className='study-choice-mark'>✓</Text>}</Button>;})}</View>}
+    </>}
+   </View>
+   <View className={`study-footer ${phase==='learn'?'study-learn-footer':''}`}>
+    {screen.pending?<View className='study-save-status'><View>{screen.busy?'正在保存本次答案…':screen.rejected?'本次答案未保存，请重新作答。':'答案已保留在本机，等待确认保存。'}</View><Button className='btn primary' disabled={screen.busy} onClick={()=>void (screen.rejected?controller.retryRejected():controller.retryAnswer())}>{screen.rejected?'重新载入并作答':'重试保存'}</Button></View>:phase==='learn'?<><View className='study-learn-actions'><Button className='btn secondary study-learn-previous' disabled={screen.busy||flow.learnIndex===0} onClick={()=>controller.learn(-1)}>‹ 上一个</Button><Button className='btn primary study-learn-next' disabled={screen.busy||!card.meaning_zh} onClick={()=>flow.learnIndex===flow.cards.length-1?controller.startTest():controller.learn(1)}>{flow.learnIndex===flow.cards.length-1?'开始小测':'下一个 ›'}</Button></View><View className='study-swipe-tip'>左右滑动也可切换单词</View></>:result?<><View className={`study-answer-feedback ${result.correct?'is-correct':'is-incorrect'}`}>{!saved?'正在保存…':result.correct?'✓ 答对了':`再记一下：${card.meaning_zh}`}</View><Button className='btn primary' disabled={!canAdvance} onClick={()=>{clearAuto();controller.advance();}}>{phase==='practice'&&!result.correct?'再试一次':phase==='test'&&counts.done===counts.total?'查看本次小结':'继续'}</Button></>:selfCheck&&revealed===marker?<View className='study-self-actions'><Button className='btn secondary' disabled={screen.busy} onClick={()=>choose('还没记住',false)}>还没记住</Button><Button className='btn primary' disabled={screen.busy} onClick={()=>choose(card.meaning_zh!,true)}>记得</Button></View>:<View className='study-footer-tip'>{card.meaning_zh?'想一想，再选答案。':'正在准备释义…'}</View>}
+   </View>
+  </>:<View className='card muted'>正在整理本组单词…</View>}
+ </View>;
 }

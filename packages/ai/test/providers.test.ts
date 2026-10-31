@@ -31,6 +31,17 @@ test('switching to Qwen changes protocol, endpoint and credential without changi
   const generator = createTextGenerator({ ...env, LLM_PROVIDER: 'qwen', QWEN_MODEL: 'qwen-test', QWEN_API_KEY: 'test-qwen', QWEN_BASE_URL: 'https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1' }, fetcher);
   assert.equal((await generator.generate(task)).provider, 'qwen');
 });
+
+test('Qwen text generation can reuse the configured OCR workspace', async () => {
+  let url = '';
+  const fetcher = (async (input: any) => {
+    url = String(input);
+    return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '{"ok":true}' } }] }));
+  }) as any;
+  const generator = createTextGenerator({ LLM_PROVIDER: 'qwen', OCR_API_KEY: 'workspace-key', OCR_MODEL: 'qwen3.7-flash-2026-07-15', OCR_WORKSPACE_ID: 'workspace' }, fetcher);
+  await generator.generate({ name: 'probe', schema: { type: 'object' }, instructions: 'return JSON', input: {}, validate: (v: any) => v });
+  assert.equal(url, 'https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions');
+});
 test('refusal, truncation, malformed JSON and invalid semantics are not successful results', async () => {
   for (const [response, code] of [
     [{ status: 'incomplete' }, 'INCOMPLETE_GENERATION'],
@@ -94,15 +105,24 @@ test('cache separates child, provider, revision and accent', () => {
 });
 
 const deepseekEnv={DEEPSEEK_API_KEY:'test-deepseek',DEEPSEEK_MODEL:'deepseek-flash'};
-test('DeepSeek is the default, uses isolated credentials, JSON mode and local validation',async()=>{
+test('Qwen is the default provider and reuses OCR workspace configuration',async()=>{
+ const generator=createTextGenerator({OCR_API_KEY:'workspace-key',OCR_MODEL:'qwen3.7-flash-2026-07-15',OCR_WORKSPACE_ID:'workspace'},async(url,init)=>{
+  assert.equal(url,'https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions');
+  assert.equal((init!.headers as Record<string,string>).Authorization,'Bearer workspace-key');
+  assert.equal(JSON.parse(init!.body as string).model,'qwen3.7-flash-2026-07-15');
+  return ok({choices:[{finish_reason:'stop',message:{content:'{"sentence":"An apple."}'}}]});
+ });
+ assert.equal((await generator.generate(task)).provider,'qwen');
+});
+test('DeepSeek remains an explicit optional provider with isolated credentials and JSON mode',async()=>{
  const generator=createTextGenerator({...env,...deepseekEnv,LLM_PROVIDER:'deepseek'},async(url,init)=>{
   assert.equal(url,'https://api.deepseek.com/chat/completions');
   assert.equal((init!.headers as Record<string,string>).Authorization,'Bearer test-deepseek');
   const body=JSON.parse(init!.body as string);assert.deepEqual(body.response_format,{type:'json_object'});assert.equal(body.thinking.type,'disabled');assert(body.messages[0].content.includes(JSON.stringify(task.schema)));
   assert.equal(body.model,'deepseek-flash');return ok({choices:[{finish_reason:'stop',message:{content:'{"sentence":"An apple."}'}}]});
  });assert.equal((await generator.generate(task)).provider,'deepseek');
- assert.throws(()=>createTextGenerator({OPENAI_API_KEY:'do-not-reuse'}),{code:'MISSING_DEEPSEEK_API_KEY'});
+ assert.throws(()=>createTextGenerator({OPENAI_API_KEY:'do-not-reuse'}),{code:'MISSING_QWEN_API_KEY'});
  for(const [finish,content,code] of [['length','{}','INCOMPLETE_GENERATION'],['stop','','INVALID_GENERATED_JSON'],['stop','{"sentence":"wrong"}','GENERATED_CONTENT_REJECTED']]){
-  await assert.rejects(createTextGenerator(deepseekEnv,async()=>ok({choices:[{finish_reason:finish,message:{content}}]})).generate(task),{code});
+  await assert.rejects(createTextGenerator({...deepseekEnv,LLM_PROVIDER:'deepseek'},async()=>ok({choices:[{finish_reason:finish,message:{content}}]})).generate(task),{code});
  }
 });
