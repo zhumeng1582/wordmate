@@ -194,10 +194,9 @@ export async function shareImageGenerator(env:Record<string,string|undefined>,fe
   ensure(typeof imageUrl==='string',502,'POSTER_IMAGE_MISSING');
   let parsed:URL;try{parsed=new URL(imageUrl);}catch{throw Object.assign(new Error('POSTER_IMAGE_URL_MALFORMED'),{code:'POSTER_IMAGE_URL_MALFORMED'});}
   ensure(parsed.protocol==='https:'&&!parsed.username&&!parsed.password&&!parsed.port,502,'POSTER_IMAGE_URL_ORIGIN_REJECTED');
-  // DashScope may serve generated results from different Alibaba OSS regions
-  // and endpoint aliases. Keep the trust boundary at its result host + OSS +
-  // Alibaba domain instead of pinning a single `oss-cn-*` hostname shape.
-  ensure(/^dashscope-result-[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/.test(parsed.hostname),502,'POSTER_IMAGE_URL_HOST_REJECTED');
+  // DashScope uses both regional and accelerated OSS endpoints, with dynamic
+  // bucket names (for example dashscope-result-bj and dashscope-a717).
+  ensure(/^dashscope-[a-z0-9-]+\.oss-(?:accelerate|cn-[a-z0-9-]+)\.aliyuncs\.com$/.test(parsed.hostname),502,'POSTER_IMAGE_URL_HOST_REJECTED');
   const downloaded=await fetcher(parsed.href,{signal:AbortSignal.timeout(30000),redirect:'error'});
   if(!downloaded.ok){await downloaded.body?.cancel();throw Object.assign(new Error('POSTER_IMAGE_DOWNLOAD_FAILED'),{code:'POSTER_IMAGE_DOWNLOAD_FAILED'});}
   const mime=(downloaded.headers.get('content-type')||'').split(';')[0].toLowerCase();ensure(mime==='image/png'||mime==='image/jpeg',502,'POSTER_IMAGE_INVALID');

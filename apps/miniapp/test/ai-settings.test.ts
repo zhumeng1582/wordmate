@@ -62,7 +62,7 @@ test('new parents get a clear child setup action before adding learning material
 });
 test('audio usage displays the charged character count and price instead of token usage',async()=>{
  const call={id:'speech',kind:'audio',mode:'system',provider:'cosyvoice',model:'cosyvoice-v3-flash',state:'succeeded',charge_micros:500,billable_characters:5,audio_yuan_per_10000_characters:'1',created_at:'2026-10-31T01:00:00Z'};
- const page=screen('ai-usage',{read:async path=>path.startsWith('/me/ai-settings')?settings({audio_yuan_per_10000_characters:'1'}):path.startsWith('/me/ai-recharges')?{enabled:false,products:[],orders:[]}:{items:[call],entries:[]}});await page.show();assert.match(page.text(page.render()),/语音生成.*扣除 ¥0.0005/);page.button('详情 ›').onClick();assert.match(page.text(page.render()),/计费字符：5 · ¥1\/万字符/);assert.doesNotMatch(page.text(page.render()),/Token/);page.button('额度与扣费说明').onClick();assert.match(page.text(page.render()),/已生成音频可重复播放，不重复扣费/);
+ const page=screen('ai-usage',{read:async path=>path.startsWith('/me/ai-settings')?settings({audio_yuan_per_10000_characters:'1'}):path.startsWith('/me/ai-recharges')?{enabled:false,products:[],orders:[]}:{items:[call],entries:[]}});await page.show();assert.match(page.text(page.render()),/语音生成.*扣除 ¥0.0005/);page.button('详情').onClick();assert.match(page.text(page.render()),/计费字符：5 · ¥1\/万字符/);assert.doesNotMatch(page.text(page.render()),/Token/);page.button('额度与扣费说明').onClick();assert.match(page.text(page.render()),/已生成音频可重复播放，不重复扣费/);
 });
 for(const pageName of ['ai-settings','ai-usage'])test(`${pageName} shows the exact remaining credit after charges below one cent`,async()=>{
  const data=settings({available_micros:19997527,balance_micros:19997527,gift_remaining_micros:19997527}),calls=[2223,250].map((charge_micros,id)=>({id:String(id),kind:'vocabulary',mode:'system',provider:'qwen',model:'text-test',state:'succeeded',charge_micros,created_at:'2026-10-30T12:13:00Z'}));
@@ -104,7 +104,7 @@ test('returning to usage retains expanded records and pagination during a delaye
  let hold=false,release!:()=>void;const wait=new Promise<void>(resolve=>release=resolve);
  const calls=Array.from({length:11},(_,id)=>({id:String(id),kind:'vocabulary',mode:'system',provider:'qwen',model:'text-test',state:'succeeded',charge_micros:110,created_at:'2026-10-30T10:00:00Z'}));
  const page=screen('ai-usage',{read:async(path)=>{if(hold)await wait;return path.startsWith('/me/ai-settings')?settings():path.startsWith('/me/ai-recharges')?{enabled:false,products:[],orders:[]}:{items:calls,entries:[]};}});
- await page.show();page.button('查看更多').onClick();page.button('详情 ›').onClick();page.hide();hold=true;await page.show();
+ await page.show();page.button('查看更多').onClick();page.button('详情').onClick();page.hide();hold=true;await page.show();
  assert.match(page.text(page.render()),/模型：text-test/);assert.doesNotMatch(page.text(page.render()),/正在加载/);assert.equal(page.all(page.render()).filter(node=>node.props?.className==='ai-record-row').length,11);
  release();await tick();assert.match(page.text(page.render()),/模型：text-test/);
 });

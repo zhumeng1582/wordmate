@@ -13,3 +13,11 @@
 .preview-lemma{font-weight:700;margin-right:14px}
 .discover-modal .btn{margin:8px 0}
 .discover-modal .text-action{display:block;margin:12px auto}
+
+.discover-filters{display:flex;align-items:center;gap:12px;margin:-8px 0 16px}.discover-filter-picker{padding:10px 16px;border-radius:12px;background:var(--field);color:var(--text);font-size:23px;white-space:nowrap}.discover-filter-input{flex:1;min-width:0;margin:0}.discover-categories{margin-top:6px}
+
+.discover-card{border-radius:30px}
+.discover-filter-picker{border-radius:18px}
+.discover-overlay{background:var(--overlay)}
+
+.preview-example{display:flex;align-items:flex-start;gap:12px}.preview-example .muted{flex:1;min-width:0}

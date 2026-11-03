@@ -1,3 +1,5 @@
+export const MAX_VOCABULARY_WORDS=8000;
+export const MAX_VOCABULARY_TEXT=1000000;
 export type MaterialMode='text'|'image'|'file';
 export type PreparedWord={input_index:number;input:string;status:'ok'|'invalid';lemma:string|null;meaning_zh:string|null;reason:string|null;[key:string]:any};
 export type VocabularyDraft={format:1;mode:MaterialMode;raw:string;theme:string;bookId:string;prepared:PreparedWord[]|null;editing:{id:string;attempts:number}|null};
@@ -5,12 +7,12 @@ export type VocabularySubmission={jobId?:string;body:{wordbook_id:string;source_
 export const vocabularyKeys=(token:string,child:string)=>({draft:`vocabulary-draft:${token}:${child}`,pending:`vocabulary-submit:${token}:${child}`,edit:`vocabulary-edit:${token}:${child}`,result:`vocabulary-result:${token}:${child}`});
 export const emptyVocabularyDraft=():VocabularyDraft=>({format:1,mode:'text',raw:'',theme:'',bookId:'',prepared:null,editing:null});
 export function readVocabularyDraft(value:any):VocabularyDraft{
- if(value?.format!==1||typeof value.raw!=='string'||value.raw.length>8000||typeof value.theme!=='string'||value.theme.length>80)return emptyVocabularyDraft();
- return {...emptyVocabularyDraft(),...value,mode:['text','image','file'].includes(value.mode)?value.mode:'text',bookId:typeof value.bookId==='string'?value.bookId:'',prepared:Array.isArray(value.prepared)&&value.prepared.length>0&&value.prepared.length<=30?value.prepared:null};
+ if(value?.format!==1||typeof value.raw!=='string'||value.raw.length>MAX_VOCABULARY_TEXT||typeof value.theme!=='string'||value.theme.length>80)return emptyVocabularyDraft();
+ return {...emptyVocabularyDraft(),...value,mode:['text','image','file'].includes(value.mode)?value.mode:'text',bookId:typeof value.bookId==='string'?value.bookId:'',prepared:Array.isArray(value.prepared)&&value.prepared.length>0&&value.prepared.length<=MAX_VOCABULARY_WORDS?value.prepared:null};
 }
 export function applyMaterial(draft:VocabularyDraft,result:{text:string;prepared_items?:PreparedWord[];source:'image'|'file'}):VocabularyDraft{
  const raw=result.source==='image'?result.text:[draft.raw.trim(),result.text].filter(Boolean).join('\n');
- if(raw.length>8000)throw Error('IMPORT_TEXT_TOO_LONG');if(!raw.trim())throw Error('IMPORT_EMPTY');
+ if(raw.length>MAX_VOCABULARY_TEXT)throw Error('IMPORT_TEXT_TOO_LONG');if(!raw.trim())throw Error('IMPORT_EMPTY');
  return {...draft,mode:result.source==='image'?'image':'file',raw,prepared:result.source==='image'&&result.prepared_items?.length?result.prepared_items:null};
 }
 export function removePreparedWord(draft:VocabularyDraft,index:number):VocabularyDraft{

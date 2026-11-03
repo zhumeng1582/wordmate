@@ -3,6 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
+const {sourceProvenance,ensureSourceUnchanged}=require('./release-provenance.cjs');
 const root=path.resolve(__dirname,'..');
 const args=process.argv.slice(2);
 if(args.length>1){console.error('Usage: node scripts/prepare-server-release.cjs [api.example.com]');process.exit(1);}
@@ -10,6 +11,8 @@ const domain=args[0];
 if(domain&&(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)||domain.endsWith('.localhost'))){
  console.error('Use a DNS hostname only: api.example.com, without scheme, port or path.');process.exit(1);
 }
+const provenance=sourceProvenance();
+if(provenance.includes_uncommitted_changes&&process.env.WORDMATE_ALLOW_DIRTY_RELEASE!=='1'){console.error('工作区有未提交的改动。请先固定源码版本，或在确认范围后设置 WORDMATE_ALLOW_DIRTY_RELEASE=1。');process.exit(1);}
 const build=spawnSync('corepack',['pnpm','build:api'],{cwd:root,stdio:'inherit'});
 if(build.status!==0)process.exit(build.status??1);
 const releaseId=new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomBytes(3).toString('hex');
@@ -47,9 +50,8 @@ if(domain){
   manifest.push({path:name,sha256:crypto.createHash('sha256').update(value).digest('hex')});
  }
 }
-const commit=spawnSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'});
-const status=spawnSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'});
-fs.writeFileSync(path.join(release,'release-manifest.json'),JSON.stringify({releaseId,domain:domain??null,source_commit:commit.status===0?commit.stdout.trim():null,includes_uncommitted_changes:status.status===0?Boolean(status.stdout.trim()):null,build_node:process.version,files:manifest},null,2)+'\n');
+ensureSourceUnchanged(provenance,sourceProvenance());
+fs.writeFileSync(path.join(release,'release-manifest.json'),JSON.stringify({releaseId,domain:domain??null,...provenance,build_node:process.version,files:manifest},null,2)+'\n');
 const archive=path.join(output,'wordmate-server.tar.gz');
 const tar=spawnSync('tar',['-czf',archive,'-C',release,'.'],{stdio:'inherit'});
 if(tar.status!==0)process.exit(tar.status??1);

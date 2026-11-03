@@ -2,6 +2,16 @@ import type {Sql,Row} from './ports.ts';
 import {ensure,uuid} from './errors.ts';
 export function validDate(value:unknown){ensure(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&value>='2000-01-01'&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value,422,'INVALID_DATE');return value;}
 export function pageSize(value:unknown){const n=value===undefined?50:Number(value);ensure((typeof value==='string'||typeof value==='number'||value===undefined)&&Number.isInteger(n)&&n>=1&&n<=100,422,'INVALID_PAGE');return n;}
+export function historyRange(query:any,today:string){
+  const single=query.date!==undefined;ensure(!single||query.date_from===undefined&&query.date_to===undefined,422,'INVALID_DATE_RANGE');
+  const from=validDate(single?query.date:query.date_from),to=validDate(single?query.date:query.date_to);
+  ensure(from<=to,422,'INVALID_DATE_RANGE');ensure(to<=today,422,'INVALID_DATE');return {from,to};
+}
+export function historicalCardFilter(scope:unknown,source:unknown){
+  ensure(scope==='studied'||scope==='mistakes',422,'INVALID_SOURCE');
+  ensure(source===undefined||source===null||scope==='mistakes'&&typeof source==='string'&&['review','monthly_quiz'].includes(source),422,'INVALID_SOURCE');
+  return scope==='studied'?`EXISTS(SELECT 1 FROM daily_word_activity a WHERE a.child_id=r.child_id AND a.card_id=r.id AND a.local_date BETWEEN $2::date AND $3::date)`:`EXISTS(SELECT 1 FROM mistake_events m WHERE m.child_id=r.child_id AND m.child_word_id=r.child_word_id AND m.local_date BETWEEN $2::date AND $3::date AND ($4::text IS NULL OR m.source=$4))`;
+}
 export async function streak(q:Sql,child:string,today:string,includeMakeup=true){
   const rows=(await q.query(`SELECT to_char(day,'YYYY-MM-DD') AS day FROM (
     SELECT local_date AS day FROM daily_activity WHERE child_id=$1 AND local_date<=$2 AND distinct_words>=goal_snapshot
@@ -15,12 +25,19 @@ export async function streak(q:Sql,child:string,today:string,includeMakeup=true)
 interface Access {tx<T>(fn:(q:Sql)=>Promise<T>):Promise<T>;child(q:Sql,actor:string,id:string):Promise<Row>;day(q:Sql,c:Row):Promise<string>}
 export class History {
   private access:Access;constructor(access:Access){this.access=access;}
-  async calendar(actor:string,child:string,month?:unknown){return this.access.tx(async q=>{
+  async calendar(actor:string,child:string,month?:unknown,source?:unknown){return this.access.tx(async q=>{
     const c=await this.access.child(q,actor,child),today=await this.access.day(q,c),m=month??today.slice(0,7);
     ensure(typeof m==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(m)&&m>='2000-01'&&m<=today.slice(0,7),422,'INVALID_MONTH');
-    const days=(await q.query(`WITH dates AS (SELECT d::date AS day FROM generate_series($2::date,($2::date+interval '1 month - 1 day')::date,interval '1 day') d), mistakes AS (SELECT local_date,count(*)::int mistake_count,count(DISTINCT child_word_id)::int wrong_words FROM mistake_events WHERE child_id=$1 AND local_date >= $2::date AND local_date < $2::date+interval '1 month' GROUP BY local_date), quizzes AS (SELECT submitted_local_date AS day,count(*)::int quiz_count FROM monthly_quizzes WHERE child_id=$1 AND status='submitted' AND submitted_local_date >= $2::date AND submitted_local_date < $2::date+interval '1 month' GROUP BY submitted_local_date) SELECT to_char(d.day,'YYYY-MM-DD') date,coalesce(a.distinct_words,0)::int studied_words,a.goal_snapshot goal,(coalesce(a.distinct_words>=a.goal_snapshot,false) OR mu.used_for_date IS NOT NULL) checked_in,(mu.used_for_date IS NOT NULL) makeup,coalesce(m.wrong_words,0)::int wrong_words,coalesce(m.mistake_count,0)::int mistake_count,coalesce(t.quiz_count,0)::int quiz_count FROM dates d LEFT JOIN daily_activity a ON a.child_id=$1 AND a.local_date=d.day LEFT JOIN checkin_makeup_credits mu ON mu.child_id=$1 AND mu.used_for_date=d.day LEFT JOIN mistakes m ON m.local_date=d.day LEFT JOIN quizzes t ON t.day=d.day ORDER BY d.day`,[child,`${m}-01`])).rows;
+    ensure(source===undefined||typeof source==='string'&&['review','monthly_quiz'].includes(source),422,'INVALID_SOURCE');
+    const days=(await q.query(`WITH dates AS (SELECT d::date AS day FROM generate_series($2::date,($2::date+interval '1 month - 1 day')::date,interval '1 day') d), reviewable AS (SELECT a.local_date,count(*)::int words FROM daily_word_activity a JOIN review_cards r ON r.id=a.card_id AND r.child_id=a.child_id JOIN child_words w ON w.id=a.child_word_id AND w.child_id=a.child_id WHERE a.child_id=$1 AND a.local_date >= $2::date AND a.local_date < $2::date+interval '1 month' AND r.suspended_at IS NULL AND w.archived_at IS NULL GROUP BY a.local_date), mistakes AS (SELECT local_date,count(*)::int mistake_count,count(DISTINCT child_word_id)::int wrong_words FROM mistake_events WHERE child_id=$1 AND ($3::text IS NULL OR source=$3) AND local_date >= $2::date AND local_date < $2::date+interval '1 month' GROUP BY local_date), quizzes AS (SELECT submitted_local_date AS day,count(*)::int quiz_count FROM monthly_quizzes WHERE child_id=$1 AND status='submitted' AND submitted_local_date >= $2::date AND submitted_local_date < $2::date+interval '1 month' GROUP BY submitted_local_date) SELECT to_char(d.day,'YYYY-MM-DD') date,coalesce(a.distinct_words,0)::int studied_words,coalesce(rv.words,0)::int reviewable_words,a.goal_snapshot goal,(coalesce(a.distinct_words>=a.goal_snapshot,false) OR mu.used_for_date IS NOT NULL) checked_in,(mu.used_for_date IS NOT NULL) makeup,coalesce(m.wrong_words,0)::int wrong_words,coalesce(m.mistake_count,0)::int mistake_count,coalesce(t.quiz_count,0)::int quiz_count FROM dates d LEFT JOIN daily_activity a ON a.child_id=$1 AND a.local_date=d.day LEFT JOIN checkin_makeup_credits mu ON mu.child_id=$1 AND mu.used_for_date=d.day LEFT JOIN reviewable rv ON rv.local_date=d.day LEFT JOIN mistakes m ON m.local_date=d.day LEFT JOIN quizzes t ON t.day=d.day ORDER BY d.day`,[child,`${m}-01`,source??null])).rows;
     const credits=Number((await q.query('SELECT count(*)::int n FROM checkin_makeup_credits WHERE child_id=$1 AND used_for_date IS NULL',[child])).rows[0].n);
-    return {month:m,timezone:c.timezone,days,makeup_credits:credits,...await streak(q,child,today)};
+    return {month:m,today,timezone:c.timezone,days,makeup_credits:credits,...await streak(q,child,today)};
+  });}
+  async range(actor:string,child:string,query:any){return this.access.tx(async q=>{
+    const c=await this.access.child(q,actor,child),today=await this.access.day(q,c),range=historyRange(query,today),scope=query.scope??'studied',filter=historicalCardFilter(scope,query.source);
+    const params=scope==='studied'?[child,range.from,range.to]:[child,range.from,range.to,query.source??null];
+    const row=(await q.query(`SELECT count(*)::int count FROM review_cards r JOIN child_words w ON w.id=r.child_word_id AND w.child_id=r.child_id WHERE r.child_id=$1 AND r.suspended_at IS NULL AND w.archived_at IS NULL AND ${filter}`,params)).rows[0];
+    return {date_from:range.from,date_to:range.to,scope,count:row.count,today};
   });}
   async wrongWords(actor:string,child:string,query:any={}){return this.access.tx(async q=>{
     await this.access.child(q,actor,child);const date=query.date===undefined?null:validDate(query.date),source=query.source??null,quiz=query.quiz_id===undefined?null:uuid(query.quiz_id),limit=pageSize(query.limit);

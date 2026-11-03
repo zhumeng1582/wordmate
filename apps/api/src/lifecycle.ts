@@ -190,7 +190,7 @@ export class Lifecycle {
   await q.query('DELETE FROM shared_wordbook_items WHERE shared_wordbook_id IN (SELECT id FROM shared_wordbooks WHERE source_child_id=$1)',[id]);
   await q.query('DELETE FROM shared_wordbooks WHERE source_child_id=$1',[id]);
   if(this.images)await this.images.deleteChild(q,id);else await this.deleteUnstoredImages(q,"split_part(cache_scope,':',1)=$1",id);
-  for(const table of ['study_session_items','mistake_events','daily_word_activity','review_logs','study_sessions','monthly_quiz_items','monthly_quizzes','word_corrections','word_annotations','audio_usage_events','audio_assets','generation_jobs','checkin_share_quotes','import_attempts','checkin_makeup_credits','daily_activity','sentence_targets','sentences','batch_items','batches','wordbook_words','review_cards','child_words','wordbooks'])await q.query(`DELETE FROM ${table} WHERE child_id=$1`,[id]);
+  for(const table of ['study_session_items','mistake_events','daily_word_activity','review_logs','study_sessions','monthly_quiz_items','monthly_quizzes','word_corrections','word_annotations','audio_usage_events','audio_assets','generation_jobs','checkin_share_quotes','import_attempts','checkin_makeup_credits','daily_activity','sentence_targets','sentences','batch_items','batches','wordbook_words','review_cards','word_tutor_sessions','child_words','wordbooks'])await q.query(`DELETE FROM ${table} WHERE child_id=$1`,[id]);
   await q.query('DELETE FROM audit_logs WHERE target_id=ANY($1::uuid[])',[refs]);
   await q.query('DELETE FROM children WHERE id=$1',[id]);
  }

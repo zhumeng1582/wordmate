@@ -59,6 +59,14 @@ test('HTTP errors are sanitized and adapters do not silently retry or switch ven
   assert.equal(calls, 1);
   await assert.rejects(createTextGenerator(env, async () => { throw new Error('private URL'); }).generate(task), { code: 'UPSTREAM_NETWORK_OR_TIMEOUT' });
 });
+test('an unactivated Model Studio service reports a precise error without exposing response messages',async()=>{
+ let calls=0;
+ await assert.rejects(createTextGenerator(env,async()=>{calls++;return Response.json({error:{code:'AccessDenied.Unpurchased',message:'private prompt and secret key'},request_id:'request-123'},{status:403});}).generate(task),error=>{
+  assert.equal((error as any).code,'AI_SERVICE_NOT_ACTIVATED');assert.equal((error as any).status,403);assert.equal((error as any).upstreamCode,'AccessDenied.Unpurchased');assert.equal((error as any).requestId,'request-123');assert.doesNotMatch(JSON.stringify(error),/private prompt|secret key/);return true;
+ });assert.equal(calls,1);
+ for(const body of ['not json','x'.repeat(20000)])await assert.rejects(createTextGenerator(env,async()=>new Response(body,{status:403})).generate(task),{code:'UPSTREAM_HTTP_ERROR',status:403});
+ await assert.rejects(createTextGenerator(env,async()=>Response.json({error:{code:'Arrearage',message:'private billing details'}},{status:400})).generate(task),{code:'AI_PROVIDER_BILLING_UNAVAILABLE',status:400,upstreamCode:'Arrearage'});
+});
 test('unknown providers and missing selected-provider credentials fail closed', () => {
   assert.throws(() => createTextGenerator({ ...env, LLM_PROVIDER: 'unknown' }), { code: 'UNSUPPORTED_LLM_PROVIDER' });
   assert.throws(() => createTextGenerator({ ...env, LLM_PROVIDER: 'qwen' }), { code: 'MISSING_QWEN_API_KEY' });

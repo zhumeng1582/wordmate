@@ -11,6 +11,19 @@ test('token accounting separates cached input and rounds once in integer micro-C
  assert.throws(()=>validateBody(['me','ai-settings'],'PUT',{mode:'byok',model_id:'qwen',expected_version:0,api_key:'some-key'}),{code:'INVALID_REQUEST_BODY'});
  assert.throws(()=>validateBody(['me','ai-settings'],'PUT',{mode:'byok',model_id:'qwen',expected_version:0,provider_consent:true,base_url:'https://attacker.test'}),{code:'INVALID_REQUEST_BODY'});
 });
+test('bulk vocabulary is billed per successful chunk, ignores legacy call counts, and resumes only unfinished chunks',async()=>{
+ let failed=false,calls=0;
+ const words=Array.from({length:61},(_,i)=>'sample'+String.fromCharCode(97+Math.floor(i/26))+String.fromCharCode(97+i%26));
+ const f=await fixture(async(_url,init)=>{calls++;const body=JSON.parse(String(init?.body)),input=JSON.parse(body.messages[1].content);if(input.words[0]===words[30]&&!failed){failed=true;return new Response('unavailable',{status:503});}return response({items:input.words.map(vocabItem)});});
+ try{
+  await f.pg.query("INSERT INTO wordmate.ai_calls(reference,user_id,kind,mode,provider,model,settings_version,state,reserved_micros,tariff,family_id,capability) SELECT 'previous:'||n,$1,'vocabulary','system','qwen','test-model',0,'failed',0,'{}',$2,'text' FROM generate_series(1,100) n",[f.dad,f.family.id]);
+  const j=await f.core.vocabulary.create(f.dad,'bulk',f.child.id,{wordbook_id:f.book.id,words});await f.core.vocabulary.processOne();await f.core.vocabulary.processOne();
+  assert.equal((await f.core.vocabulary.get(f.dad,j.id)).saved_count,30);assert.equal((await f.accounts.overview(f.dad)).balance_micros,19999890);assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);
+  await f.core.vocabulary.retry(f.dad,'resume',j.id);await f.core.vocabulary.processOne();await f.core.vocabulary.processOne();
+  assert.equal((await f.core.vocabulary.get(f.dad,j.id)).status,'succeeded');assert.equal(calls,4);assert.equal((await f.accounts.overview(f.dad)).balance_micros,19999670);assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);
+  assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,3);
+ }finally{await f.close();}
+});
 test('system generation atomically saves vocabulary and debits actual usage once',async()=>{
  let calls=0;const f=await fixture(async()=>{calls++;return response();});try{
   await f.tx((q:any)=>f.accounts.credit(q,f.dad,'grant',1000000));await f.tx((q:any)=>f.accounts.credit(q,f.dad,'grant',1000000));
@@ -19,6 +32,52 @@ test('system generation atomically saves vocabulary and debits actual usage once
   const history=await f.accounts.history(f.dad);assert.equal(history.items[0].charge_micros,110);assert.equal(history.items[0].cached_tokens,40);
   await f.tx((q:any)=>f.accounts.settle(q,history.items[0].id));assert.equal((await f.accounts.overview(f.dad)).balance_micros,20999890);
   assert.equal((await f.accounts.history(f.mom)).items.length,0);assert.equal((await f.accounts.overview(f.mom)).balance_micros,0);
+ }finally{await f.close();}
+});
+test('service activation failure is durable, pauses bulk work and releases the entire reservation without charging',async()=>{
+ let calls=0;const f=await fixture(async()=>{calls++;return Response.json({error:{code:'AccessDenied.Unpurchased',message:'private upstream details'},request_id:'request-activation'},{status:403});});
+ try{
+  const job=await f.core.vocabulary.create(f.dad,'activation-failure',f.child.id,{wordbook_id:f.book.id,words:Array.from({length:31},(_,i)=>'sample'+String.fromCharCode(97+Math.floor(i/26))+String.fromCharCode(97+i%26))});
+  await f.core.vocabulary.processOne();await f.core.vocabulary.processOne();const failed=await f.core.vocabulary.get(f.dad,job.id);
+  assert.equal(calls,1);assert.equal(failed.status,'failed');assert.equal(failed.error_code,'AI_SERVICE_NOT_ACTIVATED');assert.equal(failed.provider_error.http_status,403);assert.equal(failed.provider_error.code,'AccessDenied.Unpurchased');assert.equal(failed.saved_count,0);
+  const history=await f.accounts.history(f.dad);assert.equal(history.items[0].state,'failed');assert.equal(history.items[0].charge_micros,0);assert.equal(history.items[0].error_code,'AI_SERVICE_NOT_ACTIVATED');
+  const wallet=await f.accounts.overview(f.dad);assert.equal(wallet.balance_micros,20000000);assert.equal(wallet.frozen_micros,0);
+  assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,0);assert.doesNotMatch(JSON.stringify(failed),/private upstream details/);
+ }finally{await f.close();}
+});
+test('upstream billing refusal is distinct from family balance and never creates a charge',async()=>{
+ const f=await fixture(async()=>Response.json({error:{code:'Arrearage',message:'private billing details'},request_id:'request-billing'},{status:400}));
+ try{
+  const job=await f.core.vocabulary.create(f.dad,'billing-failure',f.child.id,{wordbook_id:f.book.id,words:['cat']});await f.core.vocabulary.processOne();const failed=await f.core.vocabulary.get(f.dad,job.id);
+  assert.equal(failed.error_code,'AI_PROVIDER_BILLING_UNAVAILABLE');assert.equal(failed.provider_error.http_status,400);assert.equal(failed.provider_error.code,'Arrearage');
+  const wallet=await f.accounts.overview(f.dad);assert.equal(wallet.balance_micros,20000000);assert.equal(wallet.frozen_micros,0);const history=await f.accounts.history(f.dad);assert.equal(history.items[0].state,'failed');assert.equal(history.items[0].charge_micros,0);assert.doesNotMatch(JSON.stringify(failed),/private billing details/);
+ }finally{await f.close();}
+});
+test('plural example sentences save their actual target surface and settle once',async()=>{
+ const sentences:Record<string,string>={bone:'😊 Our body has many bones.',strawberry:'I like strawberries.',potato:'Dad cooks the potatoes.',tomato:'The tomatoes are red.',child:'The children play.',foot:'My feet are on the floor.','candy bar':'I have two candy bars.'};
+ const f=await fixture(async(_url,init)=>{const input=JSON.parse(JSON.parse(String(init?.body)).messages[1].content);return response({items:input.words.map((word:string,i:number)=>({...vocabItem(word,i),sentence_en:sentences[word]}))});});
+ try{
+  const job=await f.core.vocabulary.create(f.dad,'plurals',f.child.id,{wordbook_id:f.book.id,words:Object.keys(sentences)});await f.core.vocabulary.processOne();assert.equal((await f.core.vocabulary.get(f.dad,job.id)).status,'succeeded');
+  const targets=(await f.pg.query('SELECT w.lemma,t.surface,t.start_utf16,t.end_utf16,s.text_en FROM wordmate.sentence_targets t JOIN wordmate.child_words w ON w.id=t.child_word_id JOIN wordmate.sentences s ON s.id=t.sentence_id WHERE t.child_id=$1',[f.child.id])).rows;
+  assert.equal(targets.length,7);for(const target of targets)assert.equal(target.text_en.slice(target.start_utf16,target.end_utf16),target.surface);assert.equal(targets.find((t:any)=>t.lemma==='bone').surface,'bones');
+  assert.equal((await f.accounts.overview(f.dad)).balance_micros,19999890);assert.equal((await f.accounts.history(f.dad)).entries.filter((entry:any)=>entry.kind==='charge').length,1);
+ }finally{await f.close();}
+});
+for(const valid of [true,false])test(`legacy validation exhaustion gets one user-triggered recovery attempt and ${valid?'saves only the missing word':'cannot receive another grant'}`,async()=>{
+ let calls=0;const words=[...Array.from({length:30},(_,i)=>'sample'+String.fromCharCode(97+Math.floor(i/26))+String.fromCharCode(97+i%26)),'bone'];
+ const f=await fixture(async(_url,init)=>{calls++;const input=JSON.parse(JSON.parse(String(init?.body)).messages[1].content);return response({items:input.words.map((word:string,i:number)=>({...vocabItem(word,i),...(word==='bone'?{sentence_en:valid?'Our body has many bones.':'A dog is here.'}:{})}))});});
+ try{
+  const root=await f.core.vocabulary.create(f.dad,'legacy-plurals',f.child.id,{wordbook_id:f.book.id,words});await f.core.vocabulary.processOne();
+  const part=(await f.pg.query("SELECT * FROM wordmate.generation_jobs WHERE payload->>'bulk_parent_id'=$1 AND (payload->>'bulk_index')::int=1",[root.id])).rows[0];
+  await f.pg.query("UPDATE wordmate.generation_jobs SET status='failed',error_code='GENERATED_CONTENT_REJECTED',attempts=3,payload=payload-'validation_revision' WHERE id=$1",[part.id]);
+  const before=await f.core.vocabulary.get(f.dad,root.id);assert.equal(before.saved_count,30);assert.equal(before.retryable,true);
+  await f.core.vocabulary.retry(f.dad,'recover-plurals',root.id);const granted=(await f.pg.query('SELECT attempts,max_attempts FROM wordmate.generation_jobs WHERE id=$1',[part.id])).rows[0];assert.equal(granted.attempts,3);assert.equal(granted.max_attempts,4);
+  await f.core.vocabulary.processOne();const after=await f.core.vocabulary.get(f.dad,root.id);assert.equal(calls,2);assert.equal(after.saved_count,valid?31:30);assert.equal((await f.accounts.overview(f.dad)).balance_micros,valid?19999780:19999890);assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);
+  if(valid)assert.equal(after.status,'succeeded');else{
+   assert.equal(after.retryable,false);assert.equal(after.validation_error.field,'sentence_en');assert.equal(after.validation_error.index,0);assert.equal(after.validation_error.request_id,'upstream-test');
+   await assert.rejects(f.core.vocabulary.retry(f.dad,'no-second-grant',root.id),{code:'GENERATION_NOT_RETRYABLE'});
+   const row=(await f.pg.query('SELECT state,charge_micros,upstream_request_id FROM wordmate.ai_calls ORDER BY created_at DESC LIMIT 1')).rows[0];assert.equal(row.state,'failed');assert.equal(Number(row.charge_micros),0);assert.equal(row.upstream_request_id,'upstream-test');
+  }
  }finally{await f.close();}
 });
 test('concurrent reservations cannot overspend; network calls do not hold a transaction',async()=>{

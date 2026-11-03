@@ -7,5 +7,7 @@
 .settings-entry-copy{flex:1}
 .settings-entry-title{font-weight:500}
 .settings-entry-description{margin-top:4px;font-size:23px;color:var(--muted);font-weight:400}
-.settings-chevron{font-size:38px;color:var(--muted)}
+.settings-chevron{color:var(--muted);margin:0}
 .settings-hint{margin-top:16px}
+
+.settings-section-title{margin:32px 2px 0;font-size:24px}.settings-menu{margin:12px 0 24px}.settings-entry{min-height:92px;padding:20px 0}

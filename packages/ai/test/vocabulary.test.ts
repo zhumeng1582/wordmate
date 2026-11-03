@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {vocabularyRequest,generateVocabulary} from '../src/vocabulary.ts';
+import {vocabularyRequest,generateVocabulary,locateVocabularyTarget} from '../src/vocabulary.ts';
 import {createTextGenerator} from '../src/index.ts';
 const item={input_index:0,input:'cat',status:'ok',lemma:'cat',part_of_speech:'noun',ipa_gb:'/kæt/',ipa_us:'/kæt/',meaning_zh:'猫',sentence_en:'The cat is on the bed.',sentence_zh:'猫在床上。',reason:null};
 test('batch prompt works with an explicitly configured DeepSeek adapter',async()=>{
@@ -19,6 +19,15 @@ test('unrecognized inputs are explicit invalid entries without invented content'
  for(const key of ['lemma','part_of_speech','ipa_gb','ipa_us','meaning_zh','sentence_en','sentence_zh'])invalid[key]=null;
  assert.deepEqual(vocabularyRequest(['qzxxy']).validate({items:[invalid]}),{items:[invalid]});
  assert.throws(()=>vocabularyRequest(['qzxxy']).validate({items:[{...invalid,meaning_zh:'虚构释义'}]}));
+});
+test('normal noun plurals validate and locate the complete word with UTF-16 offsets',()=>{
+ for(const [word,surface] of [['bone','bones'],['strawberry','strawberries'],['potato','potatoes'],['tomato','tomatoes'],['child','children'],['foot','feet'],['bus','buses'],['candy bar','candy bars'],['scissors','scissors']]){
+  const sentence=`😊 I see ${surface}.`,entry={...item,input:word,lemma:word,sentence_en:sentence};assert.deepEqual(vocabularyRequest([word]).validate({items:[entry]}),{items:[entry]});
+  const target=locateVocabularyTarget(sentence,word,'noun');assert(target);assert.equal(target.surface,surface);assert.equal(sentence.slice(target.start,target.end),surface);assert.equal(target.start,sentence.indexOf(surface));
+ }
+ for(const [word,sentence] of [['bone','A backbone is strong.'],['bone','The bonesaw is sharp.'],['cat','I like catering.'],['potato','I see potatos.']])assert.equal(locateVocabularyTarget(sentence,word,'noun'),null);
+ assert.equal(locateVocabularyTarget('I see reds.','red','adjective'),null);
+ assert.throws(()=>vocabularyRequest(['bone']).validate({items:[{...item,input:'bone',lemma:'bone',sentence_en:'A dog is here.'}]}),error=>{assert.deepEqual((error as any).validationIssue,{field:'sentence_en',index:0});return true;});
 });
 
 test('raw text is passed intact as data; output cannot inject ids, extra items or arbitrary fields',async()=>{

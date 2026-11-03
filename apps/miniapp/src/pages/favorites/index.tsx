@@ -1,0 +1,13 @@
+import {useRef,useState} from 'react';
+import {Button,Text,View} from '@tarojs/components';
+import Taro,{useDidShow,useDidHide} from '@tarojs/taro';
+import {FavoriteButton} from '../../components/FavoriteButton';
+import {api,message,storage} from '../../services/api';
+import './index.css';
+export default function Favorites(){
+ const [items,setItems]=useState<any[]>([]),[cursor,setCursor]=useState<string|null>(null),[total,setTotal]=useState(0),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[error,setError]=useState('');const serial=useRef(0),reading=useRef(false);
+ const load=async(after?:string)=>{if(reading.current)return;reading.current=true;setBusy(true);const ticket=++serial.current,scope=`${storage.get('access_token')}:${storage.get('child_id')}`;try{const result=await api(`/children/${storage.get('child_id')}/words?mark=favorite&limit=100${after?`&cursor=${encodeURIComponent(after)}`:''}`);if(ticket!==serial.current||scope!==`${storage.get('access_token')}:${storage.get('child_id')}`)return;setItems(old=>after?[...old,...result.items.filter((w:any)=>!old.some(x=>x.id===w.id))]:result.items);setCursor(result.next_cursor);setTotal(result.total);setLoaded(true);setError('');}catch(e){if(ticket===serial.current)setError(message(e));}finally{if(ticket===serial.current){reading.current=false;setBusy(false);}}};
+ useDidShow(()=>{void load();});useDidHide(()=>{serial.current++;reading.current=false;});
+ const review=()=>{storage.set('review_source',{source:'favorites'});storage.set('study_intent','start');void Taro.navigateTo({url:'/pages/review/index'});};
+ return <View className='page'><View className='title'>收藏单词</View>{error&&<View className='error'>{error}<Button className='text-action' onClick={()=>void load()}>重试</Button></View>}{busy&&!loaded&&<View className='muted'>正在加载…</View>}{loaded&&!total&&!error&&<View className='card muted'>还没有收藏的单词。点击单词旁的星星即可收藏。</View>}{!!total&&<><View className='favorite-actions'><Button className='btn secondary' disabled={busy} onClick={review}>复习收藏</Button><Button className='btn primary' disabled={busy} onClick={()=>Taro.navigateTo({url:'/pages/quiz/index?scope=favorites'})}>测试收藏</Button></View><View className='muted small'>共 {total} 个单词</View></>}{items.map(w=><View className='card favorite-item' key={w.id}><View className='favorite-copy'><Text className='favorite-lemma'>{w.lemma}</Text><View className='muted small'>{w.meaning_zh}</View></View><FavoriteButton wordId={w.id} initial={w.annotations} onChange={v=>{if(!v.favorite){setItems(old=>old.filter(x=>x.id!==w.id));setTotal(n=>Math.max(0,n-1));}}}/></View>)}{cursor&&<Button className='btn secondary' disabled={busy} onClick={()=>void load(cursor)}>{busy?'加载中…':'加载更多'}</Button>}</View>;
+}

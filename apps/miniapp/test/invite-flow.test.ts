@@ -41,3 +41,6 @@ test('login consent acknowledgment is single-use and bound to its flow and accou
  beginInviteLogin('three');acceptInviteLogin('three','account');assert.equal(consumeInviteLogin('three','account'),true);assert.equal(consumeInviteLogin('three','account'),false);
  beginInviteLogin('four');acceptInviteLogin('four','account');cancelInviteLogin('four');assert.equal(consumeInviteLogin('four','account'),false);
 });
+test('waiting application is retained for the signed-in account before leaving',async()=>{
+ const page=pageHarness('pages/invite/index',async()=>waiting,undefined,{query:{token}});await page.show();const saved=page.cache.get('pending_family_invite');assert.equal(saved.familyId,'family-b');assert.equal(saved.account,'account-a');page.button('先去首页').onClick();assert.equal(page.routes.at(-1),'/pages/home/index');page.dispose();
+});

@@ -5,7 +5,7 @@
 .search-result-heading{display:flex;align-items:center;gap:14px;min-height:72px}
 .search-result-lemma{font-size:30px;font-weight:650;flex-shrink:0}
 .search-result-heading .audio-text{flex:1;min-width:0;font-size:23px;padding:0;min-height:60px;align-items:center}
-.search-result-chevron{font-size:28px;color:var(--muted)}
+.search-result-chevron{color:var(--muted);margin-left:0}
 .search-result-detail{border-top:1px solid var(--border);padding-top:14px}
 .search-result-meaning{font-size:27px;margin-left:14px}
 .search-result-example{background:var(--field);border-radius:14px;padding:10px 16px;margin-top:14px}

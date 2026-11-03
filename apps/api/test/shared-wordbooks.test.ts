@@ -1,55 +1,33 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {Core} from '../src/core.ts';
 import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts';
-import type {Database} from '../src/ports.ts';
-import {seedLegacyPublishedBook,seedLegacySubscription} from './legacy-sharing-fixture.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
-
-test('first release rejects public creation and cached replay while preserving historical learning and exit controls',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
- for(const file of ['008_shared_wordbooks.sql','009_child_profiles.sql'])await pg.exec(readFileSync(`apps/api/migrations/${file}`,'utf8'));
- const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))},scheduler=await createScheduler();
- const core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'shared-books');
+test('public wordbooks publish, search, copy examples, preserve independent progress and stop safely',async()=>{
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/022_shared_wordbook_author.sql','utf8'));
+ const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))},scheduler=await createScheduler(),core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'sharing');
  try{
   const dad=(await core.login('dev-dad')).user.id,mom=(await core.login('dev-mom')).user.id;
-  const family=await core.createFamily(dad,'family',{name:'家长家庭'}),child=await core.createChild(dad,'child',family.id,{nickname:'小明',school_grade:'小学三年级',gender:'boy'}),book=await core.createWordbook(dad,'book',child.id,{name:'旅行词汇'});
-  const batch=await core.createBatch(dad,'batch',child.id,{wordbook_id:book.id,words:['apple','book']});
-  await core.confirmBatch(dad,'confirm',batch.id,{expected_version:batch.version,selections:batch.items.map((i:any)=>({item_id:i.id,action:'select',candidate_id:i.candidates[0].candidate_id}))});
-  const published=await seedLegacyPublishedBook(db,dad,child.id,book.id);
-  const momFamily=await core.createFamily(mom,'mom-family',{name:'另一家庭'}),learner=await core.createChild(mom,'mom-child',momFamily.id,{nickname:'小红'});
-  const joined=await seedLegacySubscription(db,scheduler,mom,learner.id,published.id);
-  // Simulate successful requests cached by the old deployment, before any release guard.
-  for(const [actor,op,key,payload,response] of [[dad,`book:share:${book.id}`,'old-publish',{published:true},{published:true}],[mom,`book:join:${learner.id}:${published.id}`,'old-join',{},joined]] as const){
-   const digest=createHash('sha256').update(JSON.stringify(payload)).digest('hex');
-   await pg.query(`INSERT INTO wordmate.idempotency_keys(actor_user_id,operation,key,request_hash,status,expires_at,http_status,response_body) VALUES($1,$2,$3,$4,'completed',now()+interval '1 day',200,$5)`,[actor,op,key,digest,JSON.stringify(response)]);
-  }
-  await assert.rejects(core.searchSharedWordbooks(mom,{q:'apple'}),{status:403,code:'PUBLIC_SHARING_DISABLED'});
-  await assert.rejects(core.sharedWordbook(mom,published.id),{code:'PUBLIC_SHARING_DISABLED'});
-  for(const key of ['new-publish','old-publish'])await assert.rejects(core.shareWordbook(dad,key,child.id,book.id,{published:true}),{code:'PUBLIC_SHARING_DISABLED'});
-  for(const key of ['new-join','old-join'])await assert.rejects(core.joinSharedWordbook(mom,key,learner.id,published.id),{code:'PUBLIC_SHARING_DISABLED'});
-  assert.equal((await core.wordbooks(mom,learner.id)).items[0].read_only,true);
-  const localWords=await core.words(mom,learner.id,{wordbook_id:joined.id});assert.equal(localWords.total,2);
-  await pg.query("UPDATE wordmate.review_cards SET state='review' WHERE child_id=$1 AND child_word_id=$2",[learner.id,localWords.items[0].id]);
-  await assert.rejects(core.createBatch(mom,'readonly',learner.id,{wordbook_id:joined.id,words:['cat']}),{code:'WORDBOOK_NOT_FOUND'});
-  await assert.rejects(core.shareWordbook(mom,'unauthorized-stop',child.id,book.id,{published:false}),{code:'FAMILY_NOT_FOUND'});
-  const invite=await core.createInvite(dad,'invite',family.id),claim=await core.claimInvite(mom,'claim',{invite_token:invite.invite_token});await core.approveInvite(dad,'approve',claim.id);
-  await assert.rejects(core.shareWordbook(mom,'not-publisher',child.id,book.id,{published:false}),{code:'SHARE_OWNER_REQUIRED'});
-  const off=await core.shareWordbook(dad,'stop',child.id,book.id,{published:false,title:'Ignored update'});assert.equal(off.published,false);assert.equal(off.title,book.name);
-  assert.equal((await core.shareWordbook(dad,'stop-again',child.id,book.id,{published:false})).version,off.version,'repeated stop does not mutate history');
-  const progress=await core.words(mom,learner.id,{wordbook_id:joined.id});assert.equal(progress.total,2);assert.equal(progress.learned_count,1);
-  // Archiving a legacy live source still unpublishes; subscriber progress survives.
-  await pg.query('UPDATE wordmate.shared_wordbooks SET published=true WHERE id=$1',[published.id]);
-  await core.archiveWordbook(dad,'archive',child.id,book.id);
-  assert.equal((await pg.query('SELECT published FROM wordmate.shared_wordbooks WHERE id=$1',[published.id])).rows[0].published,false);
-  await core.shareWordbook(dad,'stop-archived',child.id,book.id,{published:false});
-  assert.equal((await core.words(mom,learner.id,{wordbook_id:joined.id})).learned_count,1);
-  const privateBook=await core.createWordbook(dad,'private',child.id,{name:'新词本'});
-  await assert.rejects(core.shareWordbook(dad,'no-draft',child.id,privateBook.id,{published:false}),{code:'SHARED_WORDBOOK_NOT_FOUND'});
-  assert.equal((await pg.query('SELECT count(*)::int n FROM wordmate.shared_wordbooks')).rows[0].n,1,'no new public records');
-  await core.leaveSharedWordbook(mom,'leave',learner.id,published.id);assert.equal((await core.wordbooks(mom,learner.id)).items.length,0);
+  const family=await core.createFamily(dad,'family',{name:'家庭'}),child=await core.createChild(dad,'child',family.id,{nickname:'孩子'}),book=await core.createWordbook(dad,'book',child.id,{name:'旅行词本',grade:'三年级',textbook:'人教版',category:'旅行'});
+  const batch=await core.createBatch(dad,'batch',child.id,{wordbook_id:book.id,words:['apple','book']});await core.confirmBatch(dad,'confirm',batch.id,{expected_version:batch.version,selections:batch.items.map((i:any)=>({item_id:i.id,action:'select',candidate_id:i.candidates[0].candidate_id}))});
+  const words=(await core.words(dad,child.id,{wordbook_id:book.id})).items,apple=words.find((w:any)=>w.lemma==='apple');
+  const sentence=(await pg.query("INSERT INTO wordmate.sentences(child_id,text_en,translation_zh,level,model,prompt_version,status) VALUES($1,'An apples is red.','苹果是红色的。','test','test','test','validated') RETURNING id",[child.id])).rows[0];await pg.query("INSERT INTO wordmate.sentence_targets(child_id,sentence_id,child_word_id,surface,start_utf16,end_utf16) VALUES($1,$2,$3,'apples',3,9)",[child.id,sentence.id,apple.id]);
+  assert.equal((await core.searchSharedWordbooks(mom,{})).items.length,0);
+  await assert.rejects(core.shareWordbook(mom,'unauthorized',child.id,book.id,{published:true,title:'词本',author:'作者'}),{code:'FAMILY_NOT_FOUND'});
+  await assert.rejects(core.shareWordbook(dad,'no-author',child.id,book.id,{published:true,title:'词本'}),{code:'INVALID_TEXT'});
+  const share=await core.shareWordbook(dad,'publish',child.id,book.id,{published:true,title:'旅行英语',description:'出行词汇',author:'小书屋'});assert.equal(share.word_count,2);
+  assert.equal((await core.searchSharedWordbooks(dad,{child_id:child.id})).items[0].is_source,true);
+  await assert.rejects(core.searchSharedWordbooks(mom,{child_id:child.id}),{code:'FAMILY_NOT_FOUND'});
+  for(const q of ['旅行','小书屋','apple','三年级','人教版'])assert.equal((await core.searchSharedWordbooks(mom,{q})).items[0].id,share.id);assert.equal((await core.searchSharedWordbooks(mom,{grade:'三年级',textbook:'人教版',category:'旅行'})).items.length,1);assert.equal((await core.searchSharedWordbooks(mom,{grade:'四年级'})).items.length,0);
+  const detail=await core.sharedWordbook(mom,share.id);assert.equal(detail.author,'小书屋');assert.equal(detail.items.find((x:any)=>x.lemma==='apple').example_en,'An apples is red.');assert(!JSON.stringify(detail).includes(child.id));
+  const family2=await core.createFamily(mom,'other-family',{name:'另一个家庭'}),learner=await core.createChild(mom,'other-child',family2.id,{nickname:'另一个孩子'});
+  assert.equal((await core.searchSharedWordbooks(mom,{child_id:learner.id})).items[0].is_source,false);
+  const joined=await core.joinSharedWordbook(mom,'join',learner.id,share.id);assert.equal((await core.joinSharedWordbook(mom,'again',learner.id,share.id)).id,joined.id);
+  const copy=await core.words(mom,learner.id,{wordbook_id:joined.id});assert.equal(copy.total,2);const joinedBook=(await core.wordbooks(mom,learner.id)).items.find((b:any)=>b.id===joined.id);assert.equal(joinedBook.grade,'三年级');assert.equal(joinedBook.textbook,'人教版');assert.equal(joinedBook.category,'旅行');assert.notEqual(copy.items.find((w:any)=>w.lemma==='apple').id,apple.id);assert.equal(copy.items.find((w:any)=>w.lemma==='apple').example.text_en,'An apples is red.');const copiedTarget=await pg.query('SELECT surface,start_utf16,end_utf16 FROM wordmate.sentence_targets WHERE child_word_id=$1',[copy.items.find((w:any)=>w.lemma==='apple').id]);assert.equal(copiedTarget.rows[0].surface,'apples');assert.equal(copiedTarget.rows[0].end_utf16,9);
+  await pg.query("UPDATE wordmate.review_cards SET state='review' WHERE child_id=$1 AND child_word_id=$2",[learner.id,copy.items[0].id]);
+  await core.shareWordbook(dad,'stop',child.id,book.id,{published:false});assert.equal((await core.searchSharedWordbooks(mom,{})).items.length,0);await assert.rejects(core.sharedWordbook(mom,share.id),{code:'SHARED_WORDBOOK_NOT_FOUND'});await assert.rejects(core.joinSharedWordbook(mom,'join',learner.id,share.id),{code:'SHARED_WORDBOOK_NOT_FOUND'});assert.equal((await core.words(mom,learner.id,{wordbook_id:joined.id})).learned_count,1);
+  await core.leaveSharedWordbook(mom,'leave',learner.id,share.id);await core.shareWordbook(dad,'republish',child.id,book.id,{published:true,title:'旅行英语',author:'小书屋',description:''});const rejoined=await core.joinSharedWordbook(mom,'rejoin',learner.id,share.id);assert.equal(rejoined.id,joined.id);assert.equal((await core.words(mom,learner.id,{wordbook_id:joined.id})).learned_count,1);
  }finally{await pg.close();}
 });

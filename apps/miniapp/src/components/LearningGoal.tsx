@@ -1,3 +1,4 @@
+import {Chevron} from './Chevron';
 import {useEffect,useRef,useState} from 'react';
 import {View,Button,Picker,Input} from '@tarojs/components';
 import {useDidShow} from '@tarojs/taro';
@@ -14,7 +15,7 @@ export function LearningGoal(){
  const valid=/^\d+$/.test(value)&&Number(value)>=1&&Number(value)<=500;
  return <View>{error&&<View className='error'>{error}{!data&&<Button className='text-action' onClick={()=>void load()}>重试</Button>}</View>}{data?<>
  <View>{data.nickname} · 每日学习目标</View>
- <Picker mode='selector' disabled={busy} range={['5 个','10 个','20 个','30 个','自定义']} value={custom?4:presets.indexOf(Number(value))} onChange={e=>{const i=Number(e.detail.value);setCustom(i===4);if(i<4)setValue(String(presets[i]));setSaved(false);}}><View className='field field-picker'>{custom?'自定义':`${value} 个 / 天`} ▾</View></Picker>
+ <Picker mode='selector' disabled={busy} range={['5 个','10 个','20 个','30 个','自定义']} value={custom?4:presets.indexOf(Number(value))} onChange={e=>{const i=Number(e.detail.value);setCustom(i===4);if(i<4)setValue(String(presets[i]));setSaved(false);}}><View className='field field-picker'>{custom?'自定义':`${value} 个 / 天`}<Chevron direction='down'/></View></Picker>
  {custom&&<Input className='field' type='number' maxlength={3} disabled={busy} value={value} placeholder='1–500 个 / 天' onInput={e=>{setValue(e.detail.value);setSaved(false);}}/>}
  <View className='muted small'>按孩子同步，家长共同使用。新学和复习合计，重复学习同一个词只计一次。</View>
  <View className='muted small'>今天目标 {data.today_goal} 个；修改从 {data.effective_from} 生效。</View>

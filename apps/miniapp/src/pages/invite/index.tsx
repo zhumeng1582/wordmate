@@ -22,7 +22,8 @@ export default function Invite(){
   const ticket=++serial.current;locked.current=true;setBusy(true);setError('');const current=()=>shown.current&&ticket===serial.current&&account===storage.get('access_token');
   const display=async(result:Destination)=>{
    if(!current())return;
-   if(result.state==='member'&&result.family){selectFamilyContext(storage,result.family.id);reconcileFamilyChild(storage,result.children??[]);await home();return;}
+   if(result.state==='waiting'&&result.family)storage.set('pending_family_invite',{familyId:result.family.id,name:result.family.name,account});
+   if(result.state==='member'&&result.family){Taro.removeStorageSync('pending_family_invite');selectFamilyContext(storage,result.family.id);reconcileFamilyChild(storage,result.children??[]);await home();return;}
    setFamilyName(result.family?.name??'');show(result.state==='member'?'error':result.state);
   };
   try{

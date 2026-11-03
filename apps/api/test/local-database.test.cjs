@@ -43,3 +43,15 @@ test('audio migration upgrades an existing 001 database without removing learnin
   assert.equal((await connection.db.query("SELECT count(*)::int n FROM wordmate.import_attempts")).rows[0].n,0);
  }finally{if(connection)await connection.source.destroy();fs.rmSync(directory,{recursive:true,force:true});}
 });
+test('managed migration connections require an existing database and do not initialize its schema',async()=>{
+ const {PGlite}=require('@electric-sql/pglite'),name='managed-status-'+randomUUID(),directory=path.resolve('.local',name),url='pglite:.local/'+name;
+ process.env.NODE_ENV='development';process.env.AUTH_MODE='development';let connection;
+ try{
+  await assert.rejects(connect(url,{initializeLocal:false}),/Existing embedded database required/);assert.equal(fs.existsSync(directory),false);
+  const pg=new PGlite(directory);try{await pg.exec('CREATE SCHEMA wordmate; CREATE TABLE wordmate.kept(value text); INSERT INTO wordmate.kept VALUES (\'preserved\')');}finally{await pg.close();}
+  connection=await connect(url,{initializeLocal:false});
+  const tables=await connection.db.query("SELECT table_name FROM information_schema.tables WHERE table_schema='wordmate' ORDER BY table_name");
+  assert.deepEqual(tables.rows.map(row=>row.table_name),['kept']);
+  assert.equal((await connection.db.query('SELECT value FROM wordmate.kept')).rows[0].value,'preserved');
+ }finally{if(connection)await connection.source.destroy();fs.rmSync(directory,{recursive:true,force:true});}
+});

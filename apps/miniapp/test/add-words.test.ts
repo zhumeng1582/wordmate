@@ -24,13 +24,18 @@ test('opening the simplified page only reads data and keeps optional configurati
  assert.match(text,/输入文字.*拍照 \/ 图片.*导入文件/);assert.match(text,/我的词本/);assert.doesNotMatch(text,/API Key|Token|正在结算|当前可用 ¥/);assert(page.calls.every(call=>call.method==='GET'));assert(!page.all(page.render()).some(node=>node.type==='Input'));
  page.button('主题与费用说明').onClick();assert(page.all(page.render()).some(node=>node.type==='Input'));
 });
+test('large input survives draft restoration and bulk progress uses server totals instead of preview length',async()=>{
+ const raw=Array.from({length:8000},(_,i)=>`word${i}`).join('\n');const page=fixture({write:async()=>job({is_bulk:true,saved_count:6000,total_count:8000,bulk:{completed_parts:200,total_parts:267},items:entries.map(item=>({...item,word_id:'saved'}))})});
+ await page.show();input(page,raw);const reopened=fixture({cache:Object.fromEntries(page.cache)});await reopened.show();assert.equal(reopened.all(reopened.render()).find(node=>node.type==='Textarea').props.value,raw);
+ await page.button('整理并加入词本').onClick();await tick();assert.match(page.text(page.render()),/已完成 200 \/ 267 批 · 已保存 6000 词/);assert.equal(page.calls.find(call=>call.method==='POST')?.body.raw_text,raw);
+});
 
 test('text submission is durable before posting and success shows the result without another form',async()=>{
  let page!:ReturnType<typeof fixture>;
  page=fixture({write:async(_,body)=>{const pending=page.cache.get(vocabularyKeys('account-a','child-a').pending);assert.equal(pending.body.raw_text,'apple\nbanana');assert.equal(body.source_type,'text');return job({status:'succeeded',items:[{ordinal:1,input:'apple',word_id:'word-a'},{ordinal:2,input:'banana',word_id:'word-b'}]});}});
  await page.show();input(page,'apple\nbanana');await page.button('整理并加入词本').onClick();await tick();
  assert.match(page.text(page.render()),/已加入 2 个单词/);assert(!page.all(page.render()).some(node=>node.type==='Textarea'));assert(!page.cache.has(vocabularyKeys('account-a','child-a').pending));assert.equal(page.cache.get(vocabularyKeys('account-a','child-a').draft).raw,'');
- page.button('去单词本学习').onClick();assert.deepEqual(page.routes,['/pages/words/index']);
+ page.button('开始学习').onClick();assert.deepEqual(page.routes,['/pages/review/index']);assert.equal(page.cache.get('review_source').source,'new_words');assert.equal(page.cache.get('study_intent'),'start');
 });
 
 test('lost submission response keeps the material and retries the identical request',async()=>{
@@ -52,6 +57,25 @@ test('a persisted pending submission is restored after restart and cannot be rep
 test('file contents append to existing text and remain editable before submission',async()=>{
  const imports:any[]=[];const page=fixture({extract:async(...args)=>{imports.push(args);return {source:'file',text:'banana'};}});await page.show();input(page,'apple');page.button('导入文件').onClick();await page.button('从微信聊天选择文件').onClick();
  assert.equal(imports.length,1);assert.equal(imports[0][2],'apple');assert.equal(page.all(page.render()).find(node=>node.type==='Textarea').props.value,'apple\nbanana');assert(page.calls.every(call=>call.method==='GET'));
+});
+
+for(const label of ['拍照识别','从相册选择']){
+ test(`${label} cancellation returns to idle, preserves the draft and allows selecting again`,async()=>{
+  const waiting=deferred();let attempts=0;
+  const page=fixture({extract:async(...args)=>{if(++attempts===1){await waiting.promise;throw {errMsg:'chooseMedia:fail cancel'};}args[4]();return {source:'image',text:'banana'};}});
+  await page.show();input(page,'apple');page.button('拍照 / 图片').onClick();const draft=JSON.stringify(page.cache.get(vocabularyKeys('account-a','child-a').draft));
+  const work=page.button(label).onClick();assert.doesNotMatch(page.text(page.render()),/正在识别|正在读取/);assert.equal(page.button(label).disabled,true);
+  page.hide();await page.show();assert.doesNotMatch(page.text(page.render()),/正在识别/);waiting.resolve();await work;await tick();
+  assert.equal(page.button(label).disabled,false);assert.doesNotMatch(page.text(page.render()),/正在识别|正在读取|cancel|识别完成/);
+  assert.equal(JSON.stringify(page.cache.get(vocabularyKeys('account-a','child-a').draft)),draft);assert(page.calls.every(call=>call.method==='GET'));
+  await page.button(label).onClick();assert.equal(attempts,2);assert.match(page.text(page.render()),/识别完成/);assert.equal(page.button(label).disabled,false);
+ });
+}
+test('recognition status appears only after a selected image and persists across the native picker return',async()=>{
+ const waiting=deferred();let selected!:()=>void;
+ const page=fixture({extract:async(...args)=>{selected=args[4];return waiting.promise;}});await page.show();page.button('拍照 / 图片').onClick();const work=page.button('拍照识别').onClick();
+ assert.doesNotMatch(page.text(page.render()),/正在识别/);page.hide();await page.show();selected();assert.match(page.text(page.render()),/正在识别并整理图片/);
+ waiting.resolve({source:'image',text:'apple',prepared_items:entries});await work;await tick();assert.doesNotMatch(page.text(page.render()),/正在识别/);assert.match(page.text(page.render()),/检查识别结果/);
 });
 
 test('image recognition previews entries and removal reindexes the saved result without another generation',async()=>{

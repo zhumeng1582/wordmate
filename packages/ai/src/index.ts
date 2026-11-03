@@ -21,6 +21,9 @@ export class ProviderError extends Error {
   code: string;
   retryable: boolean;
   status?: number;
+  upstreamCode?: string;
+  requestId?: string;
+  validationIssue?: {field:string;index?:number};
   constructor(code: string, retryable = false, status?: number) {
     super(code); this.name = 'ProviderError';
     this.code = code; this.retryable = retryable; this.status = status;
@@ -37,7 +40,18 @@ async function request(fetcher: Fetch, url: string, init: RequestInit, timeout: 
   try {
     response = await fetcher(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(timeout) });
   } catch { throw new ProviderError('UPSTREAM_NETWORK_OR_TIMEOUT', true); }
-  if (!response.ok) throw new ProviderError('UPSTREAM_HTTP_ERROR', response.status === 429 || response.status >= 500, response.status);
+  if (!response.ok) {
+    let details:any;
+    const reader=response.body?.getReader();
+    try {
+      if(reader){const chunks:Uint8Array[]=[];let size=0;while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>16384)break;chunks.push(part.value);}if(size<=16384)details=JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+    }catch{/* Error bodies are optional and never exposed as messages. */}
+    finally{try{await reader?.cancel();}catch{}}
+    const safe=(v:unknown)=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(v)?v:undefined;
+    const upstreamCode=safe(details?.error?.code??details?.code),requestId=safe(details?.request_id??response.headers.get('x-request-id'));
+    const code=response.status===403&&upstreamCode==='AccessDenied.Unpurchased'?'AI_SERVICE_NOT_ACTIVATED':response.status===400&&upstreamCode==='Arrearage'?'AI_PROVIDER_BILLING_UNAVAILABLE':'UPSTREAM_HTTP_ERROR';
+    throw Object.assign(new ProviderError(code,response.status===429||response.status>=500,response.status),{upstreamCode,requestId});
+  }
   return response;
 }
 async function json(response: Response): Promise<any> {
@@ -92,7 +106,11 @@ export function createTextGenerator(env: Record<string, string | undefined> = pr
       catch { throw new ProviderError('INVALID_GENERATED_JSON', true); }
       let data: T;
       try { data = r.validate(value); }
-      catch { throw new ProviderError('GENERATED_CONTENT_REJECTED', true); }
+      catch(e) {
+        const issue=(e as any)?.validationIssue,validationIssue=issue&&typeof issue.field==='string'&&/^[a-z_]{1,40}$/.test(issue.field)?{field:issue.field,...(Number.isInteger(issue.index)&&issue.index>=0&&issue.index<30?{index:issue.index}:{})}:undefined;
+        const requestId=result.id??result.request_id;
+        throw Object.assign(new ProviderError('GENERATED_CONTENT_REJECTED',true),{validationIssue,requestId:typeof requestId==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(requestId)?requestId:undefined});
+      }
       return { data, provider, model, usage: result.usage ?? null };
     },
   };
@@ -100,7 +118,7 @@ export function createTextGenerator(env: Record<string, string | undefined> = pr
 
 export type Accent = 'en-GB' | 'en-US';
 export type Voice = { id: string; accent: Accent; gender: string };
-export type SpeechRequest = { text: string; accent: Accent; voiceId: string; rate: number };
+export type SpeechRequest = { text: string; accent: Accent; voiceId: string; rate: number; languageHints?: ('zh'|'en')[] };
 export type SpeechProfile = Readonly<{
   provider: string; region: string; model: string; revision: string;
   format: 'mp3'; sampleRate: number;
@@ -148,11 +166,12 @@ export function createCosyVoiceProvider(env: Record<string, string | undefined>,
       if (!['en-GB', 'en-US'].includes(r.accent) || !Number.isFinite(r.rate) || r.rate < 0.5 || r.rate > 1.5 ||
           !r.text?.trim() || r.text.length > 1000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(r.text))
         throw new ProviderError('INVALID_SPEECH_REQUEST');
+      if (r.languageHints&&(!r.languageHints.length||r.languageHints.length>2||r.languageHints.some(v=>!['zh','en'].includes(v))))throw new ProviderError('INVALID_SPEECH_REQUEST');
       if (!voices.some(v => v.id === r.voiceId && v.accent === r.accent)) throw new ProviderError('VOICE_ACCENT_UNAVAILABLE');
       const result = await json(await request(fetcher, `${base}/api/v1/services/audio/tts/SpeechSynthesizer`, {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, input: { text: r.text, voice: r.voiceId, format: 'mp3', sample_rate: 24000,
-          rate: r.rate, language_hints: ['en'], enable_ssml: false, enable_aigc_tag: true } }),
+          rate: r.rate, language_hints: r.languageHints??['en'], enable_ssml: false, enable_aigc_tag: true } }),
       }, 60000));
       if (result?.code) throw new ProviderError('TTS_SYNTHESIS_FAILED');
       if (result?.output?.finish_reason !== 'stop') throw new ProviderError('INCOMPLETE_SYNTHESIS', true);

@@ -1,14 +1,22 @@
-export type StudySource={source:string;[key:string]:any};
+import type {StudySessionRequest} from '../generated/study-session';
+export type StudySource=StudySessionRequest;
 export type StudyCard={id:string;version:number;child_word_id:string;word_version:number;lemma:string;meaning_zh?:string;part_of_speech?:string;ipa_gb?:string;ipa_us?:string;example?:{id:string;content_version:number;text_en:string;translation_zh?:string};[key:string]:any};
 export type StudyResult={correct:boolean;selectedMeaning:string;meaning:string;saved:boolean;eventId:string};
 export type StudyFlow={format:1;source:StudySource;session:any;sessionClosed:boolean;loaded:boolean;cards:StudyCard[];pool:{id:string;meaning_zh:string}[];phase:'learn'|'test'|'practice'|'summary';learnIndex:number;testIndex:number;results:Record<string,StudyResult>;baseDone:number;total:number;practiceQueue:string[];practiced:Record<string,boolean>;practiceTurn:number;practiceFeedback?:{correct:boolean;selectedMeaning:string};today?:any;startedAt:number;updatedAt:number};
 export type StudyPending={body:any;card?:StudyCard;result?:StudyResult;legacyKey?:string};
 export const studyKeys=(token:string,child:string)=>({resume:`study_resume:${token}:${child}`,pending:`study_pending:${token}:${child}`});
-export function sourceIdentity(source:StudySource){return JSON.stringify(Object.fromEntries(Object.keys(source).sort().map(key=>[key,key==='word_ids'&&Array.isArray(source[key])?[...source[key]].sort():source[key]])));}
+export function nextNewGroupSize(today:any){return Math.max(0,Math.min(Number(today?.new_count)||0,Number(today?.new_group_size??today?.goal)||10,100));}
+export function sourceIdentity(source:StudySource){const record:Record<string,unknown>=source;return JSON.stringify(Object.fromEntries(Object.keys(record).sort().map(key=>[key,key==='word_ids'&&Array.isArray(record[key])?[...record[key]].sort():record[key]])));}
 export function emptyStudy(source:StudySource,now=Date.now()):StudyFlow{return {format:1,source,session:null,sessionClosed:false,loaded:false,cards:[],pool:[],phase:source.source==='new_words'?'learn':'test',learnIndex:0,testIndex:0,results:{},baseDone:0,total:0,practiceQueue:[],practiced:{},practiceTurn:0,startedAt:now,updatedAt:now};}
 export function studyCounts(flow:StudyFlow){const answers=Object.values(flow.results).filter(result=>result.saved),correct=answers.filter(result=>result.correct).length;return {done:Math.min(flow.total,flow.baseDone+answers.length),correct,wrong:answers.length-correct,total:flow.total};}
 export const studyComplete=(flow:StudyFlow)=>flow.loaded&&studyCounts(flow).done>=flow.total;
 export const studyCard=(flow:StudyFlow)=>flow.phase==='learn'?flow.cards[flow.learnIndex]:flow.phase==='test'?flow.cards[flow.testIndex]:flow.phase==='practice'?flow.cards.find(card=>card.id===flow.practiceQueue[0]):undefined;
+export function upcomingStudyCards(flow:StudyFlow):StudyCard[]{
+ if(flow.phase==='learn')return flow.cards.slice(flow.learnIndex+1,flow.learnIndex+4);
+ if(flow.phase==='test'){const cards:StudyCard[]=[];for(let i=1;i<flow.cards.length&&cards.length<3;i++){const card=flow.cards[(flow.testIndex+i)%flow.cards.length];if(!flow.results[card.id]?.saved)cards.push(card);}return cards;}
+ if(flow.phase==='practice')return flow.practiceQueue.slice(1,4).map(id=>flow.cards.find(card=>card.id===id)).filter((card):card is StudyCard=>!!card);
+ return [];
+}
 export function nextUnanswered(flow:StudyFlow,after=flow.testIndex){for(let offset=1;offset<=flow.cards.length;offset++){const index=(after+offset)%flow.cards.length;if(!flow.results[flow.cards[index].id]?.saved)return index;}return -1;}
 export function moveStudyForward(flow:StudyFlow):StudyFlow{
  if(flow.phase==='practice'){
@@ -23,8 +31,9 @@ export function beginStudyPractice(flow:StudyFlow):StudyFlow{if(!studyComplete(f
 export function mergeStudyFlow(previous:StudyFlow,session:any,items:StudyCard[],pool:StudyFlow['pool'],counts:{total:number;remaining:number}):StudyFlow{
  const live=new Map(items.map(card=>[card.id,card])),kept=previous.cards.filter(card=>previous.results[card.id]?.saved||live.has(card.id)).map(card=>live.get(card.id)??card),known=new Set(kept.map(card=>card.id));
  const cards=[...kept,...items.filter(card=>!known.has(card.id))],baseDone=previous.loaded?previous.baseDone:Math.max(0,counts.total-counts.remaining),current=studyCard(previous);
- const results=Object.fromEntries(Object.entries(previous.results).filter(([id])=>cards.some(card=>card.id===id)));
- const extra=items.some(card=>!previous.cards.some(old=>old.id===card.id));
+ const cardIds=new Set(cards.map(card=>card.id)),previousIds=new Set(previous.cards.map(card=>card.id));
+ const results=Object.fromEntries(Object.entries(previous.results).filter(([id])=>cardIds.has(id)));
+ const extra=items.some(card=>!previousIds.has(card.id));
  const next={...previous,session,sessionClosed:false,loaded:true,cards,pool,results,baseDone,total:baseDone+cards.length,learnIndex:Math.max(0,cards.findIndex(card=>card.id===current?.id)),testIndex:Math.max(0,cards.findIndex(card=>card.id===current?.id))};
  if(!previous.loaded)next.total=counts.total;
  if(!cards.length)next.phase='summary';

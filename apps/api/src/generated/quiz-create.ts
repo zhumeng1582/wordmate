@@ -1,0 +1,36 @@
+// Generated from contracts/quiz-create.json; run node scripts/generate-contracts.cjs.
+export const quizCreateSchema = {
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "month",
+    "mode"
+  ],
+  "properties": {
+    "scope": {
+      "enum": [
+        "month",
+        "favorites"
+      ]
+    },
+    "month": {
+      "type": "string",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+    },
+    "mode": {
+      "enum": [
+        "sample",
+        "full"
+      ]
+    },
+    "sample_count": {
+      "type": "integer",
+      "enum": [
+        10,
+        20,
+        30,
+        50
+      ]
+    }
+  }
+} as const;

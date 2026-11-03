@@ -1,0 +1,30 @@
+import {useEffect,useRef,useState} from 'react';
+import {Canvas} from '@tarojs/components';
+import Taro,{useDidHide} from '@tarojs/taro';
+import {CheckinSharePreview} from './CheckinSharePreview';
+import {renderSharePoster,type ShareRecord} from '../services/share-poster';
+import {api,message,storage} from '../services/api';
+import {checkinShareRequest} from '../generated/checkin-share';
+
+const backgrounds=['01-lake','02-ocean-sunrise','03-cloud-sky','04-desert','05-deep-sea','06-forest-path','07-mountain-valley','08-snow-mountain','09-river-canyon','10-island-bay'].map(name=>`/assets/share-posters/${name}.jpg`);
+export function useCheckinShare(selected:string){
+ const scope=`${storage.get('access_token')}:${storage.get('child_id')}`,context=`${scope}:${selected}`,contextRef=useRef(context),contentContext=useRef(context);contextRef.current=context;
+ const currentContext=()=>contextRef.current===context&&scope===`${storage.get('access_token')}:${storage.get('child_id')}`;
+ const active=(ticket:number)=>ticket===shareSerial.current&&currentContext();
+ const [shareOpen,setShareOpen]=useState(false),[shareData,setShareData]=useState<ShareRecord|null>(null),[poster,setPoster]=useState(''),[shareBusy,setShareBusy]=useState(false),[shareError,setShareError]=useState(''),[albumDenied,setAlbumDenied]=useState(false),[quoteIndex,setQuoteIndex]=useState(0),[background,setBackground]=useState('');
+ const referralImage=useRef(''),shareSerial=useRef(0),shareLock=useRef(false),drawing=useRef<Promise<void>>(Promise.resolve());
+ useEffect(()=>()=>{shareSerial.current++;},[]);
+ useDidHide(()=>{shareSerial.current++;if(shareLock.current&&!poster)setShareError('成果卡准备已暂停，请重试。');shareLock.current=false;setShareBusy(false);});
+ const closeShare=()=>{shareSerial.current++;shareLock.current=false;setShareBusy(false);setShareOpen(false);};
+ const draw=async(record:ShareRecord,index:number,ticket:number,path:string)=>{
+  const work=drawing.current.catch(()=>{}).then(async()=>{if(!active(ticket))return;await new Promise<void>(resolve=>Taro.nextTick(resolve));const p=await renderSharePoster('checkinPoster',record,record.quotes[index],false,path,referralImage.current);if(active(ticket))setPoster(p);});drawing.current=work;await work;
+ };
+ const openShare=async()=>{if(!currentContext()||shareLock.current)return;shareLock.current=true;const ticket=++shareSerial.current;setShareOpen(true);setShareBusy(true);setShareError('');setAlbumDenied(false);setShareData(null);setPoster('');setQuoteIndex(0);const path=backgrounds[Math.floor(Math.random()*backgrounds.length)];setBackground(path);try{const code=await api<{code:string;base64:string;mime:string}>('/me/referral-code-image');if(!active(ticket))return;if(!/^[a-zA-Z0-9_-]{6,32}$/.test(code.code)||!code.base64||!['image/png','image/jpeg'].includes(code.mime))throw Error('REFERRAL_CODE_UNAVAILABLE');const codePath=`${Taro.env.USER_DATA_PATH}/referral-${code.code}.${code.mime==='image/png'?'png':'jpg'}`;Taro.getFileSystemManager().writeFileSync(codePath,code.base64,'base64');referralImage.current=codePath;const endpoint=`/children/${storage.get('child_id')}/checkin-share`;let record:ShareRecord;try{record=await api<ShareRecord>(endpoint,'POST',checkinShareRequest(selected,true));}catch(e){if((e as any)?.status!==422||(e as any)?.message!=='INVALID_REQUEST_BODY')throw e;record=await api<ShareRecord>(endpoint,'POST',checkinShareRequest(selected,false));}if(!active(ticket))return;setShareData(record);await draw(record,0,ticket,path);}catch(e){if(active(ticket))setShareError((e as any)?.message==='ROUTE_NOT_IMPLEMENTED'?'分享暂时不可用，请稍后再试。':message(e));}finally{if(active(ticket)){shareLock.current=false;setShareBusy(false);}}};
+ const nextQuote=async()=>{if(shareLock.current||!shareData||!background)return;shareLock.current=true;const ticket=++shareSerial.current;setShareBusy(true);setShareError('');try{const next=(quoteIndex+1)%shareData.quotes.length;await draw(shareData,next,ticket,background);if(active(ticket))setQuoteIndex(next);}catch{if(active(ticket))setShareError('图片生成失败，请重试。');}finally{if(active(ticket)){shareLock.current=false;setShareBusy(false);}}};
+ const sharePoster=()=>{if(!poster||shareLock.current)return;if(typeof wx==='undefined'||typeof wx.showShareImageMenu!=='function'){setShareError('当前微信版本暂不支持直接分享图片，请保存图片后发送。');return;}wx.showShareImageMenu({path:poster,fail:err=>{if(!/cancel/i.test(err.errMsg||''))setShareError('无法打开图片分享，请保存图片后发送。');}});};
+ const savePoster=async()=>{if(!poster||shareLock.current)return;shareLock.current=true;const ticket=++shareSerial.current;setShareBusy(true);setShareError('');setAlbumDenied(false);try{const permission=await Taro.getSetting();if(permission.authSetting['scope.writePhotosAlbum']===false){setAlbumDenied(true);setShareError('需要允许保存到相册，才能保存图片。');return;}await Taro.saveImageToPhotosAlbum({filePath:poster});Taro.showToast({title:'已保存到相册',icon:'success'});}catch(e){const msg=String((e as any)?.errMsg||'');if(/auth deny|auth denied|authorize|permission/i.test(msg)){setAlbumDenied(true);setShareError('未获得相册权限，可以打开设置后重试。');}else if(!/cancel/i.test(msg))setShareError('图片保存失败，请重试。');}finally{if(active(ticket)){shareLock.current=false;setShareBusy(false);}}};
+ useEffect(()=>{contentContext.current=context;shareSerial.current++;shareLock.current=false;setShareOpen(false);setShareBusy(false);setPoster('');setShareData(null);referralImage.current='';},[context]);
+ const content=<> <Canvas canvasId='checkinPoster' className='share-canvas' style={{width:'600px',height:'800px'}}/>
+ {contentContext.current===context&&shareOpen&&<CheckinSharePreview data={shareData} image={poster} busy={shareBusy} error={shareError} albumDenied={albumDenied} onClose={closeShare} onNext={nextQuote} onRetry={openShare} onSave={savePoster} onShare={sharePoster} onSettings={()=>{void Taro.openSetting().then(r=>{if(r.authSetting['scope.writePhotosAlbum']){setAlbumDenied(false);setShareError('');}}).catch(()=>setShareError('无法打开设置，请稍后重试。'));}}/>}</>;
+ return {openShare,content};
+}

@@ -16,7 +16,8 @@
     "migrate:security": "node --env-file=../../.env dist/migrate-security.js",
     "migrate:audio-billing": "node --env-file=../../.env dist/migrate-audio-billing.js",
     "migrate:profiles": "node --env-file=../../.env dist/migrate-profiles.js",
-    "migrate:ai-accounts": "node --env-file=../../.env dist/migrate-ai-accounts.js"
+    "migrate:ai-accounts": "node --env-file=../../.env dist/migrate-ai-accounts.js",
+    "migrate:managed": "node --env-file=../../.env dist/migrate-managed.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.6",

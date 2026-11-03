@@ -1,14 +1,14 @@
 {
   "light": {
-    "navigationBackground": "#f7f8f2",
+    "navigationBackground": "#f7faf7",
     "navigationText": "black",
-    "pageBackground": "#f7f8f2",
+    "pageBackground": "#f7faf7",
     "backgroundText": "dark"
   },
   "dark": {
-    "navigationBackground": "#141b18",
+    "navigationBackground": "#17242a",
     "navigationText": "white",
-    "pageBackground": "#141b18",
+    "pageBackground": "#17242a",
     "backgroundText": "light"
   }
 }

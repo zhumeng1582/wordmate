@@ -9,7 +9,7 @@ import {FixtureQuizBuilder} from '../src/quiz.ts';
 import type {Database,Scheduler} from '../src/ports.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 const scheduler:Scheduler={version:'test',parameterVersion:'test',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{rating,due:new Date(now.getTime()+86400000)},label:'review',due:new Date(now.getTime()+86400000)})};
-test('calendar, mixed-source mistakes, practice scheduling, quota, timezone and family isolation',async()=>{
+test('calendar, mixed-source mistakes, practice scheduling, extra rounds, timezone and family isolation',async()=>{
  const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  // Keep database-created timestamps aligned with this fixture's fixed clock.
  await pg.exec("ALTER TABLE wordmate.idempotency_keys ALTER COLUMN created_at SET DEFAULT '2026-10-19T15:59:00Z'::timestamptz");
@@ -69,7 +69,7 @@ test('calendar, mixed-source mistakes, practice scheduling, quota, timezone and 
  assert.equal((await core.history.wrongWords(dad,c.id,{source:'monthly_quiz',quiz_id:quiz.id})).items.length,2);
  calendar=await core.history.calendar(dad,c.id,'2026-10');day=calendar.days.find((d:any)=>d.date==='2026-10-19');assert.equal(day?.studied_words,2);assert.equal(day?.mistake_count,4);assert.equal(day?.quiz_count,1);
  const newWord=(await pg.query("SELECT child_word_id FROM wordmate.review_cards WHERE state='new'")).rows[0].child_word_id;
- await assert.rejects(core.startSession(dad,'quota',c.id,{source:'manual',word_ids:[newWord]}),{code:'NEW_WORD_LIMIT'});
+ const extraNew=await core.startSession(dad,'extra-new',c.id,{source:'manual',word_ids:[newWord]});assert.equal((await core.cards(dad,extraNew.id)).items.length,1);await core.heartbeat(dad,extraNew.id,{lease_generation:1},true);
  // Local midnight permits another daily check-in, while the cards are still not due.
  now=new Date('2026-10-19T16:00:10Z');session=await core.startSession(dad,'nextday',c.id,{source:'quiz',quiz_id:quiz.id});practice=(await core.cards(dad,session.id,{limit:1})).items;assert.equal(practice.length,1);
  await answer(practice[0],'good');const tail=await core.cards(dad,session.id);assert.equal(tail.remaining,1);await answer(tail.items[0],'good');

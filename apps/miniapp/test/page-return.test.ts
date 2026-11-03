@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {pageHarness,deferred,tick} from './page-harness.ts';
 
 test('settings reuses its child components on return and replaces only the changed account or child',async()=>{
- const page=pageHarness('pages/settings/index',async()=>({}));await page.show();
+ const page=pageHarness('pages/settings-learning/index',async()=>({}));await page.show();
  const keys=()=>Object.fromEntries(page.all(page.render()).filter(node=>['LearningGoal','AudioPreferences'].includes(node.type)).map(node=>[node.type,node.key]));
  const initial=keys();page.hide();await page.show();assert.deepEqual(keys(),initial);
  page.cache.set('child_id','child-b');await page.show();assert.notEqual(keys().LearningGoal,initial.LearningGoal);assert.equal(keys().AudioPreferences,initial.AudioPreferences);
@@ -44,7 +44,7 @@ test('a child change clears old list content immediately and late responses cann
 test('home return retains today progress and does not grey out its main action',async()=>{
  let hold=false;const waiting=deferred();
  const page=pageHarness('pages/home/index',async path=>{if(hold)await waiting.promise;return path==='/me'?{referral_code:''}:{child:{nickname:'小明'},completed_words:7,goal:20,due_count:15,new_count:16,remaining_new_limit:16,streak_days:3};});
- await page.show();page.hide();hold=true;await page.show();assert.match(page.text(page.render()),/小明/);assert.equal(page.button('开始今日复习').disabled,false);assert.doesNotMatch(page.text(page.render()),/正在加载/);waiting.resolve();await tick();
+ await page.show();page.hide();hold=true;await page.show();assert.match(page.text(page.render()),/小明/);assert.equal(page.button('复习单词').disabled,false);assert.doesNotMatch(page.text(page.render()),/正在加载/);waiting.resolve();await tick();
 });
 
 test('learning goal preserves an unsaved target through a delayed return refresh',async()=>{
@@ -64,7 +64,7 @@ test('audio preferences preserve unsaved values through return without another l
 
 test('failed return refresh retains the last loaded wordbooks and provides retry',async()=>{
  let fail=false;const page=pageHarness('pages/wordbooks/index',async()=>{if(fail)throw Error('NETWORK_TIMEOUT');return {items:[{id:'book-a',name:'保留的词本',word_count:5}]};});
- await page.show();page.hide();fail=true;await page.show();assert.match(page.text(page.render()),/保留的词本/);assert.match(page.text(page.render()),/NETWORK_TIMEOUT/);assert.equal(page.button('＋ 创建单词本').disabled,false);
+ await page.show();page.hide();fail=true;await page.show();assert.match(page.text(page.render()),/保留的词本/);assert.match(page.text(page.render()),/NETWORK_TIMEOUT/);assert.equal(page.button('创建词本').disabled,false);
 });
 
 test('family return keeps the selected child visible and invite controls available',async()=>{
@@ -80,9 +80,9 @@ test('returning to add words keeps the input enabled and preserves its unsubmitt
  page.hide();hold=true;await page.show();const field=page.all(page.render()).find(node=>node.type==='Textarea');assert.equal(field.props.value,'apple, banana');assert.equal(field.props.disabled,false);assert.doesNotMatch(page.text(page.render()),/正在处理|正在加载单词本/);waiting.resolve();await tick();assert.equal(page.all(page.render()).find(node=>node.type==='Textarea').props.value,'apple, banana');
 });
 
-test('calendar return keeps the selected date and share controls during refresh',async()=>{
+test('calendar return keeps the selected range and review action during a quiet refresh',async()=>{
  let hold=false;const waiting=deferred();
- const page=pageHarness('pages/calendar/index',async()=>{if(hold)await waiting.promise;return {days:[{date:'2026-10-02',studied_words:8,wrong_words:1,mistake_count:1,quiz_count:0,checked_in:true}],streak_days:3,makeup_credits:0};});
- await page.show();page.all(page.render()).find(node=>String(node.props?.className).startsWith('calendar-day')).props.onClick();page.render();
- page.hide();hold=true;await page.show();assert.match(page.text(page.render()),/学习 8 词/);assert.equal(page.button('分享打卡').disabled,false);assert.doesNotMatch(page.text(page.render()),/正在读取学习记录/);waiting.resolve();await tick();assert.match(page.text(page.render()),/学习 8 词/);
+ const page=pageHarness('pages/calendar/index',async path=>{if(hold)await waiting.promise;return path.includes('/history-range?')?{count:8}:{today:'2026-10-31',days:[{date:'2026-10-02',studied_words:8,reviewable_words:8}]};});
+ await page.show();page.all(page.render()).find(node=>node.type==='DateRangeGrid').props.onChange({start:'2026-10-02',end:'2026-10-03'});await tick();
+ page.hide();hold=true;await page.show();assert.equal(page.button('开始复习').disabled,false);assert.equal(page.all(page.render()).find(node=>node.type==='DateRangeGrid').props.value.start,'2026-10-02');assert.doesNotMatch(page.text(page.render()),/正在读取/);waiting.resolve();await tick();assert.match(page.text(page.render()),/8 个单词/);
 });

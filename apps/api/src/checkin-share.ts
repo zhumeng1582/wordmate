@@ -61,7 +61,7 @@ export class CheckinShare{
    const count=(await q.query("SELECT count(*)::int n FROM checkin_share_quotes WHERE requested_by=$1 AND created_at>now()-interval '24 hours'",[actor])).rows[0].n;
    if(count>=20)return {stats,quotes:CURATED,source:'curated',generate:false};
    await q.query("INSERT INTO checkin_share_quotes(child_id,local_date,requested_by,quotes,source) VALUES($1,$2,$3,$4,'curated') ON CONFLICT(child_id,local_date) DO UPDATE SET requested_by=excluded.requested_by,quotes=excluded.quotes,source='curated',created_at=now()",[child,date,actor,JSON.stringify(CURATED)]);
-   return {stats,quotes:CURATED,source:'curated',generate:!!this.provider};
+   return {stats,quotes:CURATED,source:'curated',generate:!!this.provider&&body.local_poster!==true};
   });
   let quotes=prepared.quotes,source=prepared.source;
   if(prepared.generate){try{quotes=validateEncouragement({safe:true,quotes:await this.provider!({checked_in:prepared.stats.checked_in})});source='ai';}catch{/* Cached curated copy is the fallback; never block sharing on AI errors. */}}
@@ -73,7 +73,7 @@ export class CheckinShare{
    return {...prepared.stats,quotes:displayQuotes,copy_source:source};
   });
   let image:ShareImageStatus|null=null;
-  if(this.images){try{const copy=result.quotes.map(q=>q.en+' '+q.zh).join(' ');image=await this.images.obtain(actor,result.quotes[0].theme,copy,`${child}:${date}`);const matching=result.quotes.findIndex(q=>q.theme===image!.theme);if(matching>0)result.quotes=[result.quotes[matching],...result.quotes.slice(0,matching),...result.quotes.slice(matching+1)];else if(matching<0)result.quotes=[THEME_FALLBACK[image.theme as EncouragementTheme],...result.quotes.slice(1)];}catch{/* The miniapp reports the server error; it never substitutes a bundled background. */}}
+  if(this.images&&body.local_poster!==true){try{const copy=result.quotes.map(q=>q.en+' '+q.zh).join(' ');image=await this.images.obtain(actor,result.quotes[0].theme,copy,`${child}:${date}`);const matching=result.quotes.findIndex(q=>q.theme===image!.theme);if(matching>0)result.quotes=[result.quotes[matching],...result.quotes.slice(0,matching),...result.quotes.slice(matching+1)];else if(matching<0)result.quotes=[THEME_FALLBACK[image.theme as EncouragementTheme],...result.quotes.slice(1)];}catch{/* The client reports the server error. */}}
   return {...result,image};
  }
  async imageStatus(actor:string,id:string){ensure(this.images,404,'SHARE_IMAGE_NOT_FOUND');return this.images.status(actor,id);}

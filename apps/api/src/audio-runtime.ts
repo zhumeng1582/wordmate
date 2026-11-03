@@ -5,7 +5,7 @@ import {configuredAudioPrice} from './audio-tariff';
 export interface AudioRuntime {
  profile:Record<string,any>;
  voices:{id:string;accent:string;gender:string}[];
- synthesize?: (r:{text:string;accent:'en-GB'|'en-US';voiceId:string;rate:number})=>Promise<{bytes:Uint8Array}>;
+ synthesize?: (r:{text:string;accent:'en-GB'|'en-US';voiceId:string;rate:number;languageHints?:('zh'|'en')[]})=>Promise<{bytes:Uint8Array}>;
  storageProfile:string;
  stores:Record<string,{put(key:string,bytes:Uint8Array,mimeType:'audio/mpeg'):Promise<void>;get(key:string):Promise<Uint8Array>;stat(key:string):Promise<{size:number}|null>;delete?(key:string):Promise<void>}>;
  spoolDir:string;pricePer10000Characters?:string;

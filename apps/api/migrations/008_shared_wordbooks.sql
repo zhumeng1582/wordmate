@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS wordmate.shared_wordbooks (
  publisher_user_id uuid NOT NULL REFERENCES wordmate.users(id),
  title varchar(60) NOT NULL,
  description varchar(300) NOT NULL DEFAULT '',
+ author varchar(60) NOT NULL DEFAULT '',
+ grade varchar(40) NOT NULL DEFAULT '',
+ textbook varchar(40) NOT NULL DEFAULT '',
+ category varchar(40) NOT NULL DEFAULT '',
  target_level varchar(40) NOT NULL DEFAULT '',
  version integer NOT NULL DEFAULT 1 CHECK(version > 0),
  published boolean NOT NULL DEFAULT false,
@@ -33,6 +37,9 @@ CREATE TABLE IF NOT EXISTS wordmate.shared_wordbook_items (
  ipa_us text,
  example_en text,
  example_zh text,
+ example_surface text,
+ example_start_utf16 integer,
+ example_end_utf16 integer,
  UNIQUE(shared_wordbook_id,ordinal),
  UNIQUE(shared_wordbook_id,normalized_lemma,part_of_speech,sense_key)
 );

@@ -16,13 +16,15 @@ test('share is scoped, historical, cached, anonymous and falls back safely',asyn
  try{
  const dad=(await core.login('dev-dad')).user.id,other=(await core.login('dev-outsider')).user.id;
  const family=await core.createFamily(dad,'f',{name:'private'}),child=await core.createChild(dad,'c',family.id,{nickname:'PRIVATE CHILD'});
- for(const [date,words] of [[previous(3),10],[previous(2),10],[previous(1),4],[today,0]] as const)await pg.query('INSERT INTO wordmate.daily_activity(child_id,local_date,distinct_words,goal_snapshot,timezone_snapshot) VALUES($1,$2,$3,10,\'Asia/Shanghai\')',[child.id,date,words]);
+ for(const [date,words] of [[previous(10),10],[previous(3),10],[previous(2),10],[previous(1),4],[today,0]] as const)await pg.query('INSERT INTO wordmate.daily_activity(child_id,local_date,distinct_words,goal_snapshot,timezone_snapshot) VALUES($1,$2,$3,10,\'Asia/Shanghai\')',[child.id,date,words]);
  const snapshot=JSON.stringify((await pg.query('SELECT * FROM wordmate.daily_activity ORDER BY local_date')).rows);
  await assert.rejects(core.checkinShare.create(other,child.id,{date:previous(2)}),{code:'FAMILY_NOT_FOUND'});assert.equal(calls,0);
  await assert.rejects(core.checkinShare.create(dad,child.id,{date:today}),{code:'NO_LEARNING_TO_SHARE'});
  const results=await Promise.all([core.checkinShare.create(dad,child.id,{date:previous(2)}),core.checkinShare.create(dad,child.id,{date:previous(2)})]);assert.equal(calls,1);
  const shared=await core.checkinShare.create(dad,child.id,{date:previous(2)});assert.equal(shared.checked_in,true);assert.equal(shared.streak_days,2);assert.equal(shared.studied_words,10);assert.equal(shared.copy_source,'ai');assert.equal(calls,1);assert.deepEqual(shared.quotes.map((q:any)=>q.theme),['growth','curiosity','discovery']);assert(!JSON.stringify(shared).includes('PRIVATE'));assert(!('child_id' in shared));assert.deepEqual(payloads,[{checked_in:true}]);
  fail=true;const partial=await core.checkinShare.create(dad,child.id,{date:previous(1)});assert.equal(partial.checked_in,false);assert.equal(partial.copy_source,'curated');assert.equal(partial.streak_days,0);assert.equal(calls,2);await core.checkinShare.create(dad,child.id,{date:previous(1)});assert.equal(calls,2);
+ let imageRequests=0;(core.checkinShare as any).images={obtain:async()=>{imageRequests++;throw Error('must not generate');}};
+ const local=await core.checkinShare.create(dad,child.id,{date:previous(10),local_poster:true});assert.equal(local.copy_source,'curated');assert.equal(local.image,null);assert.equal(calls,2);assert.equal(imageRequests,0);(core.checkinShare as any).images=undefined;
  actorToRevoke=dad;await assert.rejects(core.checkinShare.create(dad,child.id,{date:previous(3)}),{code:'FAMILY_NOT_FOUND'});
  assert.equal(JSON.stringify((await pg.query('SELECT * FROM wordmate.daily_activity ORDER BY local_date')).rows),snapshot);
  }finally{await pg.close();}

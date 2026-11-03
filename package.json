@@ -33,7 +33,9 @@
     "test:release-scope": "node --experimental-strip-types --test apps/api/test/shared-wordbooks.test.ts",
     "test:security": "node scripts/review-functional-security.cjs",
     "test:security:http": "node scripts/security-http.cjs",
-    "test:ai-accounts": "corepack pnpm build:api && node --experimental-strip-types --test apps/api/test/ai-accounts.test.ts apps/api/test/ai-payments.test.ts apps/api/test/family-ai.test.ts && node scripts/test-ai-accounts-http.cjs"
+    "test:ai-accounts": "corepack pnpm build:api && node --experimental-strip-types --test apps/api/test/ai-accounts.test.ts apps/api/test/ai-payments.test.ts apps/api/test/family-ai.test.ts && node scripts/test-ai-accounts-http.cjs",
+    "check:contracts": "node scripts/generate-contracts.cjs --check",
+    "verify": "node scripts/verify.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.15",

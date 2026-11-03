@@ -1,0 +1,7 @@
+{
+  "status": "planning",
+  "description": "首批只做新起航英语；教案核心词汇已导入本地待审核数据。",
+  "series": [
+    {"id":"fltrp-new-sailing","name":"新起航英语（预备级）","publisher":"外语教学与研究出版社","editor":"樊波","start_grade":1,"grades":[1,2]}
+  ]
+}

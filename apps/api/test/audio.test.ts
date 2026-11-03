@@ -35,7 +35,8 @@ test('audio: cache survives service restart, accents separate, access and versio
   await assert.rejects(f.core.audio.create(f.mom,'x',f.request),{code:'FAMILY_NOT_FOUND'});
   await f.core.audio.processOne();assert.equal((await f.core.audio.get(f.dad,j.job_id)).status,'succeeded');
   assert.deepEqual(await f.core.audio.content(f.dad,j.audio_id),f.bytes);
-  assert.equal((await f.newCore().audio.create(f.dad,'c',f.request)).status,'succeeded');assert.equal(f.calls(),1);
+  const reused=await f.newCore().audio.create(f.dad,'c',f.request);assert.equal(reused.status,'succeeded');assert.equal(reused.job_id,j.job_id);assert.equal(reused.audio_id,j.audio_id);assert.equal(f.calls(),1);assert.equal(f.objects.size,1);
+  assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,1);
   await assert.rejects(f.core.audio.get(f.mom,j.job_id),{code:'FAMILY_NOT_FOUND'});
   await assert.rejects(f.core.audio.content(f.mom,j.audio_id),{code:'FAMILY_NOT_FOUND'});
   const us=await f.core.audio.create(f.dad,'us',{...f.request,accent:'en-US',voice_id:'us'});assert.notEqual(us.audio_id,j.audio_id);await f.core.audio.processOne();assert.equal(f.calls(),2);
@@ -43,6 +44,9 @@ test('audio: cache survives service restart, accents separate, access and versio
   await f.pg.query('UPDATE wordmate.child_words SET version=version+1 WHERE id=$1',[f.request.word_id]);
   await assert.rejects(f.core.audio.content(f.dad,j.audio_id),{code:'AUDIO_CONTENT_CHANGED'});
  }finally{await f.close();}
+});
+test('audio: concurrent prefetch and playback requests share one job and one charge',async()=>{
+ const f=await fixture();try{const [a,b]=await Promise.all([f.core.audio.create(f.dad,'prefetch',f.request),f.core.audio.create(f.dad,'playback',f.request)]);assert.equal(a.job_id,b.job_id);assert.equal(a.audio_id,b.audio_id);await f.core.audio.processOne();assert.equal(f.calls(),1);assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.generation_jobs WHERE kind='audio'")).rows[0].n,1);assert.equal((await f.pg.query("SELECT count(*)::int n FROM wordmate.ai_family_wallet_entries WHERE kind='charge'")).rows[0].n,1);}finally{await f.close();}
 });
 test('audio: concurrent workers claim once and failed upload reuses private spool without new TTS',async()=>{
  const f=await fixture();try{

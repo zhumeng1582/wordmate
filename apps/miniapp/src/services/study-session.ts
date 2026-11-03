@@ -21,6 +21,11 @@ export class StudySessionController{
   const next={...flow,updatedAt:this.now()};try{this.deps.storage.set(this.keys.resume,next);}catch{throw Error('STUDY_STORAGE_UNAVAILABLE');}
   this.emit({flow:next});return next;
  }
+ private assertFlowUnchanged(expected:StudyFlow|null){
+  if(!this.deps.isCurrent())throw Error('SESSION_CHANGED');
+  if(!this.alive||JSON.stringify(this.stored())!==JSON.stringify(expected))throw Error('STUDY_SESSION_CHANGED');
+ }
+ private assertNoPending(){if(this.deps.storage.get(this.keys.pending))throw Error('STUDY_ANSWER_PENDING');}
  private change(update:(flow:StudyFlow)=>StudyFlow){const flow=this.stored();if(flow&&(!this.state.flow||sourceIdentity(flow.source)===sourceIdentity(this.state.flow.source)))return this.write(update(flow));return null;}
  private transition(update:(flow:StudyFlow)=>StudyFlow){try{if(this.state.flow)this.write(update(this.state.flow));}catch(error){this.emit({error});}}
  private async run(action:()=>Promise<void>){
@@ -39,19 +44,19 @@ export class StudySessionController{
  begin(){return this.run(async()=>{
   const previous=this.stored();this.emit({flow:previous,pending:this.deps.storage.get(this.keys.pending)||null});this.legacy();
   if(previous&&!studyComplete(previous)&&sourceIdentity(previous.source)!==sourceIdentity(this.deps.source)){this.emit({conflict:previous});return;}
-  if(previous&&studyComplete(previous)&&(this.deps.intent!=='resume'||sourceIdentity(previous.source)!==sourceIdentity(this.deps.source))&&!this.state.pending){await this.close(previous);this.deps.storage.remove(this.keys.resume);this.emit({flow:null});}
+  if(previous&&studyComplete(previous)&&(this.deps.intent!=='resume'||sourceIdentity(previous.source)!==sourceIdentity(this.deps.source))&&!this.state.pending){await this.close(previous);this.assertFlowUnchanged(previous);this.assertNoPending();this.deps.storage.remove(this.keys.resume);this.emit({flow:null});}
   await this.open();
  });}
  continuePrevious(){return this.run(async()=>{this.emit({conflict:null});const source=this.state.flow?.source;if(source)this.deps.storage.set('review_source',source);await this.open();});}
  replacePrevious(){return this.run(async()=>{
-  if(this.state.pending)throw Error('STUDY_ANSWER_PENDING');if(this.state.flow)await this.close(this.state.flow);this.deps.storage.remove(this.keys.resume);this.emit({flow:null,conflict:null,notice:''});await this.open();
+  if(this.state.pending)throw Error('STUDY_ANSWER_PENDING');const previous=this.state.flow;if(previous)await this.close(previous);this.assertFlowUnchanged(previous);this.assertNoPending();this.deps.storage.remove(this.keys.resume);this.emit({flow:null,conflict:null,notice:''});await this.open();
  });}
  private async open(){
   if(this.state.pending)await this.flush();
   let previous=this.state.flow??emptyStudy(this.deps.source,this.now());
   if(studyComplete(previous)){this.emit({flow:previous,notice:''});return;}
   const remaining=previous.cards.filter(card=>!previous.results[card.id]?.saved).map(card=>card.child_word_id);
-  const createSource=previous.loaded&&remaining.length?{source:'manual',word_ids:remaining}:previous.source;
+  const createSource:StudySource=previous.loaded&&remaining.length?{source:'manual',word_ids:remaining}:previous.source;
   const session=await enterReview({
    read:()=>previous.sessionClosed?null:previous.session,
    clear:()=>{previous={...previous,session:null,sessionClosed:true};this.write(previous);},
@@ -62,13 +67,22 @@ export class StudySessionController{
    },
    save:saved=>{const latest=this.stored();if(latest&&latest.session?.id===saved.id&&sourceIdentity(latest.source)===sourceIdentity(previous.source))previous=latest;else if(!this.alive&&latest?.session)return;previous={...previous,session:saved,sessionClosed:false};this.write(previous);}
   });
-  const [response,words]=await Promise.all([this.deps.api(`/study-sessions/${session.id}/cards?limit=100`),this.deps.api(`/children/${this.deps.child}/words?limit=100`)]);
+  const [response,words]=await Promise.all([this.loadCards(session.id),this.deps.api(`/children/${this.deps.child}/words?limit=100`)]);
   if(!this.deps.isCurrent())throw Error('SESSION_CHANGED');if(!this.alive||!this.visible)return;
   const latest=this.stored();if(latest&&latest.session?.id===session.id&&sourceIdentity(latest.source)===sourceIdentity(previous.source))previous=latest;else if(latest?.session?.id&&latest.session.id!==session.id)return;
   const known=new Map<string,any>(words.items.map((word:any)=>[word.id,word]));
   const items=response.items.map((card:StudyCard)=>{const word=known.get(card.child_word_id),cached=previous.cards.find(old=>old.id===card.id&&old.word_version===card.word_version);return word?.version===card.word_version?mergeStudyCardWithWord(card,word):cached?.meaning_zh?{...cached,...card,example:cached.example??card.example}:card;});
   const pool=words.items.map((word:any)=>({id:word.id,meaning_zh:word.meaning_zh}));
   const next=mergeStudyFlow(previous,session,items,pool,response);this.write(next);this.prefetch();
+ }
+ private async loadCards(sessionId:string){
+  const first=await this.deps.api(`/study-sessions/${sessionId}/cards?limit=100`),items=[...first.items],seen=new Set<string>();let cursor=first.next_cursor;
+  while(cursor){
+   if(!this.deps.isCurrent())throw Error('SESSION_CHANGED');if(!this.alive||!this.visible)return {...first,items};
+   if(seen.has(cursor))throw Error('INVALID_CURSOR');seen.add(cursor);
+   const page=await this.deps.api(`/study-sessions/${sessionId}/cards?limit=100&cursor=${encodeURIComponent(cursor)}`);items.push(...page.items);cursor=page.next_cursor;
+  }
+  return {...first,items};
  }
  prefetch(){
   const flow=this.state.flow;if(!flow||!flow.loaded||!this.visible||!this.alive)return;
@@ -100,7 +114,7 @@ export class StudySessionController{
   const meaning=card.meaning_zh.trim(),correct=remembered??selectedMeaning.trim()===meaning;
   if(flow.phase==='practice'){if(flow.practiceFeedback)return;this.write({...flow,practiceFeedback:{correct,selectedMeaning}});return;}
   if(flow.phase!=='test'||flow.results[card.id])return;
-  const body={session_id:flow.session.id,card_id:card.id,event_id:this.deps.eventId(),expected_version:card.version,rating:correct?'good':'again',lease_generation:flow.session.lease_generation};
+  const body={session_id:flow.session.id,card_id:card.id,event_id:this.deps.eventId(),expected_version:card.version,rating:correct?'good':'again',lease_generation:flow.session.lease_generation,...('wordbook_id' in flow.source&&flow.source.wordbook_id?{wordbook_id:flow.source.wordbook_id}:{})};
   const result={correct,selectedMeaning,meaning,saved:false,eventId:body.event_id},pending={body,card,result};
   try{this.deps.storage.set(this.keys.pending,pending);}catch{throw Error('STUDY_STORAGE_UNAVAILABLE');}
   this.emit({pending,rejected:false});this.write({...flow,results:{...flow.results,[card.id]:result}});await this.flush();
@@ -119,16 +133,16 @@ export class StudySessionController{
  retryAnswer(){return this.run(()=>this.flush());}
  retryRejected(){const unavailable=errorCode(this.state.error)==='WORD_UNAVAILABLE';return this.run(async()=>{
   if(!this.state.rejected||!this.state.pending)return;
-  const pending=this.state.pending;if(this.state.flow)await this.close(this.state.flow);this.deps.storage.remove(this.keys.pending);if(pending.legacyKey)this.deps.storage.remove(pending.legacyKey);
+  const pending=this.state.pending,previous=this.state.flow;if(previous)await this.close(previous);this.assertFlowUnchanged(previous);const currentPending=this.deps.storage.get(this.keys.pending);if((!pending.legacyKey||currentPending)&&currentPending?.body?.event_id!==pending.body.event_id)throw Error('STUDY_SESSION_CHANGED');if(pending.legacyKey&&this.deps.storage.get(pending.legacyKey)?.event_id!==pending.body.event_id)throw Error('STUDY_SESSION_CHANGED');this.deps.storage.remove(this.keys.pending);if(pending.legacyKey)this.deps.storage.remove(pending.legacyKey);
   this.change(flow=>{const results={...flow.results};delete results[pending.body.card_id];const next={...flow,results,session:null,sessionClosed:true};return unavailable?this.removeUnavailable(next,pending.body.card_id):next;});
   this.emit({pending:null,rejected:false});await this.open();
  });}
  advance(){if(this.state.busy||this.state.pending||!this.state.flow)return;this.transition(moveStudyForward);this.prefetch();}
  practice(){if(this.state.busy||this.state.pending||!this.state.flow)return;this.transition(beginStudyPractice);this.prefetch();}
  private async close(flow:StudyFlow){if(!flow.session||flow.sessionClosed)return;try{await this.deps.api(`/study-sessions/${flow.session.id}/end`,'POST',{lease_generation:flow.session.lease_generation});}catch(error){if(!expired(error))throw error;}}
- pause(){return this.run(async()=>{if(this.state.pending)throw Error('STUDY_ANSWER_PENDING');const flow=this.state.flow;if(flow){await this.close(flow);this.change(latest=>latest.session?.id===flow.session?.id?{...latest,sessionClosed:true}:latest);}});}
- finish(){return this.run(async()=>{if(this.state.pending||!this.state.flow||!studyComplete(this.state.flow))throw Error('STUDY_NOT_FINISHED');const id=this.state.flow.session?.id;await this.close(this.state.flow);if(this.stored()?.session?.id===id)this.deps.storage.remove(this.keys.resume);this.emit({flow:null});});}
- nextGroup(){return this.run(async()=>{if(this.state.pending||!this.state.flow||!studyComplete(this.state.flow))throw Error('STUDY_NOT_FINISHED');const previous=this.state.flow;await this.close(previous);if(this.stored()?.session?.id!==previous.session?.id)throw Error('STUDY_SESSION_CHANGED');this.write(emptyStudy(previous.source,this.now()));this.emit({notice:''});await this.open();});}
+ pause(){return this.run(async()=>{if(this.state.pending)throw Error('STUDY_ANSWER_PENDING');const flow=this.state.flow;if(flow){await this.close(flow);this.assertFlowUnchanged(flow);this.assertNoPending();this.change(latest=>({...latest,sessionClosed:true}));}});}
+ finish(){return this.run(async()=>{if(this.state.pending||!this.state.flow||!studyComplete(this.state.flow))throw Error('STUDY_NOT_FINISHED');const previous=this.state.flow;await this.close(previous);this.assertFlowUnchanged(previous);this.assertNoPending();this.deps.storage.remove(this.keys.resume);this.emit({flow:null});});}
+ nextGroup(){return this.run(async()=>{if(this.state.pending||!this.state.flow||!studyComplete(this.state.flow))throw Error('STUDY_NOT_FINISHED');const previous=this.state.flow;await this.close(previous);this.assertFlowUnchanged(previous);this.assertNoPending();this.write(emptyStudy(previous.source,this.now()));this.emit({notice:''});await this.open();});}
  hide(){this.visible=false;}
  resume(){if(!this.alive)return Promise.resolve(false);this.visible=true;if(this.locked){this.reload=true;return Promise.resolve(false);}return this.run(async()=>{
   if(this.state.conflict)return;if(this.state.pending)await this.flush();const flow=this.state.flow;

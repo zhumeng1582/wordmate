@@ -1,15 +1,24 @@
 .history-page{min-height:90vh;box-sizing:border-box}
 .month-heading{color:var(--muted);font-size:26px}
-.row .month-arrow{flex:0 0 60px;min-width:60px;width:60px;min-height:56px;padding:0;margin:0;background:transparent}
+.row .month-arrow{flex:0 0 88px;min-width:88px;width:88px;min-height:88px;padding:0;margin:0;background:transparent}
 .calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;padding:24px}
 .calendar-week{text-align:center;font-size:24px;color:var(--muted);margin-bottom:8px}
 .calendar-day{height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:24px;line-height:1.2}
 .calendar-day.checked{background:var(--soft)}
 .calendar-day.makeup-day{color:var(--primary);font-weight:600}
 .calendar-day.selected{background:var(--primary);color:var(--on-primary)}
+.calendar-day.future-day{opacity:.3}
+.calendar-review-button{margin-bottom:0}
+.calendar-review-empty{margin-top:24px;font-size:26px;line-height:1.6}
 .day-marker{font-size:18px;min-height:22px;font-weight:600}
 .history-highlight{background:var(--soft)}
 .history-name{font-size:32px;font-weight:600;line-height:1.5}
 .history-actions{margin-top:60px;padding-bottom:env(safe-area-inset-bottom)}
 .history-actions .makeup-button{background:#f0e8d7;color:#745c2b}
 .history-toggle{display:flex;justify-content:space-between;gap:20px;align-items:center}
+
+.calendar-page .title{font-size:42px;margin-bottom:26px}
+.calendar-range-card{padding:18px 22px}
+.calendar-result{padding:4px 6px 30px;text-align:center}
+.calendar-result-count{font-size:56px;font-weight:600;color:var(--primary);margin-bottom:18px}
+.calendar-result-count text{font-size:27px;font-weight:400;color:var(--muted)}

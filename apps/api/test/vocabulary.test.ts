@@ -79,7 +79,7 @@ test('Chinese list separators are split before persistence; old malformed jobs c
   const job=await core.vocabulary.create(dad,'job',c.id,{wordbook_id:b.id,words:['airport、luggage、delay']});assert.equal(job.items.length,3);
   await core.vocabulary.processOne();assert.equal((await core.vocabulary.get(dad,job.id)).status,'succeeded');assert.equal(calls,1);
   await assert.rejects(core.vocabulary.create(dad,'duplicates',c.id,{wordbook_id:b.id,words:['cat、Cat']}),{code:'DUPLICATE_WORDS'});
-  await assert.rejects(core.vocabulary.create(dad,'overflow',c.id,{wordbook_id:b.id,words:[Array.from({length:31},(_,i)=>String(i)).join('、')]}),{code:'INVALID_WORD_COUNT'});
+  await assert.rejects(core.vocabulary.create(dad,'overflow',c.id,{wordbook_id:b.id,words:Array.from({length:8001},(_,i)=>String(i))}),{code:'INVALID_WORD_COUNT'});
   const old=await core.vocabulary.create(dad,'old',c.id,{wordbook_id:b.id,words:['book']});
   await pg.query("UPDATE wordmate.batch_items SET raw_text='airport、luggage、delay' WHERE batch_id=$1",[old.batch_id]);await pg.query("UPDATE wordmate.generation_jobs SET status='failed' WHERE id=$1",[old.id]);
   await assert.rejects(core.vocabulary.retry(dad,'old-retry',old.id),{code:'INPUT_REENTRY_REQUIRED'});assert.equal(calls,1);
@@ -96,7 +96,7 @@ test('raw text jobs preserve input, reject secrets before calls, enforce quotas 
  const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'f',{name:'测试'}),c=await core.createChild(dad,'c',f.id,{nickname:'孩子'}),book=await core.createWordbook(dad,'b',c.id,{name:'本'});
  const create=(key:string,raw_text:string)=>core.vocabulary.create(dad,key,c.id,{wordbook_id:book.id,raw_text,source_type:'text'});
  await assert.rejects(create('secret','sk-'+ 'x'.repeat(24)),{code:'SENSITIVE_INPUT'});assert.equal(calls,0);
- await assert.rejects(create('control','cat\u0000'),{code:'INVALID_RAW_TEXT'});await assert.rejects(create('length','a'.repeat(8001)),{code:'INVALID_TEXT'});
+ await assert.rejects(create('control','cat\u0000'),{code:'INVALID_RAW_TEXT'});await assert.rejects(create('length','a'.repeat(1000001)),{code:'INVALID_TEXT'});
  const job=await create('raw',raw);assert.equal(job.items.length,0);assert.equal(job.raw_text,raw);await core.vocabulary.processOne();assert.equal(captured,raw);assert.equal((await core.vocabulary.get(dad,job.id)).items.length,2);assert.equal((await core.words(dad,c.id)).items.length,2);
  mode='empty';const empty=await create('empty','只有说明文字');await core.vocabulary.processOne();const failed=await core.vocabulary.get(dad,empty.id);assert.equal(failed.error_code,'NO_WORDS_FOUND');assert.equal(failed.retryable,false);assert.equal((await core.words(dad,c.id)).items.length,2);
  // Editing replaces the failed record atomically, preserves identity and usage, and is idempotent.

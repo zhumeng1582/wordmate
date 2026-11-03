@@ -1,4 +1,5 @@
 import {finishPrivacyAuthorization} from './privacy-authorization';
+import {validPendingReferral} from './referral';
 import Taro from '@tarojs/taro';
 let sessionEpoch=0;
 export const storage={get:(key:string)=>Taro.getStorageSync(key),set:(key:string,value:any)=>{if(key==='access_token')sessionEpoch++;Taro.setStorageSync(key,value);}};
@@ -35,7 +36,8 @@ export async function login(identity='dev-dad'){
   if(!policy.publishable&&!DEV_AUTH)throw Error('PRIVACY_POLICY_NOT_READY');
   if(storage.get('privacy_decision')!==policy.hash){if(Taro.getCurrentPages().slice(-1)[0]?.route==='pages/login/index')throw Error('PRIVACY_POLICY_CHANGED');await openLogin(identity);throw Error('PRIVACY_REVIEW_REQUIRED');}
   const code=DEV_AUTH?identity:await wechatLoginCode();
-  const inviteCode=storage.get('pending_referral_code');
+  const inviteCode=validPendingReferral(storage.get('pending_referral_code'));
+  if(!inviteCode)Taro.removeStorageSync('pending_referral_code');
   const data=await api(DEV_AUTH?'/auth/dev':'/auth/wechat','POST',{code,...(inviteCode?{invite_code:inviteCode}:{})});
   clearAccountStorage();
   storage.set('access_token',data.access_token);storage.set('families',data.families);
@@ -49,6 +51,10 @@ export async function loginForDataManagement(identity='dev-dad'){
 }
 export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
 const errorMessages:Record<string,string>={
+ TUTOR_IMAGE_NOT_CONFIGURED:'图片生成尚未配置，请先使用文字提问。',TUTOR_IMAGE_PRICE_NOT_CONFIGURED:'图片生成价格尚未配置。',TUTOR_IMAGE_DAILY_LIMIT:'今天生成图片的次数已用完。',TUTOR_IMAGE_STORAGE_LIMIT:'图片已达到保存上限，请先删除不需要的聊天记录。',
+ SEARCH_NOT_CONFIGURED:'联网搜索尚未配置，请先使用普通提问。',SEARCH_PRICE_NOT_CONFIGURED:'联网搜索价格尚未配置，请先使用普通提问。',SEARCH_FAILED:'联网搜索未完成，请重试。',SEARCH_DAILY_LIMIT:'今天的联网搜索次数已用完。',
+ TUTOR_AUDIO_TOO_LONG:'讲解太长，暂时无法朗读。',TUTOR_AUDIO_GENERATING:'音频正在生成，请稍后再试。',TUTOR_AUDIO_FAILED:'讲解朗读暂时不可用，请重试。',
+ ASR_NOT_CONFIGURED:'语音识别尚未配置，请先使用文字提问。',ASR_PRICE_NOT_CONFIGURED:'语音识别价格尚未配置，请先使用文字提问。',ASR_FAILED:'语音识别未完成，请重试。',ASR_IN_PROGRESS:'这段录音正在识别，请稍候。',ASR_RETRY_NEW_REQUEST:'这段录音未能完成识别，请重新录音。',ASR_DAILY_LIMIT:'今天语音识别次数已用完，请使用文字提问。',
  NETWORK_DOMAIN_NOT_ALLOWED:'服务器域名未获微信授权，请联系运营者检查连接配置。',
  NETWORK_CERTIFICATE_INVALID:'服务器安全证书验证失败，请检查手机日期和时间，仍失败请联系运营者。',
  NETWORK_DNS_FAILED:'无法解析服务器地址，请切换 Wi-Fi 或移动网络后重试。',
@@ -56,6 +62,7 @@ const errorMessages:Record<string,string>={
  NETWORK_REQUEST_FAILED:'无法连接服务器，请检查网络后重试。',
  WECHAT_LOGIN_FAILED:'微信身份验证未完成，请重新打开小程序后重试。',
  WECHAT_LOGIN_TIMEOUT:'微信身份验证超时，请检查网络后重试。',
+ REFERRAL_CODE_UNAVAILABLE:'小程序码暂时无法生成，请稍后重试。',
  WECHAT_NOT_CONFIGURED:'微信登录尚未配置完成，请联系运营者。',
  WECHAT_UNAVAILABLE:'服务器暂时无法连接微信登录服务，请稍后重试。',
  WECHAT_CODE_INVALID:'微信登录凭证已失效，请再次点击登录。',
@@ -72,7 +79,7 @@ const errorMessages:Record<string,string>={
   STUDY_NOT_FINISHED:'还有单词未完成，请继续本组学习。',
   STUDY_SESSION_CHANGED:'学习进度已在其他页面更新，请返回后继续。',
   WORD_NOT_FOUND:'这个单词已移除，请重新加载剩余内容。',
-  EMPTY_NEW_QUEUE:'当前新词已学完，可以返回查看学习进度。',
+  EMPTY_NEW_QUEUE:'新词已经学完了，可以添加新单词或按日期复习。',
   SESSION_NOT_FOUND:'上次学习已结束，已保存的进度会保留。',
   SESSION_NOT_OWNED:'这组学习由另一位家长开始，请返回后重新选择。',
   ANSWER_LOCKED:'这题已保存首次答案，请以服务器记录为准。',
@@ -97,11 +104,11 @@ const errorMessages:Record<string,string>={
   IMPORT_PRIVACY_REQUIRED:'需要同意隐私保护指引后才能选择图片或文件。你仍可直接输入单词。',
   IMPORT_FILE_TOO_LARGE:'文件不能超过 4 MB，请压缩或拆分后重试。',
   IMPORT_IMAGE_TOO_LARGE:'图片像素过大，请裁剪后重试。',
-  IMPORT_TEXT_TOO_LONG:'文字超过 8000 字符，请拆分材料；当前输入未被修改。',
+  IMPORT_TEXT_TOO_LONG:'材料过长，最多支持 100 万字符，请分次导入；当前输入未被修改。',
   IMPORT_EMPTY:'没有识别到文字，请换一张清晰的学习材料图片或检查文件。',
   INVALID_IMPORT_FILE:'文件内容无效、加密或包含不支持的内容，请另存为普通文件。',
   INVALID_IMPORT_ENCODING:'文本文件需要使用 UTF-8 编码，请另存后重试。',
-  IMPORT_FORMAT_UNSUPPORTED:'支持 JPG、PNG、TXT、CSV、TSV、XLSX、DOCX；其他文件请转换后导入。',
+  IMPORT_FORMAT_UNSUPPORTED:'支持 JPG、PNG、TXT、MD、CSV、TSV、XLSX、DOCX；其他文件请转换后导入。',
   IMPORT_FORMULA_UNSUPPORTED:'表格含公式，请复制并粘贴为数值后另存再导入。',
   OCR_NOT_CONFIGURED:'图片识别尚未开通，请联系管理员；仍可使用文本和文档导入。',
   OCR_FAILED:'图片识别未完成，请检查图片是否清晰，稍后重试。',
@@ -120,6 +127,7 @@ const errorMessages:Record<string,string>={
   SHARE_OWNER_REQUIRED:'只有发布者可以修改或停止共享。',
   EMPTY_WORDBOOK:'词本还是空的，添加单词后再发布共享。',
   SHARED_WORDBOOK_TOO_LARGE:'词本最多共享 3000 个单词，请拆分后发布。',
+  SHARED_WORDBOOK_SIZE_INVALID:'请先添加单词；每个共享词本最多 8000 个单词。',
   SHARED_WORDBOOK_NOT_FOUND:'这个共享词本已停止共享或删除。',
   SHARED_WORDBOOK_INCOMPLETE:'共享词本内容不完整，请联系发布者重新发布。',
   NOT_SHARED_WORDBOOK:'这不是已加入的共享词本。',
@@ -155,7 +163,8 @@ const errorMessages:Record<string,string>={
   INVITE_UNAVAILABLE:'邀请已过期或已被领取，请向邀请人索取新邀请。',
   ALREADY_MEMBER:'你已是该家庭成员，无需再次加入。',
   NO_WORDS_FOUND:'未识别到可学习的词汇，请编辑输入内容后重新提交。',
-  TOO_MANY_WORDS:'识别内容超过 30 项，请拆成几批提交；本次未保存。',
+  TOO_MANY_WORDS:'一次最多添加 8000 个词。请按每行一个单词或短语整理，已有保存结果会保留。',
+  IMPORT_ENTRY_TOO_LONG:'有一条内容过长，请按每行一个单词或短语整理后再提交。',
   UNSAFE_INPUT:'内容不适合词汇识别，请只提供要学习的词汇或材料。',
   SENSITIVE_INPUT:'输入疑似包含密钥或私钥，尚未发送给 AI，请先删除敏感信息。',
   INVALID_RAW_TEXT:'输入含不支持的控制字符，请粘贴纯文本后重试。',
@@ -170,7 +179,9 @@ const errorMessages:Record<string,string>={
   AI_CONFIGURATION_CHANGED:'该任务的模型配置已变化，请恢复原供应商和模型配置后重试。',
   UPSTREAM_NETWORK_OR_TIMEOUT:'AI 连接失败或超时，可以重试未保存的单词。',
   UPSTREAM_HTTP_ERROR:'AI 服务拒绝或未完成请求，请检查账号额度、密钥及服务状态后重试。',
-  GENERATED_CONTENT_REJECTED:'AI 返回内容未通过校验，未保存本次结果，请重试。',
+  AI_SERVICE_NOT_ACTIVATED:'百炼拒绝当前模型调用，请管理员检查服务开通、阿里云账号计费状态及模型权限。本次未扣费。',
+  AI_PROVIDER_BILLING_UNAVAILABLE:'AI 供应商账号计费不可用，请联系管理员检查阿里云余额、欠费账单或账号状态。本次未扣费。',
+  GENERATED_CONTENT_REJECTED:'词条内容暂未通过校验，已有保存结果会保留，可重试未完成部分。',
   INVALID_GENERATED_JSON:'AI 返回格式不正确，请重试。',
   INCOMPLETE_GENERATION:'AI 返回内容不完整，请重试。',
   GENERATION_FAILED:'生成或保存未完成，未保存的单词可以重试。',
@@ -180,11 +191,12 @@ const errorMessages:Record<string,string>={
   DUPLICATE_WORDS:'输入中有重复单词，请合并后重试。',
 
   EMPTY_REVIEW_QUEUE:'这个范围没有可练习的单词，可能已归档或暂无到期词。',
-  NEW_WORD_LIMIT:'今天的新词额度已用完，请明天继续。',
+  EMPTY_HISTORY_QUEUE:'所选日期没有可复习的单词，已归档或暂停的单词不会加入复习。',
+  NEW_WORD_LIMIT:'学习状态已更新，请返回首页刷新后继续。',
   WORD_UNAVAILABLE:'选中的单词已归档或不可复习，请返回刷新错题集。',
   INVALID_DATE:'日期无效，请重新选择。',
   INVALID_MONTH:'月份无效，请选择当前或过去的月份。',
-  ROUTE_NOT_IMPLEMENTED:'当前后端不支持此接口，请重启后端后重试。若刚创建过家庭，请勿重复创建。',
+  ROUTE_NOT_IMPLEMENTED:'服务暂时不可用，请稍后再试。',
   QUIZ_DAILY_LIMIT:'今天已创建 5 次月测，请明天再试；未完成的测验可以继续。',
   QUIZ_NOT_SUBMITTED:'交卷后才能查看正确答案。',
   INVALID_OPTION:'选择不属于当前题目，请刷新后重试。',

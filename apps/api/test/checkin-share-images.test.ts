@@ -45,6 +45,20 @@ test('poster provider reuses Qwen/OCR credentials, blends encouragement copy wit
  assert.equal(requests.length,3);assert.match(requests[1].url,/\/api\/v1\/tasks\/task-12345678$/);assert.equal(requests[1].init.headers.Authorization,'Bearer existing-qwen-key');assert.equal(requests[2].init.redirect,'error');
 });
 
+test('poster provider accepts DashScope OSS result hosts and rejects unrelated hosts',async()=>{
+ for(const [host,allowed] of [['dashscope-a717.oss-accelerate.aliyuncs.com',true],['dashscope-result-bj.oss-cn-beijing.aliyuncs.com',true],['other.oss-accelerate.aliyuncs.com',false],['dashscope-a717.oss-accelerate.aliyuncs.com.attacker.test',false]]){
+  let requests=0;const generate=await shareImageGenerator({OCR_API_KEY:'key',OCR_WORKSPACE_ID:'workspace-123'},async()=>{
+   requests++;
+   if(requests===1)return new Response(JSON.stringify({output:{task_id:'task-12345678'}}));
+   if(requests===2)return new Response(JSON.stringify({output:{task_status:'SUCCEEDED',results:[{url:`https://${host}/poster.png`}]}}));
+   return new Response(Uint8Array.from([137,80,78,71,13,10,26,10,0]),{headers:{'content-type':'image/png'}});
+  },async()=>{});
+  assert.ok(generate);
+  if(allowed){await generate('growth');assert.equal(requests,3);}
+  else{await assert.rejects(generate('growth'),(e:any)=>e.code==='POSTER_IMAGE_URL_HOST_REJECTED');assert.equal(requests,2);}
+ }
+});
+
 function deferred<T>(){
  let resolve!:(value:T)=>void,reject!:(reason:unknown)=>void;
  const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});

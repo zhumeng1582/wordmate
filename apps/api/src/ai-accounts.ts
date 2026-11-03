@@ -76,7 +76,7 @@ export class AiAccounts{
   const families=(await q.query("SELECT f.id,f.name FROM families f JOIN family_members m ON m.family_id=f.id WHERE m.user_id=$1 AND m.status='active' AND f.status='active' ORDER BY f.created_at",[actor])).rows;
   const legacy=await one(q,'SELECT balance_micros FROM ai_wallets WHERE user_id=$1',[actor]);
   return {capability,family_id:family?.id??null,family_name:family?.name??null,families,mode:row?.mode??'system',model_id:selected?.id??null,version:row?.version??0,has_key:!!row?.credential,key_hint:row?.credential?'已加密保存':null,byok_available:!!this.key,custom_provider:row?.custom_model?.provider??null,custom_model:row?.custom_model?.model??null,
-   balance_micros:Number(wallet?.balance_micros??0),frozen_micros:Number(wallet?.frozen_micros??0),available_micros:Number(wallet?.balance_micros??0)-Number(wallet?.frozen_micros??0),gift_remaining_micros:Number(wallet?.gift_remaining_micros??0),welcome_credit_micros:20000000,legacy_balance_micros:Number(legacy?.balance_micros??0),currency:'CNY',audio_model:this.env.COSYVOICE_MODEL||'cosyvoice-v3-flash',audio_yuan_per_10000_characters:configuredAudioPrice(this.env)??null,
+   balance_micros:Number(wallet?.balance_micros??0),frozen_micros:Number(wallet?.frozen_micros??0),available_micros:Number(wallet?.balance_micros??0)-Number(wallet?.frozen_micros??0),gift_remaining_micros:Number(wallet?.gift_remaining_micros??0),welcome_credit_micros:20000000,legacy_balance_micros:Number(legacy?.balance_micros??0),currency:'CNY',audio_model:this.env.COSYVOICE_MODEL||'cosyvoice-v3-flash',audio_yuan_per_10000_characters:configuredAudioPrice(this.env)??null,tutor_prices:{asr_yuan_per_minute:this.env.TUTOR_ASR_YUAN_PER_MINUTE??null,search_yuan_per_call:this.env.TUTOR_SEARCH_YUAN_PER_CALL??null,search_input_yuan_per_million:this.env.TUTOR_SEARCH_INPUT_YUAN_PER_MILLION??null,search_output_yuan_per_million:this.env.TUTOR_SEARCH_OUTPUT_YUAN_PER_MILLION??null,image_yuan_per_image:this.env.TUTOR_IMAGE_YUAN_PER_IMAGE??null},
    models:[...this.models,...(row?.custom_model?[row.custom_model]:[])].filter(m=>capability==='text'||m.vision).map(m=>({id:m.id,label:m.label,provider:m.provider,model:m.model,vision:!!m.vision,system_available:!!this.systemKey(m,capability)&&this.priced(m),input_yuan_per_million:m.input_yuan_per_million??null,output_yuan_per_million:m.output_yuan_per_million??null,cached_yuan_per_million:m.cached_yuan_per_million??m.input_yuan_per_million??null,pricing_tiers:m.pricing_tiers??null,max_charge_micros:this.priced(m)?this.reserveCost(m):null})),
    other_services:'文字与图片模型独立配置，默认使用系统模型。每个家庭一次性获赠 20 元，家庭成员共享余额；私有 Key 各自保管。语音新生成按输入字符从家庭余额结算，已生成音频重复播放不扣费，打卡鼓励语使用免费精选文案。'};
  });}
@@ -115,6 +115,12 @@ export class AiAccounts{
   const wrap=async<T>(fn:()=>Promise<T>)=>{ensure(reference,500,'AI_REFERENCE_REQUIRED');return this.run(actor,'vocabulary',reference!,selected,observed,fn);};
   return {...p!,selection:selected.selection,generate:async(...args)=>{const r=await wrap(()=>p!.generate(...args));return {...r.data,billing_id:r.id};},generateRaw:async(...args)=>{const r=await wrap(()=>p!.generateRaw!(...args));return {...r.data,billing_id:r.id};}};
  }
+ async tutor(q:Sql,actor:string,reference:string,familyId:string){
+  const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
+  const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
+  const tutor=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/word-tutor.js')).href);
+  return async(word:any,history:any[],question?:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>tutor.generateTutorAnswer(adapter.createTextGenerator(selected.env,observed.fetcher),word,history,question));
+ }
  async reader(q:Sql,actor:string,familyId?:string):Promise<ImageReader>{
   const s=await this.select(q,actor,undefined,'vision',familyId);ensure(s.model.vision&&['qwen','openai'].includes(s.model.provider),422,'AI_VISION_UNAVAILABLE');
   const observed=this.observer(),reader=imageReader({OCR_PROVIDER:s.model.provider,OCR_API_KEY:s.env[`${s.model.provider.toUpperCase()}_API_KEY`],OCR_MODEL:s.model.model,OCR_BASE_URL:s.env.QWEN_BASE_URL},observed.fetcher);ensure(reader,503,'OCR_NOT_CONFIGURED');
@@ -128,14 +134,14 @@ export class AiAccounts{
    return response;
   }};return observed;
  }
- private async run<T>(actor:string,kind:'vocabulary'|'vision'|'connection_test',reference:string,selected:Selected,observed:ReturnType<AiAccounts['observer']>,fn:()=>Promise<T>){
+ private async run<T>(actor:string,kind:'vocabulary'|'vision'|'connection_test'|'word_tutor',reference:string,selected:Selected,observed:ReturnType<AiAccounts['observer']>,fn:()=>Promise<T>){
   const familyId=selected.selection.family_id;ensure(kind==='connection_test'||familyId,422,'AI_FAMILY_REQUIRED');
   const reserve=selected.selection.mode==='system'?this.reserveCost(selected.model):0;
   const id=await this.tx(async q=>{
    // Recheck credentials/version immediately before reserving, after worker claims.
    await this.select(q,actor,selected.selection,selected.selection.capability,familyId);
    const w=familyId?await one(q,'SELECT * FROM ai_family_wallets WHERE family_id=$1 FOR UPDATE',[familyId]):undefined;ensure(!await one(q,'SELECT 1 FROM ai_calls WHERE reference=$1',[reference]),409,'AI_CALL_ALREADY_STARTED');
-   const count=await one(q,"SELECT count(*)::int n FROM ai_calls WHERE user_id=$1 AND kind<>'audio' AND created_at>now()-interval '24 hours'",[actor]);ensure(count.n<Number(this.env.AI_USER_DAILY_CALLS||100),429,'AI_DAILY_LIMIT');
+   if(kind!=='vocabulary'){const count=await one(q,"SELECT count(*)::int n FROM ai_calls WHERE user_id=$1 AND kind NOT IN ('audio','vocabulary') AND created_at>now()-interval '24 hours'",[actor]);ensure(count.n<Number(this.env.AI_USER_DAILY_CALLS||100),429,'AI_DAILY_LIMIT');}
    if(selected.selection.mode==='system'){
     // Serialize the global cap across users, processes and workers.
     await q.query("SELECT pg_advisory_xact_lock(170017)");
@@ -155,7 +161,7 @@ export class AiAccounts{
    await this.tx(async q=>{
     let cost:number|null=null;let u:ReturnType<typeof tokenUsage>|undefined;try{u=tokenUsage(observed.usage);cost=this.priced(selected.model)?usageCost(u,selected.model):null;}catch{}
     if(familyId)await q.query('SELECT family_id FROM ai_family_wallets WHERE family_id=$1 FOR UPDATE',[familyId]);
-    await q.query("UPDATE ai_calls SET cost_micros=$2,input_tokens=$3,output_tokens=$4,cached_tokens=$5 WHERE id=$1",[id,cost,u?.input??null,u?.output??null,u?.cached??null]);await this.release(q,id,safeCode(e),observed.sent&&cost===null);
+    const requestId=(e as any)?.requestId??observed.request_id;await q.query("UPDATE ai_calls SET cost_micros=$2,input_tokens=$3,output_tokens=$4,cached_tokens=$5,upstream_request_id=coalesce($6,upstream_request_id) WHERE id=$1",[id,cost,u?.input??null,u?.output??null,u?.cached??null,typeof requestId==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(requestId)?requestId:null]);await this.release(q,id,safeCode(e),observed.sent&&cost===null&&!['AI_SERVICE_NOT_ACTIVATED','AI_PROVIDER_BILLING_UNAVAILABLE'].includes(safeCode(e)));
    });throw e;
   }
  }

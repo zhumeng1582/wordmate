@@ -1,0 +1,1 @@
+.favorite-button{display:flex;align-items:center;justify-content:center;flex:none;width:64px;min-width:64px;height:64px;min-height:64px;margin:0;padding:0;border:0;background:transparent;color:var(--muted);font-size:42px;line-height:1}.favorite-button::after{border:0}.favorite-button.is-favorite{color:var(--primary)}.favorite-button[disabled]{background:transparent;opacity:.5}

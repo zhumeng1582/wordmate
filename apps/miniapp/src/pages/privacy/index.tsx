@@ -1,3 +1,4 @@
+import {Chevron} from '../../components/Chevron';
 import {useEffect,useRef,useState} from 'react';
 import Taro,{useDidShow,useDidHide} from '@tarojs/taro';
 import {View,Text,Button,Input} from '@tarojs/components';
@@ -20,7 +21,7 @@ export default function PrivacyPage(){
  const leave=async(f:any,member?:any)=>{const answer=await Taro.showModal({title:member?'移除这位家长？':'退出这个家庭？',content:'该家长将失去访问和陪学权限，孩子的共同学习资料会保留。'});if(!answer.confirm)return;if(member)await api(`/families/${f.id}/members/${member.user_id}`,'DELETE',{});else{await api(`/families/${f.id}/leave`,'POST',{});const token=storage.get('access_token');clearAccountStorage();storage.set('access_token',token);}await load();};
  const transfer=async(f:any)=>{const options=f.members.filter((m:any)=>m.user_id!==f.owner_user_id);if(!options.length)return;const pick=await Taro.showActionSheet({itemList:options.map((m:any)=>m.display_name)}).catch(()=>null);if(!pick)return;const member=options[pick.tapIndex],yes=await Taro.showModal({title:'转交家庭管理员',content:`确认转交给“${member.display_name}”？转交后你将成为普通家长。`});if(yes.confirm){await api(`/families/${f.id}/transfer-owner`,'POST',{member_user_id:member.user_id,expected_version:f.version});await load();}};
  return <View className='page'><View className='title'>隐私与数据管理</View>{error&&<View className='error'>{error}<Button className='text-action' disabled={busy} onClick={()=>void run(load)}>重新加载</Button></View>}
- <Button className='btn secondary privacy-policy-entry' onClick={()=>go('privacy-policy')}>隐私政策<Text>查看全文 ›</Text></Button>
+ <Button className='btn secondary privacy-policy-entry' onClick={()=>go('privacy-policy')}>隐私政策<Text className='indicator-label'>查看全文<Chevron/></Text></Button>
  {!signedIn&&<View className='card'><View className='muted'>仅验证已有账号身份，用于管理、删除资料或注销，不会创建新账号或恢复学习授权。</View><Button className='btn secondary' disabled={busy} onClick={()=>void run(async()=>{await loginForDataManagement();await load();})}>验证身份并管理数据</Button></View>}
  {signedIn&&<>
   <View className='card'><View className='subtitle'>同意状态</View><View>{consent?.management_only?'当前仅登录数据管理 · 不具备学习权限':consent?.accepted?'已同意当前政策':'尚未同意当前政策或已撤回'}</View>{!consent?.accepted&&<Button className='btn secondary' disabled={busy} onClick={()=>void openLogin()}>同意并恢复学习</Button>}{consent?.accepted&&<Button className='btn secondary' disabled={busy} onClick={()=>void run(async()=>{const yes=await Taro.showModal({title:'撤回隐私同意？',content:'将停止本账号学习、导入和生成并撤销陪学会话。家庭共同资料不会自动删除，你仍可申请删除、退出家庭或注销账号。'});if(yes.confirm){await api('/me/privacy-consent','DELETE',{confirm:true});const token=storage.get('access_token');clearAccountStorage();storage.set('access_token',token);Taro.reLaunch({url:'/pages/privacy/index'});}})}>撤回同意</Button>}</View>

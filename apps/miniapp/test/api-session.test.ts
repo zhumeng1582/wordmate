@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
+import {validPendingReferral} from '../src/services/referral.ts';
 const require=createRequire(import.meta.url),ts=require('typescript');
 function client(loginImpl=async()=>({code:'wechat-code'})){
  const cache=new Map<string,any>(),requests:{resolve:(value:any)=>void;reject:(error:unknown)=>void;headers:any;url:string;data:any}[]=[],navigations:string[]=[],module={exports:{} as any};let route='';
  const taro={getStorageSync:(k:string)=>cache.get(k)||'',setStorageSync:(k:string,v:any)=>cache.set(k,v),clearStorageSync:()=>cache.clear(),removeStorageSync:(k:string)=>cache.delete(k),request:(r:any)=>new Promise((resolve,reject)=>requests.push({resolve,reject,headers:r.header,url:r.url,data:r.data})),login:loginImpl,getCurrentPages:()=>route?[{route}]:[],navigateTo:async(options:any)=>{navigations.push(options.url);}};
  const code=ts.transpileModule(readFileSync('apps/miniapp/src/services/api.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
- vm.runInNewContext(code,{module,exports:module.exports,require:(id:string)=>id==='@tarojs/taro'?taro:{finishPrivacyAuthorization(){}},API_BASE:'https://example.com/api',DEV_AUTH:false});
+ vm.runInNewContext(code,{module,exports:module.exports,require:(id:string)=>id==='@tarojs/taro'?taro:id==='./referral'?{validPendingReferral}:{finishPrivacyAuthorization(){}},API_BASE:'https://example.com/api',DEV_AUTH:false});
  return {api:module.exports.api,storage:module.exports.storage,clear:module.exports.clearAccountStorage,message:module.exports.message,login:module.exports.login,loginForDataManagement:module.exports.loginForDataManagement,setRoute:(next:string)=>{route=next;},cache,requests,navigations};
 }
 for(const statusCode of [200,401,500])test(`late ${statusCode} from old login cannot expose data or clear new account`,async()=>{
@@ -80,4 +81,8 @@ test('a failed avatar save never persists the selected image or nickname in requ
  const c=client();c.storage.set('access_token','parent');const body={avatar_base64:'private-avatar-bytes',display_name:'private-name',expected_version:1},pending=c.api('/me/profile','PUT',body,'profile-retry');
  assert.equal(c.requests[0].headers['Idempotency-Key'],'profile-retry');assert.doesNotMatch(JSON.stringify([...c.cache]),/private-avatar|private-name/);
  c.requests[0].reject({errMsg:'request:fail timeout'});await assert.rejects(pending,/NETWORK_TIMEOUT/);assert.doesNotMatch(JSON.stringify([...c.cache]),/private-avatar|private-name/);
+});
+for(const [capturedAt,expected] of [[Date.now(),'0123456789abcdef'],[Date.now()-8*86400000,undefined]] as const)test(`login ${expected?'sends a valid':'ignores an expired'} referral`,async()=>{
+ const c=client();c.storage.set('privacy_decision','current-policy');c.storage.set('pending_referral_code',{code:'0123456789abcdef',capturedAt});const pending=c.login();respond(c.requests[0],{hash:'current-policy',version:'v1',publishable:true});await tick();assert.equal(c.requests[1].data.invite_code,expected);
+ respond(c.requests[1],{access_token:'session',families:[],is_new_user:true,user:{id:'parent',avatar_path:null}});await tick();respond(c.requests[2],{accepted:true});await pending;assert.equal(c.storage.get('pending_referral_code'),'');
 });

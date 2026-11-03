@@ -8,7 +8,7 @@ import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts
 import type {Scheduler,Database} from '../src/ports.ts';
 const require=createRequire(import.meta.url);
 const {PGlite}=require(process.env.PGLITE_MODULE??'@electric-sql/pglite');
-test('new word groups combine a one-word tail with the preceding group',()=>{assert.equal(newWordsGroupSize(1),1);assert.equal(newWordsGroupSize(8),8);assert.equal(newWordsGroupSize(9),9);assert.equal(newWordsGroupSize(10),8);let remaining=17;const groups=[];while(remaining){const size=newWordsGroupSize(remaining);groups.push(size);remaining-=size;}assert.deepEqual(groups,[8,9]);});
+test('new word rounds use the daily goal and leave a smaller final round',()=>{assert.equal(newWordsGroupSize(0),0);assert.equal(newWordsGroupSize(1),1);assert.equal(newWordsGroupSize(10),10);assert.equal(newWordsGroupSize(200,500),100);assert.equal(newWordsGroupSize(12,5),5);let remaining=23;const groups=[];while(remaining){const size=newWordsGroupSize(remaining,10);groups.push(size);remaining-=size;}assert.deepEqual(groups,[10,10,3]);});
 test('resuming remaining new words through a manual session preserves daily counts and the original wrong answer',async()=>{
  const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(sql,params)=>pg.query(sql,params),transaction:fn=>pg.transaction((tx:any)=>fn({query:(sql,params)=>tx.query(sql,params)}))};

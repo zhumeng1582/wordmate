@@ -1,0 +1,168 @@
+// Generated from contracts/study-session.json; run node scripts/generate-contracts.cjs.
+export const studySessionSchema = {
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "scheduled"
+        },
+        "wordbook_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "review"
+        },
+        "wordbook_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "new_words"
+        },
+        "wordbook_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "favorites"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "calendar"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "scope": {
+          "enum": [
+            "studied",
+            "mistakes"
+          ]
+        },
+        "mistake_source": {
+          "enum": [
+            "review",
+            "monthly_quiz"
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "date"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "calendar"
+        },
+        "date_from": {
+          "type": "string",
+          "format": "date"
+        },
+        "date_to": {
+          "type": "string",
+          "format": "date"
+        },
+        "scope": {
+          "enum": [
+            "studied",
+            "mistakes"
+          ]
+        },
+        "mistake_source": {
+          "enum": [
+            "review",
+            "monthly_quiz"
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "date_from",
+        "date_to"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "manual"
+        },
+        "word_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minItems": 1,
+          "maxItems": 8000,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "source",
+        "word_ids"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "source": {
+          "const": "quiz"
+        },
+        "quiz_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "source",
+        "quiz_id"
+      ],
+      "additionalProperties": false
+    }
+  ]
+} as const;

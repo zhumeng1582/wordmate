@@ -89,7 +89,7 @@ COMMENT ON TABLE children IS '实际学习者；口音、目标、时区与进�
 
 CREATE TABLE wordbooks (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), child_id uuid NOT NULL REFERENCES children(id),
- name varchar(60) NOT NULL, created_by uuid REFERENCES users(id),
+ name varchar(60) NOT NULL, grade varchar(40) NOT NULL DEFAULT '', textbook varchar(40) NOT NULL DEFAULT '', category varchar(40) NOT NULL DEFAULT '', created_by uuid REFERENCES users(id),
  version integer NOT NULL DEFAULT 1 CHECK(version > 0), archived_at timestamptz,
  shared_source_id uuid, shared_source_version integer, read_only boolean NOT NULL DEFAULT false,
  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(id,child_id)
@@ -399,7 +399,7 @@ CREATE INDEX daily_words_by_month ON daily_word_activity(child_id,local_date,chi
 CREATE TABLE shared_wordbooks (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_wordbook_id uuid NOT NULL, source_child_id uuid NOT NULL,
  publisher_user_id uuid NOT NULL REFERENCES users(id), title varchar(60) NOT NULL,
- description varchar(300) NOT NULL DEFAULT '', target_level varchar(40) NOT NULL DEFAULT '',
+ description varchar(300) NOT NULL DEFAULT '', author varchar(60) NOT NULL DEFAULT '', grade varchar(40) NOT NULL DEFAULT '', textbook varchar(40) NOT NULL DEFAULT '', category varchar(40) NOT NULL DEFAULT '', target_level varchar(40) NOT NULL DEFAULT '',
  version integer NOT NULL DEFAULT 1 CHECK(version>0), published boolean NOT NULL DEFAULT false,
  word_count integer NOT NULL DEFAULT 0 CHECK(word_count>=0), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
  UNIQUE(source_wordbook_id), UNIQUE(id,source_child_id),
@@ -409,7 +409,7 @@ CREATE TABLE shared_wordbook_items (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), shared_wordbook_id uuid NOT NULL REFERENCES shared_wordbooks(id) ON DELETE CASCADE,
  ordinal integer NOT NULL CHECK(ordinal>0), lemma varchar(120) NOT NULL, normalized_lemma varchar(120) NOT NULL,
  part_of_speech varchar(24) NOT NULL, sense_key text NOT NULL, meaning_zh varchar(500) NOT NULL,
- ipa_gb text, ipa_us text, example_en text, example_zh text,
+ ipa_gb text, ipa_us text, example_en text, example_zh text, example_surface text, example_start_utf16 integer, example_end_utf16 integer,
  UNIQUE(shared_wordbook_id,ordinal), UNIQUE(shared_wordbook_id,normalized_lemma,part_of_speech,sense_key)
 );
 CREATE TABLE shared_wordbook_subscriptions (

@@ -26,17 +26,17 @@ test('a claimed invitation displays the applicant and requires an explicit appro
  await page.button('确认加入家庭').onClick();await tick();assert.match(page.text(page.render()),/一起陪学 · 2 位家长/);assert.doesNotMatch(page.text(page.render()),/等待你确认/);
 });
 test('a parent awaiting approval sees the application instead of a misleading create-family prompt',async()=>{
- const page=familyPage({families:[],applications:[{id:'invite-a',family_id:'family-b',family_name:'共学家庭',status:'claimed',expires_at:expires}]});await page.show();assert.match(page.text(page.render()),/已申请加入“共学家庭”/);assert.match(page.text(page.render()),/无需重复创建家庭/);assert.doesNotMatch(page.text(page.render()),/建立你们的家庭/);assert(page.all(page.render()).some(node=>node.props?.children==='设置头像与昵称 ›'));
+ const page=familyPage({families:[],applications:[{id:'invite-a',family_id:'family-b',family_name:'共学家庭',status:'claimed',expires_at:expires}]});await page.show();assert.match(page.text(page.render()),/已申请加入“共学家庭”/);assert.match(page.text(page.render()),/无需重复创建家庭/);assert.doesNotMatch(page.text(page.render()),/建立你们的家庭/);assert(page.button('设置头像与昵称'));
 });
 test('the home page focuses on learning and does not load or poll family details',async()=>{
- const page=pageHarness('pages/home/index',async path=>{if(path==='/me')return {families:[family],referral_code:'referral'};assert.equal(path,'/children/child-a/today');return {child:{nickname:'小明'},completed_words:0,goal:10,due_count:0,new_count:8,remaining_new_limit:8};});await page.show();
- const text=page.text(page.render());assert.match(text,/小明 · 今日学习/);assert.match(text,/学一组新词/);assert.match(text,/分享小程序给好友/);assert.doesNotMatch(text,/一起陪学|切换孩子|复习安排/);
+ const page=pageHarness('pages/home/index',async path=>{if(path==='/me')return {families:[family],referral_code:'referral'};assert.equal(path,'/children/child-a/today?wordbook_id=book-a');return {child:{nickname:'小明'},completed_words:0,goal:10,due_count:0,new_count:8,remaining_new_limit:8};});await page.show();
+ const text=page.text(page.render());assert.match(text,/今日学习小明/);assert.match(text,/学习新词/);assert.match(text,/分享小程序/);assert.doesNotMatch(text,/一起陪学|切换孩子|复习安排/);
  page.button('设置').onClick();assert.equal(page.routes.at(-1),'/pages/settings/index');
  const reads=page.calls.length;await page.poll();assert.equal(page.calls.length,reads);assert(page.calls.every(call=>!call.path.includes('/families/')));
 });
 test('settings keeps child switching with the family and opens the review instructions without login',async()=>{
  const page=pageHarness('pages/settings/index',async()=>({}),undefined,{cache:{access_token:'',child_id:''}});await page.show();
- assert.match(page.text(page.render()),/切换孩子、管理家长与邀请/);assert.equal(page.button('家庭与孩子').disabled,false);page.button('家庭与孩子').onClick();assert.equal(page.routes.at(-1),'/pages/family/index');
+ assert.match(page.text(page.render()),/家庭与 AI/);assert.match(page.text(page.render()),/家庭与孩子/);assert.equal(page.button('家庭与孩子').disabled,false);page.button('家庭与孩子').onClick();assert.equal(page.routes.at(-1),'/pages/family/index');
  page.button('应用说明').onClick();assert.equal(page.routes.at(-1),'/pages/help/index');
  const help=pageHarness('pages/help/index',async()=>{throw Error('Help must work offline');});await help.show();assert.match(help.text(help.render()),/复习安排.*首次作答.*巩固练习不会更改首次答题记录/);assert.equal(help.calls.length,0);
 });
