@@ -53,3 +53,7 @@
 .grade-pill{background:var(--accent-yellow);color:#765a17;font-weight:600}
 .quiz-page .quiz-option.option-correct,.quiz-page .quiz-option[disabled].option-correct{background:var(--success-bg);border-color:var(--success-border);color:var(--success-text)}
 .quiz-session-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 14px}.quiz-pause{width:auto;min-height:64px;margin:0;padding:8px 0;background:transparent;color:var(--primary);font-size:24px;line-height:1.5}.quiz-pause::after{border:0}.quiz-pause[disabled]{background:transparent;color:var(--disabled-text)}
+
+.quiz-sense-context{color:var(--muted);font-size:25px;margin:0 0 8px}.quiz-sense-example{color:var(--text);font-size:27px;line-height:1.6;margin:4px 0 16px;word-break:break-word}
+
+.quiz-inline-back{display:flex;align-items:center;gap:6px;width:auto;margin:0 0 12px;padding:8px 0}.quiz-inline-back .chevron{width:20px;height:20px}

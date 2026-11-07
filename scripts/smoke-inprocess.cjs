@@ -62,6 +62,17 @@ const {createApplication}=require('../apps/api/dist/main.js');
   {const catalogue=await ok(`/textbook-volumes?child_id=${emptyProfile.id}`);assert.equal(catalogue.items.length,4);const volume=catalogue.items[0];const joined=await ok(`/children/${emptyProfile.id}/textbook-volumes/${volume.id}/join`,{});assert.equal((await ok(`/children/${emptyProfile.id}/words?wordbook_id=${joined.id}`)).total,volume.word_count);assert.equal((await ok(`/textbook-volumes?child_id=${emptyProfile.id}`)).items[0].joined_book_id,joined.id);}
   const c=await ok(`/families/${f.id}/children`,{nickname:'测试',accent:'en-GB',school_grade:'小学一年级',gender:'boy'});
   assert.equal(c.school_grade,'小学一年级');assert.equal(c.gender,'boy');
+  {const route=`/children/${c.id}/poems`,body={title:'静夜思',author:'李白',dynasty:'唐',body:'床前明月光。',genre:'五言绝句',pinyin:'chuang qian',translation:'月光洒在床前',annotations:'疑：好像',background:'月夜',source:'教材',notes:'熟读'};
+   assert.equal((await request(route,{...body,unexpected:true})).status,422);
+   const poem=await ok(route,body),list=await ok(route);assert.equal(list.total,1);assert.equal(list.items[0].id,poem.id);
+   assert.equal((await ok(`${route}/${poem.id}`)).pinyin,'chuang qian');assert.equal((await ok(`${route}/${poem.id}`)).translation,'月光洒在床前');
+   const marked=await ok(`${route}/${poem.id}/memorization`,{memorized:true,expected_version:poem.version},undefined,'PUT');assert(marked.memorized_at);
+   assert.equal((await request(`${route}/${poem.id}/memorization`,{memorized:false,expected_version:poem.version},undefined,'PUT')).status,409);
+   const session=await ok(`${route}/${poem.id}/sessions`,{});assert.deepEqual(session.messages,[]);
+   assert.equal((await request(`${route}/${poem.id}/sessions/${session.id}/messages`,{request_id:'bad'})).status,422);
+   await ok(`${route}/${poem.id}`,{},undefined,'DELETE');assert.equal((await ok(route)).total,0);
+  }
+
   assert.equal((await ok(`/families/${f.id}/children`)).items.find(item=>item.id===c.id).school_grade,'小学一年级');
   const goal=await ok(`/children/${c.id}/learning-goal`);assert.equal(goal.daily_goal,10);
   const updatedGoal=await ok(`/children/${c.id}/learning-goal`,{daily_goal:20,expected_version:goal.version},undefined,'PUT');assert.equal(updatedGoal.today_goal,20);

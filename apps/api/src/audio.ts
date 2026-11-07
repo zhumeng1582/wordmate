@@ -36,7 +36,7 @@ export class AudioService {
   await this.a.child(q,actor,job.child_id);const current=await one(q,'SELECT * FROM generation_jobs WHERE id=$1 FOR UPDATE',[id]);
   await this.source(q,actor,current.payload.request);return current;
  }
- private async dto(q:Sql,j:Row){const asset=await one(q,'SELECT * FROM audio_assets WHERE id=$1',[j.payload.audio_id]);return {job_id:j.id,status:j.status,attempts:j.attempts,retryable:j.status==='failed'&&j.attempts<j.max_attempts,error_code:j.error_code,poll_after_ms:2000,audio_id:asset.id,resource_path:j.status==='succeeded'?`/audio/${asset.id}/content`:null};}
+ private async dto(q:Sql,j:Row){const asset=await one(q,'SELECT * FROM audio_assets WHERE id=$1',[j.payload.audio_id]);return {job_id:j.id,status:j.status,attempts:j.attempts,retryable:j.status==='failed'&&j.attempts<j.max_attempts&&j.error_code!=='AUDIO_REPAIR_RECOVERY_REQUIRED',error_code:j.error_code,poll_after_ms:2000,audio_id:asset.id,resource_path:j.status==='succeeded'?`/audio/${asset.id}/content`:null};}
  async create(actor:string,key:string,b:any){return this.a.write(actor,key,'audio:create',b,q=>this.source(q,actor,b),async(q,s)=>{
   const runtime=this.runtime;ensure(runtime,503,'AUDIO_NOT_CONFIGURED');
   ensure(['en-GB','en-US'].includes(b.accent)&&typeof b.voice_id==='string'&&Number.isFinite(b.speech_rate)&&b.speech_rate>=0.5&&b.speech_rate<=1.5,422,'INVALID_SPEECH_REQUEST');
@@ -51,9 +51,30 @@ export class AudioService {
  });}
  async get(actor:string,id:string){return this.a.tx(async q=>this.dto(q,await this.scope(q,actor,id)));}
  async retry(actor:string,key:string,id:string){return this.a.write(actor,key,`audio:retry:${id}`,{},q=>this.scope(q,actor,id),async(q,j)=>{
-  ensure(j.status==='failed'&&j.attempts<j.max_attempts,409,'AUDIO_NOT_RETRYABLE');
+  ensure(j.status==='failed'&&j.attempts<j.max_attempts&&j.error_code!=='AUDIO_REPAIR_RECOVERY_REQUIRED',409,'AUDIO_NOT_RETRYABLE');
   await q.query("UPDATE audio_assets SET status='queued',error_code=NULL WHERE id=$1",[j.payload.audio_id]);
   return this.dto(q,await one(q,"UPDATE generation_jobs SET status='queued',requested_by=$3,error_code=NULL,run_after=$2,updated_at=$2 WHERE id=$1 RETURNING *",[id,this.a.now(),actor]));
+ });}
+ async reportPronunciation(actor:string,key:string,id:string){return this.a.write(actor,key,`audio:feedback:${id}`,{},async q=>{
+  const asset=await one(q,'SELECT * FROM audio_assets WHERE id=$1',[uuid(id)]);ensure(asset,404,'AUDIO_RESOURCE_NOT_FOUND');
+  await this.source(q,actor,{word_id:asset.child_word_id,sentence_id:asset.sentence_id,content_version:asset.content_version});ensure(asset.status==='succeeded',409,'AUDIO_NOT_READY');return asset;
+ },async(q,asset)=>{
+  const existing=await one(q,'SELECT id FROM audio_feedback WHERE audio_id=$1 AND created_by=$2',[asset.id,actor]);if(existing)return {id:existing.id,already_reported:true};
+  const count=await one(q,"SELECT count(*)::int n FROM audio_feedback WHERE created_by=$1 AND created_at>now()-interval '24 hours'",[actor]);ensure(count.n<100,429,'AUDIO_FEEDBACK_LIMIT');
+  const row=await one(q,'INSERT INTO audio_feedback(child_id,audio_id,created_by) VALUES($1,$2,$3) ON CONFLICT(audio_id,created_by) DO UPDATE SET audio_id=excluded.audio_id RETURNING id',[asset.child_id,asset.id,actor]);return {id:row.id,already_reported:false};
+ });}
+ async reportWord(actor:string,key:string,id:string,b:any){return this.a.write(actor,key,`word:feedback:${id}`,b,async q=>{
+  ensure(['pronunciation','spelling','translation','example','example_pronunciation'].includes(b.kind),422,'INVALID_REQUEST_BODY');
+  const word=await this.source(q,actor,{word_id:id,content_version:b.word_version});
+  const needsSentence=['example','example_pronunciation'].includes(b.kind);
+  ensure(needsSentence===!!b.sentence_id&&needsSentence===!!b.sentence_version,422,'INVALID_REQUEST_BODY');
+  if(needsSentence){const sentence=await this.source(q,actor,{sentence_id:b.sentence_id,content_version:b.sentence_version});ensure(sentence.child===word.child&&await one(q,'SELECT 1 FROM sentence_targets WHERE sentence_id=$1 AND child_word_id=$2 AND child_id=$3',[b.sentence_id,id,word.child]),404,'AUDIO_RESOURCE_NOT_FOUND');}
+  if(b.audio_id){ensure(['pronunciation','example_pronunciation'].includes(b.kind),422,'INVALID_REQUEST_BODY');const asset=await one(q,'SELECT * FROM audio_assets WHERE id=$1 AND child_id=$2 AND status=$3',[uuid(b.audio_id),word.child,'succeeded']);ensure(asset&&(b.kind==='pronunciation'?asset.child_word_id===id&&asset.content_version===b.word_version:asset.sentence_id===b.sentence_id&&asset.content_version===b.sentence_version),422,'AUDIO_RESOURCE_NOT_FOUND');}
+  return word;
+ },async(q,word)=>{
+  const existing=await one(q,'SELECT id FROM word_feedback WHERE child_id=$1 AND child_word_id=$2 AND word_version=$3 AND kind=$4 AND sentence_id IS NOT DISTINCT FROM $5::uuid AND sentence_version IS NOT DISTINCT FROM $6::integer AND audio_id IS NOT DISTINCT FROM $7::uuid AND created_by=$8',[word.child,id,b.word_version,b.kind,b.sentence_id??null,b.sentence_version??null,b.audio_id??null,actor]);if(existing)return {id:existing.id,already_reported:true};
+  const count=await one(q,"SELECT count(*)::int n FROM word_feedback WHERE created_by=$1 AND created_at>now()-interval '24 hours'",[actor]);ensure(count.n<100,429,'AUDIO_FEEDBACK_LIMIT');
+  const row=await one(q,'INSERT INTO word_feedback(child_id,child_word_id,word_version,sentence_id,sentence_version,kind,audio_id,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',[word.child,id,b.word_version,b.sentence_id??null,b.sentence_version??null,b.kind,b.audio_id??null,actor]);return {id:row.id,already_reported:false};
  });}
  async content(actor:string,id:string){
   const asset=await this.a.tx(async q=>{const r=await one(q,'SELECT * FROM audio_assets WHERE id=$1',[uuid(id)]);ensure(r,404,'AUDIO_RESOURCE_NOT_FOUND');await this.source(q,actor,{word_id:r.child_word_id,sentence_id:r.sentence_id,content_version:r.content_version});ensure(r.status==='succeeded',409,'AUDIO_NOT_READY');return r;});
@@ -72,8 +93,11 @@ export class AudioService {
   if(!job||job.status!=='succeeded')return;
   const current=await one(q,'SELECT * FROM audio_assets WHERE id=$1 FOR UPDATE',[asset.id]);
   if(current.storage_key!==asset.storage_key||current.storage_profile_id!==asset.storage_profile_id)return;
-  await q.query("UPDATE audio_assets SET status='failed',error_code='AUDIO_OBJECT_MISSING' WHERE id=$1",[asset.id]);
-  await q.query("UPDATE generation_jobs SET status='failed',error_code='AUDIO_OBJECT_MISSING',updated_at=$2 WHERE id=$1",[job.id,this.a.now()]);
+  const repairsTable=await one(q,"SELECT to_regclass('wordmate.admin_audio_repairs') present");
+  const repaired=repairsTable?.present&&await one(q,"SELECT 1 FROM admin_audio_repairs WHERE audio_id=$1 AND status='applied' LIMIT 1",[asset.id]);
+  const code=repaired?'AUDIO_REPAIR_RECOVERY_REQUIRED':'AUDIO_OBJECT_MISSING';
+  await q.query("UPDATE audio_assets SET status='failed',error_code=$2 WHERE id=$1",[asset.id,code]);
+  await q.query("UPDATE generation_jobs SET status='failed',error_code=$3,updated_at=$2 WHERE id=$1",[job.id,this.a.now(),code]);
  });}
  private spool(j:Row){return join(this.runtime!.spoolDir,`${j.id}-${j.payload.spool_attempt??j.attempts}.mp3`);}
  private async cachedSpool(j:Row){if(!j.payload.spool_sha)return null;try{const file=this.spool(j);if((await stat(file)).size>10*1024*1024)return null;const bytes=await readFile(file);return mp3(bytes)&&hash(bytes)===j.payload.spool_sha?bytes:null;}catch{return null;}}

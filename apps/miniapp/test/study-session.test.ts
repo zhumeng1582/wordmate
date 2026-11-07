@@ -55,6 +55,12 @@ test('explicit pause releases the lease and resumes the same learning position',
  const f=fixture(),study=f.make();await study.begin();study.learn(1);study.learn(1);study.learn(1);const expected=flow.studyCard(study.state.flow)!.id;assert.equal(await study.pause(),true);study.dispose();
  const resumed=f.make();await resumed.begin();assert.equal(resumed.state.flow.phase,'learn');assert.equal(flow.studyCard(resumed.state.flow)!.id,expected);const creates=f.calls.filter(call=>call.path.endsWith('/study-sessions'));assert.equal(creates[1].body.source,'manual');assert.equal(creates[1].body.word_ids.length,8);
 });
+test('leaving the page releases the session and keeps the learning position',async()=>{
+ const f=fixture(),study=f.make();await study.begin();study.learn(1);const expected=flow.studyCard(study.state.flow)!.id;study.leave();await tick();await tick();assert(f.calls.some(call=>call.path.endsWith('/end')));assert.equal(f.storage.get(f.keys.resume).sessionClosed,true);const resumed=f.make();await resumed.begin();assert.equal(flow.studyCard(resumed.state.flow)!.id,expected);
+});
+test('leaving while an answer is saving waits for it before releasing the session',async()=>{
+ const f=fixture(3);let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);f.intercept(async()=>gate);const study=f.make({source:'review'});await study.begin();const answer=study.answer(flow.studyCard(study.state.flow)!.meaning_zh);await tick();study.leave();assert.equal(f.calls.filter(call=>call.path.endsWith('/end')).length,0);release();await answer;await tick();await tick();assert.equal(f.accepted.length,1);assert.equal(f.storage.get(f.keys.resume).sessionClosed,true);assert.equal(f.storage.get(f.keys.pending),'');
+});
 test('backgrounding does not end a session; expiry restores only the unanswered words',async()=>{
  const f=fixture(3),study=f.make({source:'review'});await study.begin();await study.answer(flow.studyCard(study.state.flow)!.meaning_zh);study.advance();const expected=flow.studyCard(study.state.flow)!.id;
  study.hide();assert.equal(f.calls.filter(call=>call.path.endsWith('/end')).length,0);f.advanceClock(121000);await study.resume();assert.equal(flow.studyCard(study.state.flow)!.id,expected);assert.equal(flow.studyCounts(study.state.flow).done,1);assert.equal(study.state.flow.total,3);const lastCreate=f.calls.filter(call=>call.path.endsWith('/study-sessions')).at(-1)!;assert.equal(lastCreate.body.word_ids.length,2);assert.equal(f.accepted.length,1);

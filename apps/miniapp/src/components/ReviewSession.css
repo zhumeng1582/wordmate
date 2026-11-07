@@ -30,3 +30,12 @@
 .study-summary-stats{gap:48px}
 .study-choice.is-correct,.study-choice.is-correct[disabled]{background:var(--success-bg);border-color:var(--success-border);color:var(--success-text)}
 .study-choice.is-correct .study-choice-mark,.study-answer-feedback.is-correct{color:var(--success-text)}
+.study-learning-card{flex:none;justify-content:flex-start;min-height:0;max-height:none;margin:0;gap:18px;padding:28px 30px}
+.study-learning-card .study-headword{padding-top:0}
+.study-learn-actions .study-learn-previous,.study-learn-actions .study-learn-next{flex:1 1 0;width:0;min-width:0}
+.study-word-card,.study-self-check{min-height:0}
+.study-self-check{justify-content:flex-start}
+
+.study-word-card{position:relative}.study-word-card>.word-feedback-button{position:absolute;top:16px;right:16px;z-index:1}.study-word-card .study-word-row{padding-right:96px}
+
+.study-toolbar-action{gap:8px;color:var(--primary)}.study-toolbar-action .chevron{flex:none;width:20px;height:20px}

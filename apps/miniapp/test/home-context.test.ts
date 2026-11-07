@@ -13,7 +13,7 @@ test('home restores the existing child after login before showing any setup prom
  },undefined,{cache:{family_id:'',child_id:''}});
  assert.match(page.text(page.render()),/正在加载/);assert.doesNotMatch(page.text(page.render()),/添加孩子档案/);
  await page.show();assert.match(page.text(page.render()),/正在加载/);kids.resolve({items:[{id:'child-a',nickname:'豆芽'}]});await tick();
- assert.equal(page.cache.get('family_id'),'family-a');assert.equal(page.cache.get('child_id'),'child-a');assert.match(page.text(page.render()),/今日学习豆芽/);assert.doesNotMatch(page.text(page.render()),/添加孩子档案|正在加载/);
+ assert.equal(page.cache.get('family_id'),'family-a');assert.equal(page.cache.get('child_id'),'child-a');assert.match(page.text(page.render()),/豆芽，今天一起学/);assert.doesNotMatch(page.text(page.render()),/添加孩子档案|正在加载/);
 });
 
 test('home only shows the child setup prompt after confirming the family has no children',async()=>{
@@ -23,7 +23,7 @@ test('home only shows the child setup prompt after confirming the family has no 
   return today;
  },undefined,{cache:{child_id:''}});
  await page.show();assert.match(page.text(page.render()),/添加孩子档案/);assert.equal(page.cache.get('child_id'),'');
- hasChild=true;page.hide();await page.show();assert.match(page.text(page.render()),/今日学习豆芽/);assert.equal(page.cache.get('child_id'),'child-a');
+ hasChild=true;page.hide();await page.show();assert.match(page.text(page.render()),/豆芽，今天一起学/);assert.equal(page.cache.get('child_id'),'child-a');
 });
 
 test('failed child lookup offers retry instead of claiming there are no children',async()=>{
@@ -33,7 +33,7 @@ test('failed child lookup offers retry instead of claiming there are no children
   return today;
  },undefined,{cache:{child_id:''}});
  await page.show();assert.match(page.text(page.render()),/暂时无法加载学习进度/);assert.doesNotMatch(page.text(page.render()),/添加孩子档案/);
- fail=false;await page.button('重新加载').onClick();await tick();assert.match(page.text(page.render()),/今日学习豆芽/);
+ fail=false;await page.button('重新加载').onClick();await tick();assert.match(page.text(page.render()),/豆芽，今天一起学/);
 });
 
 test('home replaces an archived cached child with the existing child from the current family',async()=>{
@@ -43,7 +43,7 @@ test('home replaces an archived cached child with the existing child from the cu
   if(path.endsWith('/children'))return {items:[{id:'child-a'}]};
   assert.equal(path,'/children/child-a/today?wordbook_id=book-a');return today;
  },undefined,{cache:{child_id:'removed'}});
- await page.show();assert.equal(page.cache.get('child_id'),'child-a');assert.match(page.text(page.render()),/今日学习豆芽/);
+ await page.show();assert.equal(page.cache.get('child_id'),'child-a');assert.match(page.text(page.render()),/豆芽，今天一起学/);
 });
 
 test('home preserves the selected child and avoids fetching the child list on ordinary returns',async()=>{
@@ -61,13 +61,19 @@ test('late child discovery cannot change another account or a more recent child 
 });
 test('returning home after a wordbook change reloads its counts and launches that book',async()=>{
  const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[family]}:path.includes('/words?')?(path.includes('wordbook_id=book-b')?{learned_count:4,book_total:25}:{learned_count:104,book_total:163}):{...today,wordbook:path.includes('wordbook_id=book-b')?{id:'book-b',name:'一年级下册'}:{id:'book-a',name:'一年级上册'},new_count:path.includes('wordbook_id=book-b')?3:20,new_group_size:path.includes('wordbook_id=book-b')?3:10});
- await page.show();await tick();assert.match(page.text(page.render()),/再学 10 词/);assert.match(page.text(page.render()),/一年级上册/);assert.match(page.text(page.render()),/已学 104 词 · 共 163 词/);
- page.hide();page.cache.set('current_wordbook:child-a','book-b');await page.show();await tick();assert.match(page.text(page.render()),/再学 3 词/);assert.match(page.text(page.render()),/一年级下册/);assert.match(page.text(page.render()),/已学 4 词 · 共 25 词/);assert.doesNotMatch(page.text(page.render()),/一年级上册|104 词/);
- assert.match(page.text(page.render()),/今日累计/);assert.equal(page.all(page.render()).filter(n=>n.type==='Button'&&n.props?.className==='home-current-book').length,1);assert(!page.all(page.render()).some(n=>n.type==='Button'&&n.props?.className==='home-shortcut'&&page.text(n)==='单词本'));page.button('当前词本').onClick();assert(page.routes.includes('/pages/words/index'));page.button('按日期复习').onClick();assert(page.routes.includes('/pages/calendar/index'));
+ await page.show();await tick();assert.match(page.text(page.render()),/再学 10 词/);assert.match(page.text(page.render()),/一年级上册/);assert.match(page.text(page.render()),/已学 104 · 共 163/);
+ page.hide();page.cache.set('current_wordbook:child-a','book-b');await page.show();await tick();assert.match(page.text(page.render()),/再学 3 词/);assert.match(page.text(page.render()),/一年级下册/);assert.match(page.text(page.render()),/已学 4 · 共 25/);assert.doesNotMatch(page.text(page.render()),/一年级上册|104 词/);
+ assert.match(page.text(page.render()),/今日累计/);assert.equal(page.all(page.render()).filter(n=>n.type==='Button'&&n.props?.className==='home-current-book').length,1);assert(!page.all(page.render()).some(n=>n.type==='Button'&&n.props?.className==='home-shortcut'&&page.text(n)==='单词本'));page.button('英语单词').onClick();assert(page.routes.includes('/pages/words/index'));assert(page.all(page.render()).some(n=>n.type==='CheckinStatus'));
  page.button('学习新词').onClick();assert.equal(page.cache.get('review_source').wordbook_id,'book-b');
 });
 
 test('late wordbook statistics cannot overwrite the newly selected book',async()=>{
  const oldStats=deferred(),page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[family]}:path.includes('/words?')?(path.includes('book-b')?{learned_count:3,book_total:9}:oldStats.promise):{...today,wordbook:{name:path.includes('book-b')?'新词本':'旧词本'}});
- await page.show();page.hide();page.cache.set('current_wordbook:child-a','book-b');await page.show();await tick();oldStats.resolve({learned_count:80,book_total:100});await tick();assert.match(page.text(page.render()),/已学 3 词 · 共 9 词/);assert.doesNotMatch(page.text(page.render()),/80 词/);
+ await page.show();page.hide();page.cache.set('current_wordbook:child-a','book-b');await page.show();await tick();oldStats.resolve({learned_count:80,book_total:100});await tick();assert.match(page.text(page.render()),/已学 3 · 共 9/);assert.doesNotMatch(page.text(page.render()),/80 词/);
 });
+test('home keeps the student name in the title and learning and check-in in the English card',async()=>{
+ const load=async(path:string)=>path==='/me'?{families:[family]}:path.endsWith('/poems')?{items:[],total:3}:path.includes('/words?')?{learned_count:0,book_total:0}:today;
+ const page=pageHarness('pages/home/index',load);await page.show();await tick();const tree=page.render(),card=page.all(tree).find(n=>n.props?.className==='card home-progress-card');assert.match(page.text(tree),/豆芽，今天一起学/);assert.match(page.text(card),/英语单词/);assert(!page.text(card).includes('豆芽'));assert(page.all(card).some(n=>n.type==='CheckinStatus'));page.button('古诗词').onClick();assert.equal(page.routes.at(-1),'/pages/poems/index');page.dispose();
+});
+
+test('home shows the total number of memorized poems, including beyond the first page',async()=>{const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[family]}:path.endsWith('/poems')?{items:[],total:120,memorized_count:75}:path.includes('/words?')?{learned_count:0,book_total:0}:today);await page.show();await tick();assert.match(page.text(page.render()),/已背诵 75 首 · 共 120 首/);page.dispose();});

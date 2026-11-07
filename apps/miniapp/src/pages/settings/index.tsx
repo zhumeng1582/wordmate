@@ -13,7 +13,7 @@ const sections=[
  {title:'家庭与 AI',entries:[
   {page:'family',title:'家庭与孩子',description:'家庭成员和孩子档案',needsChild:false},
   {page:'ai-settings',title:'AI 助手',description:'AI 服务与使用额度',needsChild:false},
-  {page:'word-tutor',title:'单词聊天记录',description:'查看与小老师的对话',needsChild:true}
+  {page:'word-tutor',title:'AI 学童聊天记录',description:'查看单词和诗词的对话',needsChild:true}
  ]},
  {title:'其他',entries:[
   {page:'help',title:'应用说明',description:'使用帮助',needsChild:false},

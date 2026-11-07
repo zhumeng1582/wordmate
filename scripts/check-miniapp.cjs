@@ -1,6 +1,12 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../apps/miniapp/dist');
+const release=JSON.parse(fs.readFileSync(path.join(root,'release-info.json'),'utf8'));
+const codeFiles=fs.readdirSync(root,{recursive:true}).filter(file=>file.endsWith('.js')&&fs.statSync(path.join(root,file)).isFile());
+const code=codeFiles.map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n');
+assert(code.includes(release.api_base),'release API address is missing from compiled code');
+assert(!/https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/|["'`])/i.test(code),'release contains a local API address');
+assert(!code.includes('/auth/dev'),'release contains development authentication');
 const app=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8'));
 const project=JSON.parse(fs.readFileSync(path.join(root,'project.config.json'),'utf8'));
 assert.equal(project.appid,'wxcf7d28bc513949d4');

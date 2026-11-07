@@ -26,3 +26,13 @@ test('speech failure releases reservation without creating playable audio',async
   await assert.rejects(service.create(f.dad,message.id,'en-GB','voice'),{code:'TUTOR_AUDIO_FAILED'});const wallet=await f.accounts.overview(f.dad);assert.equal(wallet.balance_micros,20000000);assert.equal(wallet.frozen_micros,0);
  }finally{await f.close();}
 });
+test('lesson example audio speaks only the English example and uses a separate cache',async()=>{
+ const f=await fixture();try{
+  await f.pg.exec(readFileSync('apps/api/migrations/028_word_tutor.sql','utf8'));
+  const s=(await f.pg.query("INSERT INTO wordmate.word_tutor_sessions(child_id,sense_key,lemma,part_of_speech,meaning_zh) VALUES($1,$2,'cat','noun','猫') RETURNING id",[f.child.id,'c'.repeat(64)])).rows[0];
+  const m=(await f.pg.query("INSERT INTO wordmate.word_tutor_messages(session_id,role,content) VALUES($1,'assistant',$2) RETURNING id",[s.id,'【一句话理解】\n猫\n\n【这样用】\n小动物\n\n【看例句】\nI see a cat.\n我看见一只猫。\n\n【你来试试】\n猫怎么说？'])).rows[0];
+  const texts:string[]=[];const service=new TutorSpeech({tx:f.tx,child:(q:any,actor:string,id:string)=>f.core.tutorChild(q,actor,id)},{profile:{model:'cosyvoice-v3-flash'},voices:[{id:'voice',accent:'en-GB'}],pricePer10000Characters:'1',synthesize:async(r:any)=>{texts.push(r.text);return {bytes:Buffer.from('ID3audio')};}});
+  const first=await service.create(f.dad,m.id,'en-GB','voice','example');const again=await service.create(f.dad,m.id,'en-GB','voice','example');assert.equal(first.id,again.id);assert.deepEqual(texts,['I see a cat.']);
+  await service.create(f.dad,m.id,'en-GB','voice');assert.equal(texts.length,2);assert.match(texts[1],/【一句话理解】/);
+ }finally{await f.close();}
+});

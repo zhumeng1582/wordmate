@@ -1,0 +1,120 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {randomUUID} from 'node:crypto';
+import {fixture,response} from './ai-fixture.ts';
+test('poems belong to a child, use version checks and never alter word check-ins',async()=>{
+ const f=await fixture();try{await f.pg.exec(readFileSync('apps/api/migrations/028_word_tutor.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/034_poems.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/035_poem_fields.sql','utf8'));
+  const b={title:'静夜思',author:'李白',dynasty:'唐',body:'床前明月光，\n疑是地上霜。',genre:'五言绝句',pinyin:'chuang qian',translation:'月光洒在床前',annotations:'疑：好像',background:'月夜',source:'教材',notes:'重点背诵'};
+  const p=await f.core.poems.create(f.dad,'create-poem',f.child.id,b);assert.equal((await f.core.poems.create(f.dad,'create-poem',f.child.id,b)).id,p.id);
+  assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).total,1);const detail=await f.core.poems.get(f.dad,f.child.id,p.id);assert.equal(detail.pinyin,'chuang qian');assert.equal(detail.translation,'月光洒在床前');assert.equal(detail.genre,'五言绝句');await assert.rejects(f.core.poems.get(f.mom,f.child.id,p.id),{code:'FAMILY_NOT_FOUND'});
+  const marked=await f.core.poems.mark(f.dad,f.child.id,p.id,{memorized:true,expected_version:p.version});assert.ok(marked.memorized_at);assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).memorized_count,1);
+  await assert.rejects(f.core.poems.mark(f.dad,f.child.id,p.id,{memorized:false,expected_version:p.version}),{code:'POEM_CHANGED'});
+  const changed=await f.core.poems.update(f.dad,f.child.id,p.id,{...b,body:'举头望明月。',expected_version:marked.version,reset_memorized:true});assert.equal(changed.memorized_at,null);assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).memorized_count,0);
+  assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.daily_activity')).rows[0].n,0);
+  await f.core.poems.delete(f.dad,f.child.id,p.id);assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).total,0);
+ }finally{await f.close();}
+});
+test('poem tutor uses the poem snapshot, persists dialogue and settles once',async()=>{
+ let calls=0;const f=await fixture(async()=>{calls++;return response(calls===1?{annotations:'疑：好像',translation:'月光洒在床前。'}:{answer:'月光照在床前。'});});try{
+  await f.pg.exec(readFileSync('apps/api/migrations/028_word_tutor.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/034_poems.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/035_poem_fields.sql','utf8'));const b={title:'静夜思',author:'李白',dynasty:'唐',body:'床前明月光。'};
+  const p=await f.core.poems.create(f.dad,'p',f.child.id,b),s=await f.core.poems.open(f.dad,f.child.id,p.id),id=randomUUID();
+  const answer=await f.core.poems.answer(f.dad,f.child.id,p.id,s.id,id);assert.equal(answer.messages.length,1);assert.match(answer.messages[0].content,/注释：[\s\S]*译文：/);await f.core.poems.answer(f.dad,f.child.id,p.id,s.id,id);assert.equal(calls,1);
+  const next=await f.core.poems.answer(f.dad,f.child.id,p.id,s.id,randomUUID(),'什么意思？');assert.equal(next.messages.length,3);
+  const history=await f.core.poems.listSessions(f.dad,f.child.id);assert.equal(history.items.length,1);assert.equal(history.items[0].id,s.id);assert.equal(history.items[0].last_message,'月光照在床前。');assert.equal((await f.core.poems.getSession(f.dad,f.child.id,p.id,s.id)).messages.length,3);await assert.rejects(f.core.poems.listSessions(f.mom,f.child.id),{code:'FAMILY_NOT_FOUND'});await assert.rejects(f.core.poems.getSession(f.mom,f.child.id,p.id,s.id),{code:'FAMILY_NOT_FOUND'});
+  await assert.rejects(f.core.poems.open(f.mom,f.child.id,p.id),{code:'FAMILY_NOT_FOUND'});
+  await f.core.poems.update(f.dad,f.child.id,p.id,{...b,body:'举头望明月。',expected_version:p.version});const newer=await f.core.poems.open(f.dad,f.child.id,p.id);assert.notEqual(newer.id,s.id);assert.equal((await f.core.poems.getSession(f.dad,f.child.id,p.id,s.id)).body,b.body);
+  await f.core.poems.delete(f.dad,f.child.id,p.id);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.poem_messages')).rows[0].n,0);
+ }finally{await f.close();}
+});
+
+test('poem narration is private, cached and billed once',async()=>{
+ const f=await fixture();let calls=0;const spoken:string[]=[];try{
+  await f.pg.exec(readFileSync('apps/api/migrations/028_word_tutor.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/034_poems.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/035_poem_fields.sql','utf8'));
+  const p=await f.core.poems.create(f.dad,'poem-audio',f.child.id,{title:'春晓',dynasty:'唐',author:'孟浩然',body:'春眠不觉晓。'});
+  const {Poems}=createRequire(import.meta.url)('../dist/poems.js');const runtime={profile:{model:'cosyvoice-v3-flash'},voices:[{id:'voice',accent:'en-GB'}],pricePer10000Characters:'1',synthesize:async(r:any)=>{calls++;spoken.push(r.text);assert.deepEqual(r.languageHints,['zh']);assert.equal(r.voiceId,'longxiaochun_v3');assert.equal(r.accent,'zh-CN');return {bytes:Buffer.from('ID3audio')};}};
+  const service=new Poems({tx:f.tx,child:(q:any,a:string,id:string)=>f.core.tutorChild(q,a,id)},f.accounts,runtime);
+  await assert.rejects(service.audio(f.mom,f.child.id,p.id),{code:'FAMILY_NOT_FOUND'});
+  const a=await service.audio(f.dad,f.child.id,p.id),b=await service.audio(f.dad,f.child.id,p.id);assert.equal(a.id,b.id);assert.equal(calls,1);assert.equal(spoken[0],'春晓。\n唐，孟浩然。\n春眠不觉晓。');assert.equal((await service.audioContent(f.dad,f.child.id,p.id,a.id)).toString(),'ID3audio');
+  await assert.rejects(service.audioContent(f.mom,f.child.id,p.id,a.id),{code:'FAMILY_NOT_FOUND'});assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);
+  const edited=await f.core.poems.update(f.dad,f.child.id,p.id,{author:'新作者',expected_version:p.version});await assert.rejects(service.audioContent(f.dad,f.child.id,p.id,a.id),{code:'AUDIO_RESOURCE_NOT_FOUND'});const updatedAudio=await service.audio(f.dad,f.child.id,p.id);assert.notEqual(updatedAudio.id,a.id);assert.equal(spoken[1],'春晓。\n唐，新作者。\n春眠不觉晓。');await f.core.poems.update(f.dad,f.child.id,p.id,{body:'处处闻啼鸟。',expected_version:edited.version});await assert.rejects(service.audioContent(f.dad,f.child.id,p.id,updatedAudio.id),{code:'AUDIO_RESOURCE_NOT_FOUND'});
+  await f.core.poems.delete(f.dad,f.child.id,p.id);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.poem_audio')).rows[0].n,0);
+ }finally{await f.close();}
+});
+test('failed narration releases reservation and can be retried',async()=>{
+ const f=await fixture();let calls=0;try{
+  await f.pg.exec(readFileSync('apps/api/migrations/028_word_tutor.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/034_poems.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/035_poem_fields.sql','utf8'));
+  const p=await f.core.poems.create(f.dad,'audio-fail',f.child.id,{title:'春晓',body:'春眠不觉晓。'});const {Poems}=createRequire(import.meta.url)('../dist/poems.js');
+  const service=new Poems({tx:f.tx,child:(q:any,a:string,id:string)=>f.core.tutorChild(q,a,id)},f.accounts,{profile:{model:'cosyvoice-v3-flash'},voices:[{id:'voice',accent:'en-GB'}],pricePer10000Characters:'1',synthesize:async()=>{if(!calls++)throw Error('unavailable');return {bytes:Buffer.from('ID3audio')};}});
+  await assert.rejects(service.audio(f.dad,f.child.id,p.id),{code:'TUTOR_AUDIO_FAILED'});assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);
+  await service.audio(f.dad,f.child.id,p.id);assert.equal(calls,2);assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);
+ }finally{await f.close();}
+});
+test('poem photo extraction uses family vision billing and replays cached transcription',async()=>{
+ let calls=0;const f=await fixture(async()=>{calls++;return new Response(JSON.stringify({id:'mock',choices:[{finish_reason:'stop',message:{content:'静夜思\n作者：李白\n正文：床前明月光。'}}],usage:{prompt_tokens:100,completion_tokens:20,prompt_tokens_details:{cached_tokens:0}}}),{status:200});});try{
+  const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS9sAAAAASUVORK5CYII=','base64').toString('base64');const body={name:'page.png',base64:image,purpose:'poem'};
+  const first=await f.core.imports.extract(f.dad,f.child.id,body),again=await f.core.imports.extract(f.dad,f.child.id,body);assert.match(first.text,/静夜思/);assert.equal(first.text,again.text);assert.equal(calls,1);assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);await assert.rejects(f.core.imports.extract(f.mom,f.child.id,body),{code:'FAMILY_NOT_FOUND'});
+ }finally{await f.close();}
+});
+test('AI poem import parses arbitrary text, uses family billing and replays the same request',async()=>{
+ const item={title:'静夜思',author:'李白',dynasty:'唐',body:'床前明月光。'};let calls=0;const f=await fixture(async()=>{calls++;return response({items:[item],incomplete:false,overflow:false});});try{
+  await f.pg.exec(readFileSync('apps/api/migrations/028_word_tutor.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/036_poem_import_ai.sql','utf8'));
+  const id=randomUUID(),first=await f.core.poems.analyzeImport(f.dad,f.child.id,id,'李白的静夜思：床前明月光。');assert.equal(first.items[0].title,'静夜思');assert.deepEqual(await f.core.poems.analyzeImport(f.dad,f.child.id,id,'李白的静夜思：床前明月光。'),first);assert.equal(calls,1);assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);await assert.rejects(f.core.poems.analyzeImport(f.dad,f.child.id,id,'不同文本'),{code:'IDEMPOTENCY_CONFLICT'});await assert.rejects(f.core.poems.analyzeImport(f.mom,f.child.id,randomUUID(),'静夜思'),{code:'FAMILY_NOT_FOUND'});
+ }finally{await f.close();}
+});
+test('an incomplete AI response releases the reservation and records a failed attempt',async()=>{
+ const f=await fixture(async()=>new Response(JSON.stringify({id:'mock',choices:[{finish_reason:'length',message:{content:''}}],usage:{prompt_tokens:50,completion_tokens:20,prompt_tokens_details:{cached_tokens:0}}}),{status:200}));try{
+  await f.pg.exec(readFileSync('apps/api/migrations/028_word_tutor.sql','utf8'));await f.pg.exec(readFileSync('apps/api/migrations/036_poem_import_ai.sql','utf8'));const id=randomUUID();await assert.rejects(f.core.poems.analyzeImport(f.dad,f.child.id,id,'未完整的诗词资料'),{code:'INCOMPLETE_GENERATION'});assert.equal((await f.accounts.overview(f.dad)).frozen_micros,0);assert.equal((await f.pg.query('SELECT status FROM wordmate.poem_import_ai WHERE id=$1',[id])).rows[0].status,'failed');
+ }finally{await f.close();}
+});
+test('background poem import persists progress, protects results and saves once',async()=>{
+ const item={title:'春晓',author:'孟浩然',dynasty:'唐',body:'春眠不觉晓。'};let calls=0;const f=await fixture(async()=>{calls++;return response({items:[item],incomplete:false,overflow:false});});try{
+  for(const n of ['028_word_tutor.sql','034_poems.sql','035_poem_fields.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));
+  const id=randomUUID(),job=await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:'孟浩然写的春晓：春眠不觉晓。'});assert.equal(job.status,'queued');assert.equal((await f.core.poemImports.list(f.dad,f.child.id)).items[0].status,'queued');assert.equal((await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:'孟浩然写的春晓：春眠不觉晓。'})).id,id);
+  await assert.rejects(f.core.poemImports.list(f.mom,f.child.id),{code:'FAMILY_NOT_FOUND'});await f.core.poemImports.processOne();const ready=await f.core.poemImports.get(f.dad,f.child.id,id);assert.equal(ready.status,'ready',JSON.stringify(ready));assert.equal(ready.completed_parts,1);assert.equal(ready.results[0].items[0].title,'春晓');assert.equal(calls,1);
+  assert.equal((await f.core.poemImports.save(f.dad,f.child.id,id,{items:[item]})).saved_count,1);assert.equal((await f.core.poemImports.save(f.dad,f.child.id,id,{items:[item]})).saved_count,1);await assert.rejects(f.core.poemImports.save(f.dad,f.child.id,id,{items:[{...item,title:'别的诗'}]}),{code:'IDEMPOTENCY_CONFLICT'});assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).total,1);
+ }finally{await f.close();}
+});
+test('poem review drafts persist with the import job and are private',async()=>{
+ const item={title:'春晓',author:'孟浩然',dynasty:'唐',body:'春眠不觉晓。'};const f=await fixture(async()=>response({items:[item],incomplete:false,overflow:false}));try{
+  for(const n of ['028_word_tutor.sql','034_poems.sql','035_poem_fields.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));
+  const id=randomUUID();await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:'春晓：春眠不觉晓。'});await f.core.poemImports.processOne();
+  const batch=[{draft:{...item,body:'修正后的正文'},key:'draft-1',saved:false,locked:false,issues:[],issuesReviewed:true}];
+  await f.core.poemImports.saveDraft(f.dad,f.child.id,id,{batch,expected_batch:0});const job=await f.core.poemImports.get(f.dad,f.child.id,id);assert.deepEqual(job.review_draft,batch);assert.equal(job.results[0].items[0].body,item.body);
+  await assert.rejects(f.core.poemImports.get(f.mom,f.child.id,id),{code:'FAMILY_NOT_FOUND'});await assert.rejects(f.core.poemImports.saveDraft(f.mom,f.child.id,id,{batch,expected_batch:0}),{code:'FAMILY_NOT_FOUND'});
+  await assert.rejects(f.core.poemImports.saveDraft(f.dad,f.child.id,id,{batch:[{...batch[0],draft:{...item,body:'字'.repeat(1001)}}],expected_batch:0}),{code:'INVALID_REQUEST_BODY'});
+  await f.core.poemImports.cancel(f.dad,f.child.id,id);await assert.rejects(f.core.poemImports.saveDraft(f.dad,f.child.id,id,{batch,expected_batch:0}),{code:'IMPORT_BUSY'});
+ }finally{await f.close();}
+});
+test('large poem imports save in idempotent batches and retain remaining drafts',async()=>{
+ const item={title:'春晓',author:'孟浩然',dynasty:'唐',body:'春眠不觉晓。'};const f=await fixture(async()=>response({items:[item],incomplete:false,overflow:false}));try{
+  for(const n of ['028_word_tutor.sql','034_poems.sql','035_poem_fields.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));
+  const id=randomUUID();await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:'春晓：春眠不觉晓。'});await f.core.poemImports.processOne();const remaining=[{draft:{...item,title:'静夜思'},key:'k',saved:false,locked:false}];
+  const first={items:[item],request_id:randomUUID(),expected_batch:0,remaining_batch:remaining};assert.equal((await f.core.poemImports.save(f.dad,f.child.id,id,first)).saved_count,1);assert.equal((await f.core.poemImports.get(f.dad,f.child.id,id)).review_draft[0].draft.title,'静夜思');assert.equal((await f.core.poemImports.save(f.dad,f.child.id,id,first)).saved_count,1);assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).total,1);await assert.rejects(f.core.poemImports.save(f.dad,f.child.id,id,{...first,request_id:randomUUID()}),{code:'IMPORT_CHANGED'});await assert.rejects(f.core.poemImports.saveDraft(f.dad,f.child.id,id,{batch:remaining,expected_batch:0}),{code:'IMPORT_CHANGED'});
+  const last={items:[remaining[0].draft],request_id:randomUUID(),expected_batch:1,remaining_batch:[]};assert.equal((await f.core.poemImports.save(f.dad,f.child.id,id,last)).total_saved,2);assert.equal((await f.core.poemImports.save(f.dad,f.child.id,id,last)).total_saved,2);assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).total,2);
+ }finally{await f.close();}
+});
+test('uploaded files are read by the worker, resume as AI work, and are cleared after reading',async()=>{
+ const item={title:'春晓',author:'孟浩然',dynasty:'唐',body:'春眠不觉晓。'};const f=await fixture(async()=>response({items:[item],incomplete:false,overflow:false}));try{
+  for(const n of ['028_word_tutor.sql','034_poems.sql','035_poem_fields.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));
+  const id=randomUUID(),body={id,name:'春晓.txt',base64:Buffer.from('春晓\n春眠不觉晓。').toString('base64')};assert.equal((await f.core.poemImports.create(f.dad,f.child.id,body)).stage,'reading');await f.core.poemImports.processOne();const first=await f.core.poemImports.get(f.dad,f.child.id,id);assert.equal(first.stage,'analysis');assert.equal(first.status,'queued');assert.equal((await f.pg.query('SELECT source_base64 FROM wordmate.poem_import_jobs WHERE id=$1',[id])).rows[0].source_base64,null);assert.equal((await f.core.poemImports.create(f.dad,f.child.id,body)).id,id);await f.core.poemImports.processOne();assert.equal((await f.core.poemImports.get(f.dad,f.child.id,id)).status,'ready');
+ }finally{await f.close();}
+});
+test('failed background analysis can retry while preserving the task and completed work',async()=>{
+ let calls=0;const item={title:'春晓',author:'',dynasty:'',body:'春眠不觉晓。'};const f=await fixture(async()=>{if(!calls++)return new Response('{}',{status:503});return response({items:[item],incomplete:false,overflow:false});});try{for(const n of ['028_word_tutor.sql','034_poems.sql','035_poem_fields.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));const id=randomUUID();await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:'春晓：春眠不觉晓。'});await f.core.poemImports.processOne();assert.equal((await f.core.poemImports.get(f.dad,f.child.id,id)).status,'failed');assert.equal((await f.core.poemImports.retry(f.dad,f.child.id,id)).status,'queued');await f.core.poemImports.processOne();assert.equal((await f.core.poemImports.get(f.dad,f.child.id,id)).status,'ready');assert.equal(calls,2);}finally{await f.close();}
+});
+test('existing poem chat keeps old messages and receives the new structured analysis once',async()=>{
+ let calls=0;const f=await fixture(async()=>{calls++;return response({annotations:'晓：早晨',translation:'春天睡到天亮。'});});try{for(const n of ['028_word_tutor.sql','034_poems.sql','035_poem_fields.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));const p=await f.core.poems.create(f.dad,'existing-chat-poem',f.child.id,{title:'春晓',body:'春眠不觉晓。'}),session=await f.core.poems.open(f.dad,f.child.id,p.id);await f.pg.query("INSERT INTO wordmate.poem_messages(session_id,role,content) VALUES($1,'assistant','之前的讲解')",[session.id]);const reopened=await f.core.poems.open(f.dad,f.child.id,p.id);assert.equal(reopened.needs_analysis,true);const answer=await f.core.poems.answer(f.dad,f.child.id,p.id,session.id,randomUUID());assert.equal(answer.messages[0].content,'之前的讲解');assert.match(answer.messages[1].content,/注释：[\s\S]*译文：/);assert.equal(answer.needs_analysis,false);await assert.rejects(f.core.poems.answer(f.dad,f.child.id,p.id,session.id,randomUUID()),{code:'TUTOR_ALREADY_STARTED'});assert.equal(calls,1);}finally{await f.close();}
+});
+test('editing four core fields preserves previously saved optional details',async()=>{
+ const f=await fixture();try{for(const n of ['034_poems.sql','035_poem_fields.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));const p=await f.core.poems.create(f.dad,'legacy-fields',f.child.id,{title:'春晓',body:'春眠不觉晓。',genre:'绝句',translation:'旧译文',notes:'旧备注'});const updated=await f.core.poems.update(f.dad,f.child.id,p.id,{title:'春晓',author:'孟浩然',dynasty:'唐',body:'春眠不觉晓。',expected_version:p.version});assert.equal(updated.genre,'绝句');assert.equal(updated.translation,'旧译文');assert.equal(updated.notes,'旧备注');}finally{await f.close();}
+});
+test('cancelled poem import discards review results and cannot be saved or retried',async()=>{
+ const item={title:'春晓',author:'孟浩然',dynasty:'唐',body:'春眠不觉晓。'};const f=await fixture(async()=>response({items:[item],incomplete:false,overflow:false}));try{for(const n of ['028_word_tutor.sql','034_poems.sql','035_poem_fields.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));const id=randomUUID();await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:'春晓：春眠不觉晓。'});await f.core.poemImports.processOne();assert.equal((await f.core.poemImports.cancel(f.dad,f.child.id,id)).status,'cancelled');assert.equal((await f.core.poemImports.list(f.dad,f.child.id)).items[0].status,'cancelled');await assert.rejects(f.core.poemImports.save(f.dad,f.child.id,id,{items:[item]}),{code:'IMPORT_BUSY'});await assert.rejects(f.core.poemImports.retry(f.dad,f.child.id,id),{code:'IMPORT_BUSY'});assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).total,0);}finally{await f.close();}
+});
+test('poem search and memorization filter cover all four fields, combine and paginate',async()=>{
+ const f=await fixture();try{for(const n of ['034_poems.sql','035_poem_fields.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));const a=await f.core.poems.create(f.dad,'search-a',f.child.id,{title:'静夜思',author:'李白',dynasty:'唐',body:'床前明月光'}),b=await f.core.poems.create(f.dad,'search-b',f.child.id,{title:'春晓',author:'孟浩然',dynasty:'唐',body:'处处闻啼鸟'});await f.core.poems.mark(f.dad,f.child.id,a.id,{memorized:true,expected_version:a.version});for(const term of ['静夜','李白','唐','明月']){const result=await f.core.poems.list(f.dad,f.child.id,0,'memorized',term);assert.equal(result.total,2);assert.equal(result.memorized_count,1);assert.equal(result.matched_total,1);assert.equal(result.items[0].id,a.id);}assert.equal((await f.core.poems.list(f.dad,f.child.id,0,'unmemorized','唐')).items[0].id,b.id);assert.equal((await f.core.poems.list(f.dad,f.child.id,0,'all','%')).matched_total,0);await assert.rejects(f.core.poems.list(f.dad,f.child.id,0,'bad',''),{code:'INVALID_REQUEST_BODY'});await assert.rejects(f.core.poems.list(f.mom,f.child.id,0,'all','唐'),{code:'FAMILY_NOT_FOUND'});
+ await f.pg.query("INSERT INTO wordmate.poems(child_id,title,author,dynasty,body) SELECT $1,'筛选诗'||n,'甲','宋','长河落日' FROM generate_series(1,302) n",[f.child.id]);const page=await f.core.poems.list(f.dad,f.child.id,0,'unmemorized','长河'),next=await f.core.poems.list(f.dad,f.child.id,300,'unmemorized','长河');assert.equal(page.matched_total,302);assert.equal(page.items.length,300);assert.equal(page.next_offset,300);assert.equal(next.items.length,2);assert.equal(next.next_offset,null);
+ }finally{await f.close();}
+});

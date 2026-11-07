@@ -1,0 +1,10 @@
+古诗词库（2026-11-06）
+
+每个孩子一个诗词库，首页展示总数。支持单首填写，粘贴批量文字、TXT/MD/CSV/TSV/XLSX/DOCX 文件以及拍照或相册图片；识别和拆分后必须逐首核对再保存。标题、正文必填，可选作者、朝代、体裁、拼音、注释、译文、创作背景、出处和备注。表格第一行用字段名称，每行一首；文字多首可用单独一行 --- 分隔，也可使用标题：或《标题》标记。每批最多 300 首，批量文字最多 100 万字，正文每首最多 1000 字。图片识别使用当前视觉模型和相应额度，不保证识别准确。家庭有效成员可录入、编辑、删除并标记已背诵；不影响单词目标、日历、补卡和连续打卡。诗文最多 1000 字，正文修改时由用户决定是否保留已背诵状态。
+诗词详情可以听中文合成朗读或打开 AI 讲解。朗读按正文和语音配置缓存，重复播放不重复计费；正文变更后生成新音频。AI 对话按诗词内容快照保存，内容修改后重新生成讲解。删除诗词会删除该诗词的讲解和朗读。AI 文本沿用家庭 AI 设置和结算，语音沿用家庭语音额度、价格与配置；均不保存用户的背诵录音。
+
+本地 PGlite 启动时应用 034_poems.sql 和 035_poem_fields.sql。已有受控 PostgreSQL 数据库先备份并检查迁移账本，再通过 migrate:managed status / apply 按顺序应用迁移，然后发布兼容后端和小程序；不要将空库初始迁移用于现有库。本次修改了隐私政策内容和版本，用户需要重新确认。请核验正式音频价格、音色及 AI 服务配置。
+
+验证：corepack pnpm build:api；node --experimental-strip-types --test apps/api/test/poems.test.ts apps/api/test/import-export.test.ts apps/miniapp/test/poem-import.test.ts apps/miniapp/test/poems-page.test.ts；corepack pnpm test:routes；corepack pnpm --filter @wordmate/miniapp typecheck；corepack pnpm build:miniapp。模拟服务只验证流程和账务，不代表真实 AI 讲解或中文朗读效果。发布前需在微信开发者工具和真机检查录入、换行、播放暂停、音色、多音字、重新进入和隐私提示。
+
+PDF 与 AI 整理：诗词库支持 PDF（不超过 4 MB、200 页，其中图片页不超过 20 页）。图片页会发送给已选图片 AI，文本页在服务端提取。服务器必须安装 Poppler 工具 pdfinfo、pdftotext、pdfimages、pdftoppm（Ubuntu 包 poppler-utils）；缺失时会返回明确提示。AI 根据原文分析分段和字段，不要求固定分隔格式，整理结果可对照原文编辑或手动补充；模型可能遗漏或误识别，必须核对。长材料分段处理，失败后可继续，已完成的分段保留幂等结果。整理使用现有文字 AI 设置和费用；识别图片页使用图片 AI 设置和费用。服务端新增迁移 036_poem_import_ai.sql，需按迁移账本流程应用；隐私说明更新需用户重新确认。

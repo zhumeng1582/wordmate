@@ -54,7 +54,9 @@ test('child deletion freezes immediately, deletes full learning graph and object
   await f.core.review(actor,{session_id:session.id,card_id:cards.items[0].id,event_id:'11111111-1111-4111-8111-111111111111',expected_version:cards.items[0].version,lease_generation:session.lease_generation,rating:'again'});
   await f.core.patchWordAnnotations(actor,'annotation',items[0].id,{expected_version:0,favorite:true});
   await f.core.imports.extract(actor,f.child.id,{name:'words.txt',base64:Buffer.from('apple').toString('base64')});
-  await f.core.audio.create(actor,'audio',{word_id:items[0].id,content_version:1,accent:'en-US',voice_id:'us',speech_rate:1});await f.core.audio.processOne();assert.equal(f.objects.size,1);
+  const audio=await f.core.audio.create(actor,'audio',{word_id:items[0].id,content_version:1,accent:'en-US',voice_id:'us',speech_rate:1});await f.core.audio.processOne();await f.core.audio.reportPronunciation(actor,'audio-feedback',audio.audio_id);await f.core.audio.reportWord(actor,'word-feedback',items[0].id,{kind:'spelling',word_version:1});assert.equal(f.objects.size,1);
+  f.objects.set('repair-old.mp3',Buffer.from('ID3-old'));f.objects.set('repair-new.mp3',Buffer.from('ID3-new'));
+  await f.pg.query("INSERT INTO wordmate.admin_audio_repairs(child_id,audio_id,status,voice_id,accent,original_sha256,content_version,old_storage_profile_id,old_storage_key,new_storage_profile_id,new_storage_key) VALUES($1,$2,'applied','us','en-US','sha',1,'test','repair-old.mp3','test','repair-new.mp3')",[f.child.id,audio.audio_id]);
   const body={confirm_nickname:f.child.nickname,expected_version:1},job=await f.life.deleteChild(actor,f.child.id,body);
   await assert.rejects(f.core.words(actor,f.child.id),{code:'CHILD_NOT_FOUND'});
   assert.equal((await f.life.deleteChild(actor,f.child.id,body)).id,job.id);
@@ -63,7 +65,7 @@ test('child deletion freezes immediately, deletes full learning graph and object
   await assert.rejects(f.life.job(f.other.user.id,job.id),{code:'DELETION_NOT_FOUND'});
   f.setDeny(false);await f.life.retry(actor,job.id);await f.life.processOne();
   assert.equal((await f.life.job(actor,job.id)).status,'succeeded');assert.equal(f.objects.size,0);
-  for(const table of ['children','child_words','review_cards','review_logs','study_sessions','generation_jobs','audio_assets','wordbooks'])assert.equal((await f.pg.query(`SELECT count(*)::int n FROM wordmate.${table}`)).rows[0].n,0,table);
+  for(const table of ['children','child_words','review_cards','review_logs','study_sessions','generation_jobs','audio_feedback','word_feedback','audio_assets','wordbooks'])assert.equal((await f.pg.query(`SELECT count(*)::int n FROM wordmate.${table}`)).rows[0].n,0,table);
   assert.equal((await f.life.deleteChild(actor,f.child.id,body)).id,job.id);
   assert.equal((await f.pg.query("SELECT completed_at FROM wordmate.deletion_tombstones WHERE kind='delete_child' AND target_id=$1",[f.child.id])).rows[0].completed_at!==null,true);
  }finally{await f.close();}

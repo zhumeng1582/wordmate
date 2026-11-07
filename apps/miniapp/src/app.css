@@ -140,3 +140,4 @@ input,textarea{caret-color:var(--primary)}
 .import-actions,.export-toolbar{display:flex;align-items:center;gap:16rpx;flex-wrap:wrap}.import-actions .btn{flex:1;margin:12rpx 0;min-width:140rpx}.export-toolbar{justify-content:space-between;margin-bottom:16rpx}.export-toolbar .btn{width:auto;margin:0;padding:0 24rpx}.word-select{width:44rpx;flex-shrink:0;color:var(--muted)}.word-select.checked{color:var(--primary)}
 
 .audio-example-wrap{display:flex;align-items:flex-start;gap:12px}.audio-example-wrap .audio-text{flex:1;min-width:0}.example-copy{flex:none;margin:0;padding:12px 4px;min-width:64px;min-height:64px;background:transparent;color:var(--primary);font-size:23px;line-height:40px}.example-copy::after{border:0}
+.word-feedback-button{background:transparent;border:0;color:var(--muted);font-size:23px;line-height:1.4;margin:0;padding:10px 12px;min-height:60px}.word-feedback-button::after{border:0}

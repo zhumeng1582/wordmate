@@ -3,3 +3,4 @@
 .textbook-unit{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px;margin:14px 0}
 .textbook-title{font-size:28px;font-weight:650;margin-bottom:8px}
 .textbook-unit .btn{margin:0;min-height:64px;font-size:23px}
+.textbook-unit-actions{display:flex;flex-direction:column;gap:10px;flex-shrink:0}

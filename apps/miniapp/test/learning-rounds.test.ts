@@ -19,8 +19,8 @@ test('study shows the actual resumed wordbook instead of the newly selected book
 });
 test('home offers the next 10 new words after the daily goal instead of hiding them behind the old quota',async()=>{
  const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[{id:'family-a'}]}:{child:{nickname:'孩子'},completed_words:10,goal:10,goal_reached:true,due_count:0,new_count:25,new_group_size:10,remaining_new_limit:0});
- await page.show();assert.equal(page.button('学习新词').disabled,false);assert.doesNotMatch(page.text(page.render()),/今日还可学|每天一点|月度测验|错题集/);assert.match(page.text(page.render()),/再学 10 词/);assert.equal(page.all(page.render()).filter(n=>String(n.props?.className).includes('home-study-button')).length,2);assert.equal(page.button('复习单词').disabled,true);page.button('按日期复习').onClick();assert(page.routes.includes('/pages/calendar/index'));
- page.button('学习新词').onClick();assert.equal(page.cache.get('review_source').source,'new_words');assert.equal(page.cache.get('study_intent'),'start');
+ await page.show();assert.equal(page.button('学习新词').disabled,false);assert.doesNotMatch(page.text(page.render()),/今日还可学|每天一点|月度测验|错题集/);assert.match(page.text(page.render()),/再学 10 词/);assert.equal(page.all(page.render()).filter(n=>String(n.props?.className).includes('home-study-button')).length,2);assert.equal(page.button('复习单词').disabled,false);page.button('复习单词').onClick();await tick();assert(page.routes.includes('/pages/calendar/index'));
+ page.button('学习新词').onClick();assert.equal(page.cache.get('review_source').source,'new_words');assert.equal(page.cache.get('study_intent'),'start');assert.equal(page.routes.at(-1),'/pages/review/index');
  assert.equal(nextNewGroupSize({new_count:3,goal:10,remaining_new_limit:0}),3);assert.equal(nextNewGroupSize({new_count:0,goal:10}),0);
 });
 test('completion offers another round even when wrong words remain for optional practice',async()=>{
@@ -33,7 +33,7 @@ test('completion offers another round even when wrong words remain for optional 
 test('the two home actions open due reviews directly and resume the matching unfinished learning round',async()=>{
  const saved={...emptyStudy({source:'new_words'}),loaded:true,total:10,cards:[],results:{},phase:'learn'},page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[{id:'family-a'}]}:{child:{nickname:'孩子'},completed_words:0,goal:10,due_count:8,new_count:25,new_group_size:10},undefined,{cache:{'study_resume:account-a:child-a':saved}});
  await page.show();assert.equal(page.button('继续学习').disabled,false);assert.match(page.text(page.render()),/8 词待复习/);page.button('继续学习').onClick();assert.equal(page.cache.get('study_intent'),'resume');assert.equal(page.cache.get('review_source').source,'new_words');
- const review=pageHarness('pages/home/index',async path=>path==='/me'?{families:[{id:'family-a'}]}:{child:{nickname:'孩子'},completed_words:0,goal:10,due_count:8,new_count:25});await review.show();review.button('复习单词').onClick();assert.equal(review.cache.get('review_source').source,'review');assert.equal(review.cache.get('study_intent'),'start');assert.equal(review.routes.length,0);
+ const review=pageHarness('pages/home/index',async path=>path==='/me'?{families:[{id:'family-a'}]}:{child:{nickname:'孩子'},completed_words:0,goal:10,due_count:8,new_count:25});await review.show();review.button('复习单词').onClick();await tick();assert.equal(review.cache.get('review_source').source,'review');assert.equal(review.cache.get('study_intent'),'start');assert.equal(review.routes.at(-1),'/pages/review/index');
 });
 test('calendar launches all words from the selected range, including dates with zero mistakes',async()=>{
  const page=pageHarness('pages/calendar/index',async path=>path.includes('/history-range?')?{count:8}:{today:'2026-10-31',days:[{date:'2026-10-02',studied_words:10,reviewable_words:8,wrong_words:0}]});
@@ -42,4 +42,17 @@ test('calendar launches all words from the selected range, including dates with 
 });
 test('a late calendar response cannot offer another account old learning records',async()=>{
  const waiting=deferred(),page=pageHarness('pages/calendar/index',async()=>waiting.promise);await page.show();page.cache.set('access_token','account-b');waiting.resolve({days:[{date:'2026-10-02',studied_words:10,reviewable_words:10}]});await tick();assert.doesNotMatch(page.text(page.render()),/开始复习/);
+});
+test('dictation hides the answer and grades spelling with case and whitespace normalization',async()=>{
+ const data={...emptyStudy({source:'manual',word_ids:['w']}),mode:'dictation' as const,loaded:true,phase:'test' as const,total:1,cards:[{id:'c',child_word_id:'w',word_version:1,version:1,lemma:'ice cream',meaning_zh:'冰淇淋'}]};let answer:any;
+ class Controller{state={flow:data,pending:null,conflict:null,busy:false,error:null,notice:'',rejected:false};subscribe(){return()=>{};}begin(){return Promise.resolve();}dispose(){}heartbeat(){}answer(value:string,correct:boolean){answer={value,correct};return Promise.resolve();}}
+ const page=pageHarness('components/ReviewSession',async()=>({items:[]}),'ReviewSession',{studyController:Controller});await tick();assert.doesNotMatch(page.text(page.render()),/ice cream/);const input=page.all(page.render()).find(n=>n.type==='Input');assert(input);input.props.onInput({detail:{value:' ICE  cream '}});page.button('提交拼写').onClick();assert.equal(answer.correct,true);assert.equal(answer.value,' ICE  cream ');page.dispose();
+});
+test('textbook unit launch fetches the complete unit and starts dictation',async()=>{
+ const page=pageHarness('pages/textbook-books/index',async(path,method)=>{if(path.startsWith('/textbook-volumes'))return {items:[]};if(path.endsWith('/textbook-units'))return {items:[{id:'new-sailing-1-a-1',title:'Unit 1',grade:1,term:'上册',word_count:2,joined_book_id:null}]};if(method==='POST')return {id:'unit-book'};if(path.includes('cursor=next'))return {items:[{id:'w2'}],next_cursor:null};return {items:[{id:'w1'}],next_cursor:'next'};});await page.show();page.button('按单元复习').onClick();page.button('听写单元').onClick();await tick();await tick();assert.deepEqual(JSON.parse(JSON.stringify(page.cache.get('review_source'))),{source:'manual',word_ids:['w1','w2']});assert.equal(page.cache.get('review_mode'),'dictation');assert.equal(page.routes[0],'/pages/review/index');page.dispose();
+});
+
+test('unfinished-session choice relies on the page navigation back button without altering the saved session',async()=>{
+ let paused=0,finished=0;class Controller{state={flow:null,pending:null,conflict:{source:{source:'favorites'}},busy:false,error:null,notice:'',rejected:false};subscribe(){return()=>{};}begin(){return Promise.resolve();}dispose(){}heartbeat(){}pause(){paused++;return Promise.resolve(true);}finish(){finished++;return Promise.resolve(true);}}
+ const page=pageHarness('components/ReviewSession',async()=>({items:[]}),'ReviewSession',{studyController:Controller});await tick();assert.match(page.text(page.render()),/还有一组单词没学完/);assert(!page.all(page.render()).some(n=>n.type==='Button'&&/返回|暂存退出/.test(page.text(n))));assert.equal(paused,0);assert.equal(finished,0);page.dispose();
 });

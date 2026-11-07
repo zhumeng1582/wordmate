@@ -6,7 +6,7 @@ export default function Help(){
   <View className='title'>应用说明</View>
   <View className='card'>
    <View className='help-heading'>从首页开始</View>
-   <View className='help-text'>点击首页的学习按钮，就能开始今日学习。没学完也没关系，暂存退出后，下次可以接着学。</View>
+   <View className='help-text'>点击首页的学习按钮，就能开始今日学习。没学完也没关系，返回后，下次可以接着学。</View>
    <View className='help-text'>新词按每日目标分轮学习：目标 10 个，每轮就是 10 个。完成后可继续下一轮，不受当天目标限制；剩余不足一轮时，学习剩余单词。每轮最多 100 个。</View>
   </View>
   <View className='card'>

@@ -119,12 +119,24 @@ export class AiAccounts{
   const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
   const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
   const tutor=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/word-tutor.js')).href);
-  return async(word:any,history:any[],question?:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>tutor.generateTutorAnswer(adapter.createTextGenerator(selected.env,observed.fetcher),word,history,question));
+  return async(word:any,history:any[],question?:string,exerciseAnswer=false)=>this.run(actor,'word_tutor',reference,selected,observed,()=>tutor.generateTutorAnswer(adapter.createTextGenerator(selected.env,observed.fetcher),word,history,question,exerciseAnswer));
+ }
+ async poemTutor(q:Sql,actor:string,reference:string,familyId:string){
+  const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
+  const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
+  const tutor=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/poem-tutor.js')).href);
+  return async(poem:any,history:any[],question?:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>tutor.generatePoemAnswer(adapter.createTextGenerator(selected.env,observed.fetcher),poem,history,question));
+ }
+ async poemImport(q:Sql,actor:string,reference:string,familyId:string){
+  const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
+  const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
+  const importer=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/poem-import.js')).href);
+  return async(raw:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>importer.generatePoemImport(adapter.createTextGenerator(selected.env,observed.fetcher),raw));
  }
  async reader(q:Sql,actor:string,familyId?:string):Promise<ImageReader>{
   const s=await this.select(q,actor,undefined,'vision',familyId);ensure(s.model.vision&&['qwen','openai'].includes(s.model.provider),422,'AI_VISION_UNAVAILABLE');
   const observed=this.observer(),reader=imageReader({OCR_PROVIDER:s.model.provider,OCR_API_KEY:s.env[`${s.model.provider.toUpperCase()}_API_KEY`],OCR_MODEL:s.model.model,OCR_BASE_URL:s.env.QWEN_BASE_URL},observed.fetcher);ensure(reader,503,'OCR_NOT_CONFIGURED');
-  return {profile:`${actor}:${s.selection.version}:${reader!.profile}`,read:reader!.read,readVocabulary:async(...args)=>{const r=await this.run(actor,'vision',`vision:${randomUUID()}`,s,observed,()=>reader!.readVocabulary!(...args));return {...r.data,billing_id:r.id};}};
+  return {profile:`${actor}:${s.selection.version}:${reader!.profile}`,read:reader!.read,readText:async(...args)=>{ensure(reader!.readText,503,'OCR_NOT_CONFIGURED');const r=await this.run(actor,'vision',`vision:${randomUUID()}`,s,observed,()=>reader!.readText!(...args));return {...r.data,billing_id:r.id};},readVocabulary:async(...args)=>{const r=await this.run(actor,'vision',`vision:${randomUUID()}`,s,observed,()=>reader!.readVocabulary!(...args));return {...r.data,billing_id:r.id};}};
  }
  private observer(){
   const observed:{usage?:unknown;request_id?:string;sent:boolean;fetcher:typeof fetch}={sent:false,fetcher:async(input,init)=>{

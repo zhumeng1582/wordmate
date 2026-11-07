@@ -22,6 +22,5 @@ export default function PrivacyPolicyPage(){
    {policy.sections.map(section=><View className='card' key={section.title}><View className='privacy-policy-heading'>{section.title}</View><View className='privacy-policy-text'>{section.text}</View></View>)}
    <View className='card'><View className='privacy-policy-heading'>第三方政策链接</View>{policy.providers.map(provider=><Button className='text-action privacy-provider-link' key={provider.url} onClick={()=>void Taro.setClipboardData({data:provider.url})}>{provider.name} · 复制链接</Button>)}<Button className='text-action privacy-provider-link' onClick={openContract}>微信小程序隐私保护指引</Button></View>
   </>}
-  <Button className='btn secondary' onClick={()=>void Taro.navigateBack().catch(()=>Taro.reLaunch({url:'/pages/home/index'}))}>返回上一页</Button>
  </View>;
 }

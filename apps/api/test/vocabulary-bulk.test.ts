@@ -20,6 +20,7 @@ test('bulk text keeps phrases, respects model chunk size, and rejects 8001 rows 
  const rows=Array.from({length:8000},(_,i)=>`word${i}`),chunks=vocabularyImportChunks(rows.join('\n'));
  assert.equal(chunks.length,267);assert.equal(chunks.flatMap(chunk=>chunk.split('\n')).length,8000);
  assert(chunks.every(chunk=>chunk.split('\n').length<=30));assert.equal(vocabularyImportChunks('ice cream\nread a book')[0],'ice cream\nread a book');
+ const annotated=vocabularyImportChunks([...Array(29).fill('apple'),'match n.比赛；v. 匹配'].join('\n'));assert(annotated.some(chunk=>chunk.includes('match n.比赛；v. 匹配')));
  assert.throws(()=>vocabularyImportChunks([...rows,'extra'].join('\n')),/TOO_MANY_WORDS/);
  assert(vocabularyImportChunks(Array.from({length:100},()=> 'cat').join(' ')).every(chunk=>(chunk.match(/cat/g)??[]).length<=30));
 });
@@ -88,4 +89,22 @@ test('8000 words are accepted as a durable import and 8001 are rejected before c
   const completed=await f.core.vocabulary.get(f.actor,job.id);assert.equal(completed.status,'succeeded');assert.equal(completed.saved_count,8000);assert.equal(completed.bulk.completed_parts,267);
   assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,8000);
  }finally{await f.pg.close();}
+});
+
+test('bulk review exposes all pending senses across pages and only saves selected entries',async()=>{
+ let calls=0;const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',rawPromptVersion:'raw-test',generate:async words=>({items:words.map(result)}),generateRaw:async raw=>{calls++;return {items:raw.split('\n').map(result),error:null};}});
+ try{const raw=Array.from({length:65},(_,i)=>`word${i}`).join('\n'),job=await f.core.vocabulary.create(f.actor,'review-bulk',f.child.id,{wordbook_id:f.book.id,raw_text:raw,review_before_save:true});for(let i=0;i<3;i++)await f.core.vocabulary.processOne();assert.equal((await f.core.vocabulary.get(f.actor,job.id)).pending_count,65);assert.equal((await f.core.words(f.actor,f.child.id)).items.length,0);
+ let total=0;for(let page=0;page<3;page++){const preview=await f.core.vocabulary.candidates(f.actor,job.id);total+=preview.items.length;await f.core.vocabulary.confirmCandidates(f.actor,`review-page-${page}`,job.id,{decisions:preview.items.map((item:any,index:number)=>({item_id:item.id,selected:index===0}))});}assert.equal(total,65);assert.equal((await f.core.vocabulary.candidates(f.actor,job.id)).pending_count,0);assert.equal((await f.core.words(f.actor,f.child.id)).items.length,3);assert.equal(calls,3);
+ }finally{await f.pg.close();}
+});
+test('long plain vocabulary with examples keeps each source sentence with its word',()=>{
+ const text=Array.from({length:36},(_,i)=>`${markdownWord(i)} 名词\n例句：I see ${markdownWord(i)}.\n译文：我看见了它。`).join('\n');const chunks=vocabularyImportChunks(text);assert.equal(chunks.length,2);for(let i=0;i<36;i++){const group=chunks.filter(chunk=>chunk.includes(`${markdownWord(i)} 名词`));assert.equal(group.length,1);assert(group[0].includes(`I see ${markdownWord(i)}.`));}
+});
+test('cancelling a running bulk import keeps saved words and prevents late results',async()=>{
+ let entered!:()=>void,release!:()=>void;const start=new Promise<void>(r=>entered=r),gate=new Promise<void>(r=>release=r);let calls=0;
+ const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>{if(++calls===2){entered();await gate;}return {items:words.map(result)};}});
+ try{const job=await f.core.vocabulary.create(f.actor,'cancel-bulk',f.child.id,{wordbook_id:f.book.id,words:Array.from({length:61},(_,i)=>`word${i}`)});await f.core.vocabulary.processOne();const work=f.core.vocabulary.processOne();await start;const cancelled=await f.core.vocabulary.cancel(f.actor,job.id);assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.saved_count,30);release();await work;await f.core.vocabulary.processOne();const final=await f.core.vocabulary.get(f.actor,job.id);assert.equal(final.status,'cancelled');assert.equal(final.saved_count,30);assert.equal(calls,2);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,30);}finally{release?.();await f.pg.close();}
+});
+test('cancelling a pending review discards candidates and prevents confirmation',async()=>{
+ const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>({items:words.map(result)})});try{const job=await f.core.vocabulary.create(f.actor,'cancel-review',f.child.id,{wordbook_id:f.book.id,words:['apple'],review_before_save:true});await f.core.vocabulary.processOne();const review=await f.core.vocabulary.candidates(f.actor,job.id);assert.equal(review.pending_count,1);assert.equal((await f.core.vocabulary.cancel(f.actor,job.id)).status,'cancelled');await assert.rejects(f.core.vocabulary.confirmCandidates(f.actor,'confirm-cancelled',job.id,{decisions:[{item_id:review.items[0].id,selected:true}]}),{code:'GENERATION_NOT_REVIEWABLE'});assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,0);}finally{await f.pg.close();}
 });

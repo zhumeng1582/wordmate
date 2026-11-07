@@ -48,6 +48,10 @@ export class Lifecycle {
    await q.query("INSERT INTO deletion_tombstones(kind,target_id,family_id) VALUES('delete_child',$1,$2) ON CONFLICT DO NOTHING",[child,family]);
    const assets=(await q.query('SELECT storage_profile_id,storage_key FROM audio_assets WHERE child_id=$1 AND storage_key IS NOT NULL',[child])).rows;
    for(const a of assets)await this.object(q,job.id,'audio',a.storage_profile_id??'',a.storage_key);
+   if((await one(q,"SELECT to_regclass('wordmate.admin_audio_repairs') present"))?.present){
+    const repairs=(await q.query('SELECT old_storage_profile_id,old_storage_key,new_storage_profile_id,new_storage_key FROM admin_audio_repairs WHERE child_id=$1',[child])).rows;
+    for(const a of repairs){if(a.old_storage_key)await this.object(q,job.id,'audio',a.old_storage_profile_id??'',a.old_storage_key);await this.object(q,job.id,'audio',a.new_storage_profile_id,a.new_storage_key);}
+   }
    const jobs=(await q.query("SELECT id,payload,max_attempts FROM generation_jobs WHERE child_id=$1 AND kind='audio'",[child])).rows;
    for(const j of jobs)for(let attempt=1;attempt<=j.max_attempts;attempt++){
     await this.object(q,job.id,'audio',j.payload.storage_profile??'',`private/${child}/${j.id}/${attempt}.mp3`);
@@ -88,7 +92,7 @@ export class Lifecycle {
   await q.query("UPDATE family_invites SET status='revoked' WHERE family_id=$1 AND (created_by=$2 OR claimed_by=$2) AND status IN ('pending','claimed')",[id,target]);
   await q.query('UPDATE families SET version=version+1 WHERE id=$1',[id]);await q.query("INSERT INTO audit_logs(family_id,actor_user_id,action,target_type,target_id) VALUES($1,$2,$3,'user',$4)",[id,actor,target===actor?'leave_family':'remove_member',target]);return {left:true,user_id:target};
  });}
- async purgeEphemeral(){await this.tx(async q=>{await q.query("DELETE FROM provider_usage_events WHERE created_at<=now()-interval '48 hours'");await q.query('DELETE FROM idempotency_keys WHERE expires_at<=now()');await q.query("DELETE FROM auth_sessions WHERE expires_at<=now() OR revoked_at<now()-interval '24 hours'");});}
+ async purgeEphemeral(){await this.tx(async q=>{if((await one(q,"SELECT to_regclass('wordmate.poem_import_jobs') present"))?.present)await q.query("DELETE FROM poem_import_jobs WHERE created_at<now()-interval '48 hours' AND (status<>'running' OR lease_until<now())");if((await one(q,"SELECT to_regclass('wordmate.poem_import_ai') present"))?.present)await q.query("DELETE FROM poem_import_ai WHERE created_at<now()-interval '2 days' AND status<>'running'");await q.query("DELETE FROM provider_usage_events WHERE created_at<=now()-interval '48 hours'");await q.query('DELETE FROM idempotency_keys WHERE expires_at<=now()');await q.query("DELETE FROM auth_sessions WHERE expires_at<=now() OR revoked_at<now()-interval '24 hours'");});}
  async logout(actor:string,token:string){await this.tx(q=>q.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND token_hash=$2',[actor,createHash('sha256').update(token).digest('hex')]));return {logged_out:true};}
  async deleteAccount(actor:string){return this.tx(async q=>{
   // Lock every membership's family before the account row: same order as writes.
@@ -107,9 +111,10 @@ export class Lifecycle {
   await q.query("UPDATE generation_jobs SET status='failed',lease_until=NULL,error_code='ACCOUNT_UNAVAILABLE' WHERE requested_by=$1 AND status IN ('queued','running','partial')",[actor]);
   await q.query("UPDATE family_invites SET status='revoked',claimed_by=NULL,approved_by=NULL WHERE (created_by=$1 OR claimed_by=$1 OR approved_by=$1)",[actor]);
   await q.query("UPDATE family_members SET status='left',revoked_at=now(),display_name='已注销家长' WHERE user_id=$1",[actor]);
-  for(const [table,column] of [['wordbooks','created_by'],['batches','created_by'],['child_words','created_by'],['sentences','created_by'],['word_annotations','updated_by'],['word_corrections','created_by'],['word_corrections','resolved_by'],['monthly_quizzes','created_by'],['review_logs','actor_user_id'],['audit_logs','actor_user_id'],['generation_jobs','requested_by']])await q.query(`UPDATE ${table} SET ${column}=NULL WHERE ${column}=$1`,[actor]);
+  for(const [table,column] of [['wordbooks','created_by'],['batches','created_by'],['child_words','created_by'],['sentences','created_by'],['word_annotations','updated_by'],['word_corrections','created_by'],['word_corrections','resolved_by'],['audio_feedback','created_by'],['word_feedback','created_by'],['monthly_quizzes','created_by'],['review_logs','actor_user_id'],['audit_logs','actor_user_id'],['generation_jobs','requested_by']])await q.query(`UPDATE ${table} SET ${column}=NULL WHERE ${column}=$1`,[actor]);
   await q.query('UPDATE shared_wordbooks SET published=false,version=version+1 WHERE publisher_user_id=$1 AND published',[actor]);
-  await q.query('DELETE FROM import_attempts WHERE actor_id=$1',[actor]);await q.query('DELETE FROM checkin_share_quotes WHERE requested_by=$1',[actor]);
+  await q.query('DELETE FROM import_attempts WHERE actor_id=$1',[actor]);if((await one(q,"SELECT to_regclass('wordmate.poem_import_jobs') present"))?.present)await q.query('DELETE FROM poem_import_jobs WHERE actor_id=$1',[actor]);if((await one(q,"SELECT to_regclass('wordmate.poem_import_ai') present"))?.present)await q.query('DELETE FROM poem_import_ai WHERE actor_id=$1',[actor]);await q.query('DELETE FROM checkin_share_quotes WHERE requested_by=$1',[actor]);
+  if((await one(q,"SELECT to_regclass('wordmate.word_tutor_learning_events') present"))?.present)await q.query('DELETE FROM word_tutor_learning_events WHERE actor_id=$1',[actor]);
   for(const table of ['auth_sessions','idempotency_keys','privacy_consent_events'])await q.query(`DELETE FROM ${table} WHERE ${table==='idempotency_keys'?'actor_user_id':table==='privacy_consent_events'?'user_id':'user_id'}=$1`,[actor]);
   await q.query('DELETE FROM user_referrals WHERE invited_user_id=$1 OR inviter_user_id=$1',[actor]);
   await q.query("UPDATE users SET status='deleted',wx_open_id=$2,display_name='已注销用户',referral_code=$3,avatar_bytes=NULL,avatar_mime=NULL,avatar_revision=avatar_revision+1,profile_version=profile_version+1,audio_voice_id=NULL,audio_accent='en-GB',audio_auto_play=false,audio_settings_version=1 WHERE id=$1",[actor,`deleted:${randomUUID()}`,randomUUID()]);
@@ -190,7 +195,7 @@ export class Lifecycle {
   await q.query('DELETE FROM shared_wordbook_items WHERE shared_wordbook_id IN (SELECT id FROM shared_wordbooks WHERE source_child_id=$1)',[id]);
   await q.query('DELETE FROM shared_wordbooks WHERE source_child_id=$1',[id]);
   if(this.images)await this.images.deleteChild(q,id);else await this.deleteUnstoredImages(q,"split_part(cache_scope,':',1)=$1",id);
-  for(const table of ['study_session_items','mistake_events','daily_word_activity','review_logs','study_sessions','monthly_quiz_items','monthly_quizzes','word_corrections','word_annotations','audio_usage_events','audio_assets','generation_jobs','checkin_share_quotes','import_attempts','checkin_makeup_credits','daily_activity','sentence_targets','sentences','batch_items','batches','wordbook_words','review_cards','word_tutor_sessions','child_words','wordbooks'])await q.query(`DELETE FROM ${table} WHERE child_id=$1`,[id]);
+  for(const table of ['study_session_items','mistake_events','daily_word_activity','review_logs','study_sessions','monthly_quiz_items','monthly_quizzes','word_corrections','word_annotations','audio_feedback','word_feedback','audio_usage_events','audio_assets','generation_jobs','checkin_share_quotes','import_attempts','checkin_makeup_credits','daily_activity','sentence_targets','sentences','batch_items','batches','wordbook_words','review_cards','word_tutor_sessions','child_words','wordbooks'])await q.query(`DELETE FROM ${table} WHERE child_id=$1`,[id]);
   await q.query('DELETE FROM audit_logs WHERE target_id=ANY($1::uuid[])',[refs]);
   await q.query('DELETE FROM children WHERE id=$1',[id]);
  }

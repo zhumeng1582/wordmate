@@ -78,7 +78,6 @@ export default function AiAdvancedPage(){
     {data.mode==='byok'&&data.has_key&&<Button className='btn secondary' disabled={busy||changed} onClick={testConnection}>检查已保存的连接</Button>}
     {data.has_key&&<Button className='text-action' disabled={busy} onClick={deleteKey}>删除当前用途的服务密钥</Button>}
    </View>
-   <Button className='text-action' disabled={busy} onClick={()=>void Taro.navigateBack().catch(()=>Taro.reLaunch({url:'/pages/ai-settings/index'}))}>返回 AI 助手</Button>
   </>}
  </View>;
 }

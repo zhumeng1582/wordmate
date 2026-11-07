@@ -11,12 +11,18 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  poem:object({title:str(100),author:{type:'string',maxLength:100},dynasty:{type:'string',maxLength:40},body:str(1000),genre:{type:'string',maxLength:80},annotations:{type:'string',maxLength:3000},translation:{type:'string',maxLength:3000},background:{type:'string',maxLength:3000},source:{type:'string',maxLength:200},notes:{type:'string',maxLength:3000},pinyin:{type:'string',maxLength:3000},expected_version:positive,reset_memorized:{type:'boolean'}},['title','body']),
+  poemImport:{oneOf:[object({id,raw_text:str(MAX_IMPORT_TEXT)}),object({id,name:str(120),base64:str(13981016)})]},
+  poemImportSave:object({items:{type:'array',minItems:1,maxItems:300,items:object({title:str(100),author:{type:'string',maxLength:100},dynasty:{type:'string',maxLength:40},body:str(1000),genre:{type:'string',maxLength:80},annotations:{type:'string',maxLength:3000},translation:{type:'string',maxLength:3000},background:{type:'string',maxLength:3000},source:{type:'string',maxLength:200},notes:{type:'string',maxLength:3000},pinyin:{type:'string',maxLength:3000}},['title','body'])}}),
+  poemAnalyze:object({request_id:id,text:str(6000)}),
+  poemMark:object({memorized:{type:'boolean'},expected_version:positive}),
   tutorOpen:object({word_id:id}),
   tutorImage:object({request_id:id}),
   tutorSearch:object({request_id:id,question:str(1000)}),
-  tutorSpeech:object({accent:{enum:['en-GB','en-US']},voice_id:str(100)}),
+  tutorSpeech:object({accent:{enum:['en-GB','en-US']},voice_id:str(100),part:{enum:['example']}},['accent','voice_id']),
   tutorTranscription:object({request_id:id,audio_base64:str(800000)}),
-  tutorAnswer:object({request_id:id,question:str(1000)},['request_id']),
+  tutorAnswer:object({request_id:id,question:str(1000),use_school_grade:{type:'boolean'},exercise_answer:{type:'boolean'}},['request_id']),
+  tutorLearningEvent:object({event_id:id,kind:{enum:['lesson_opened','exercise_started','exercise_answered','exercise_completed','feedback_wrong','feedback_hard','feedback_unnatural']},message_id:id},['event_id','kind']),
   parentProfile:object({display_name:{type:'string',minLength:1,maxLength:40,pattern:'^[^\\u0000-\\u001f\\u007f]+$'},expected_version:positive,avatar_base64:{type:'string',minLength:1,maxLength:174764},avatar_mime:{enum:['image/jpeg','image/png']},remove_avatar:{type:'boolean'}},['display_name','expected_version']),
   aiSettings:object({capability:{enum:['text','vision']},family_id:id,mode:{enum:['system','byok']},model_id:str(60),custom_provider:{enum:['qwen','deepseek','openai']},custom_model:{type:'string',minLength:1,maxLength:120,pattern:'^[A-Za-z0-9][A-Za-z0-9._:/-]*$'},expected_version:{type:'integer',minimum:0},api_key:{type:'string',minLength:8,maxLength:512,pattern:'^[!-~]+$'},provider_consent:{const:true}},['mode','model_id','expected_version','provider_consent']),
   aiKeyDelete:object({expected_version:{type:'integer',minimum:0},capability:{enum:['text','vision']},family_id:id},['expected_version']),
@@ -27,7 +33,7 @@ const schemas:Record<string,any>={
   deleteChild:object({confirm_nickname:str(40),expected_version:positive}),
   deleteFamily:object({confirm_name:str(40),expected_version:positive,confirm_data_deletion:{const:true}}),
   transferOwner:object({member_user_id:id,expected_version:positive}),
-  importFile:object({name:str(120),base64:str(5592408),existing_text:{type:'string',maxLength:MAX_IMPORT_TEXT},theme:{type:'string',maxLength:80}},['name','base64']),
+  importFile:object({name:str(120),base64:str(13981016),existing_text:{type:'string',maxLength:MAX_IMPORT_TEXT},theme:{type:'string',maxLength:80},purpose:{enum:['poem']}},['name','base64']),
   exportWords:{oneOf:[object({word_ids:{type:'array',items:id,minItems:1,maxItems:10000,uniqueItems:true},wordbook_id:id},['word_ids']),object({all:{const:true},excluded_ids:{type:'array',items:id,maxItems:10000,uniqueItems:true},wordbook_id:id},['all'])]},
   checkinShare:checkinShareSchema,
   checkinMakeup:object({date:{type:'string',format:'date'}}),
@@ -36,8 +42,10 @@ const schemas:Record<string,any>={
   voicePreview:object({accent:{enum:['en-GB','en-US']},voice_id:str(100)}),
   audioSettings:object({accent:{enum:['en-GB','en-US']},voice_id:str(100),auto_play:{type:'boolean'},expected_version:positive},['accent','voice_id','expected_version']),
   audio:{oneOf:['word_id','sentence_id'].map(resource=>object({[resource]:id,content_version:positive,accent:{enum:['en-GB','en-US']},voice_id:str(100),speech_rate:{type:'number',minimum:0.5,maximum:1.5}}))},
-  aiReplace:object({wordbook_id:id,raw_text:str(MAX_IMPORT_TEXT),source_type:{const:'text'},theme:{type:'string',maxLength:80},expected_attempts:{type:'integer',minimum:0}},['wordbook_id','raw_text','expected_attempts']),
-  aiBatch:{oneOf:[object({wordbook_id:id,raw_text:str(MAX_IMPORT_TEXT),source_type:{enum:['text','vision']},prepared_items:{type:'array',minItems:1,maxItems:MAX_IMPORT_WORDS,items:{type:'object',additionalProperties:false,required:['input_index','input','status','lemma','part_of_speech','ipa_gb','ipa_us','meaning_zh','sentence_en','sentence_zh','reason'],properties:{input_index:{type:'integer',minimum:0,maximum:MAX_IMPORT_WORDS-1},input:str(120),status:{enum:['ok','invalid']},lemma:{type:['string','null'],maxLength:120},part_of_speech:{type:['string','null'],maxLength:80},ipa_gb:{type:['string','null'],maxLength:140},ipa_us:{type:['string','null'],maxLength:140},meaning_zh:{type:['string','null'],maxLength:500},sentence_en:{type:['string','null'],maxLength:1000},sentence_zh:{type:['string','null'],maxLength:1000},reason:{type:['string','null'],maxLength:500}}}},theme:{type:'string',maxLength:80}},['wordbook_id','raw_text']),object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:MAX_IMPORT_WORDS},theme:{type:'string',maxLength:80}},['wordbook_id','words'])]},
+  wordFeedback:object({kind:{enum:['pronunciation','spelling','translation','example','example_pronunciation']},word_version:positive,sentence_id:id,sentence_version:positive,audio_id:id},['kind','word_version']),
+  aiReplace:object({review_before_save:{type:'boolean'},wordbook_id:id,raw_text:str(MAX_IMPORT_TEXT),source_type:{const:'text'},theme:{type:'string',maxLength:80},expected_attempts:{type:'integer',minimum:0}},['wordbook_id','raw_text','expected_attempts']),
+  aiBatch:{oneOf:[object({review_before_save:{type:'boolean'},wordbook_id:id,raw_text:str(MAX_IMPORT_TEXT),source_type:{enum:['text','vision']},prepared_items:{type:'array',minItems:1,maxItems:MAX_IMPORT_WORDS,items:{type:'object',additionalProperties:false,required:['input_index','input','status','lemma','part_of_speech','ipa_gb','ipa_us','meaning_zh','sentence_en','sentence_zh','reason'],properties:{input_index:{type:'integer',minimum:0,maximum:MAX_IMPORT_WORDS-1},input:str(120),status:{enum:['ok','invalid']},lemma:{type:['string','null'],maxLength:120},part_of_speech:{type:['string','null'],maxLength:80},ipa_gb:{type:['string','null'],maxLength:140},ipa_us:{type:['string','null'],maxLength:140},meaning_zh:{type:['string','null'],maxLength:500},sentence_en:{type:['string','null'],maxLength:1000},sentence_zh:{type:['string','null'],maxLength:1000},reason:{type:['string','null'],maxLength:500}}}},theme:{type:'string',maxLength:80}},['wordbook_id','raw_text']),object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:MAX_IMPORT_WORDS},theme:{type:'string',maxLength:80}},['wordbook_id','words'])]},
+  vocabularyConfirm:object({decisions:{type:'array',minItems:1,maxItems:30,items:object({item_id:id,selected:{type:'boolean'},correction:object({meaning_zh:str(500),sentence_en:str(1000),sentence_zh:str(1000)})},['item_id','selected'])}}),
   quizCreate:quizCreateSchema,
   quizVersion:object({expected_version:positive}),
   quizTakeover:object({expected_version:positive,expected_session_id:id,confirmed:{const:true}}),
@@ -54,7 +62,8 @@ export function validateBody(path:string[],method:string,body:unknown){
   if(!['POST','PUT','PATCH','DELETE'].includes(method))return;
   if(method==='DELETE'){const route=path.join('/');const kind=route==='me/ai-key'?'aiKeyDelete':route==='me'||route==='me/privacy-consent'?'confirmed':path[0]==='children'&&path.length===2?'deleteChild':path[0]==='families'&&path.length===2?'deleteFamily':'empty';ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');return;}
   let kind='';const route=path.join('/');
-  if(route==='me/profile')kind='parentProfile';
+  if(path[0]==='children'&&path[2]==='poems'){kind=path[3]==='imports'?(path.length===4?'poemImport':path[5]==='save'?'poemImportSave':'empty'):path.length===3?'poem':path.length===4&&path[3]==='analyze'?'poemAnalyze':path.length===4?'poem':path[4]==='memorization'?'poemMark':path[4]==='sessions'&&path[6]==='messages'?'tutorAnswer':'empty';}
+  else if(route==='me/profile')kind='parentProfile';
   else if(route==='me/ai-settings')kind='aiSettings';
   else if(route==='me/ai-test')kind='aiTest';
   else if(route==='me/ai-recharges')kind='aiRecharge';
@@ -74,12 +83,16 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='monthly-quizzes'){kind=path[2]==='items'&&path[4]==='answer'?'quizAnswer':path[2]==='submit'?'quizSubmit':path[2]==='takeover'?'quizTakeover':['resume','abandon'].includes(path[2])?'quizVersion':'';}
   else if(path[0]==='ai-batches'&&path.length===2&&method==='PUT')kind='aiReplace';
   else if(path[0]==='words'&&path[2]==='annotations'&&method==='PATCH')kind='annotations';
-  else if(path[0]==='ai-batches'&&path[2]==='retry')kind='empty';
+  else if(path[0]==='ai-batches'&&path[2]==='confirm')kind='vocabularyConfirm';
+  else if(path[0]==='audio'&&path.length===3&&path[2]==='feedback')kind='empty';
+  else if(path[0]==='words'&&path.length===3&&path[2]==='feedback')kind='wordFeedback';
+  else if(path[0]==='ai-batches'&&['retry','cancel'].includes(path[2]))kind='empty';
   else if(path[0]==='word-tutor-messages'&&path[2]==='audio')kind='tutorSpeech';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='images')kind='tutorImage';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='search')kind='tutorSearch';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='transcriptions')kind='tutorTranscription';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='messages')kind='tutorAnswer';
+  else if(path[0]==='word-tutor-sessions'&&path[2]==='learning-events')kind='tutorLearningEvent';
   else if(path[0]==='children'&&path[2]==='word-tutor-sessions')kind='tutorOpen';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
   else if(path[0]==='children'&&path[2]==='checkin-makeup'&&method==='POST')kind='checkinMakeup';

@@ -65,9 +65,18 @@ test('vision adapter isolates credentials and image data; handles refusal, trunc
  const entry={input_index:0,input:'airport',status:'ok',lemma:'airport',part_of_speech:'noun',ipa_gb:'/ˈeəpɔːt/',ipa_us:'/ˈerpɔːrt/',meaning_zh:'机场',sentence_en:'We arrived at the airport.',sentence_zh:'我们到达了机场。',reason:null};
  const reader=imageReader(env,(async(url:any,init:any)=>{request={url,init,body:JSON.parse(init.body)};return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({text:'airport',error:null,items:[entry]})}}]}));}) as any)!;
  assert.deepEqual(await reader.readVocabulary!(png,'image/png','','travel'),{text:'airport',items:[entry]});assert(request.url.startsWith('https://workspace-test.cn-beijing.maas.aliyuncs.com/'));assert.equal(request.init.redirect,'error');assert.deepEqual(request.body.response_format,{type:'json_object'});assert.equal(request.body.messages[1].content.filter((x:any)=>x.type==='image_url').length,1);assert(!JSON.stringify(request.body).includes(env.OCR_API_KEY));
+ const supplied=imageReader(env,(async()=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({text:'1. **airport** 机场\n例句：The airport is busy.\n译文：机场很繁忙。',error:null,items:[entry]})}}]}))) as any)!;const suppliedResult=await supplied.readVocabulary!(png,'image/png','','');assert.equal(suppliedResult.items[0].meaning_zh,'机场');assert.equal(suppliedResult.items[0].sentence_en,'The airport is busy.');assert.equal(suppliedResult.items[0].sentence_zh,'机场很繁忙。');
  const words=['airport','luggage','delay'],items=words.map(word=>({input:word,status:'ok',lemma:word,part_of_speech:'n.',ipa_gb:'[ˈeəpɔːt]',ipa_us:'[ˈerpɔːrt]',meaning_zh:'机场',sentence_en:`We saw the ${word}.`,sentence_zh:`我们看到了${word}。`}));
  const multi=imageReader(env,(async()=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify({result:{items,explanation:'ignored'}})}}]}))) as any)!;
  const multiResult=await multi.readVocabulary!(png,'image/png','','');assert.deepEqual(multiResult.items.map((x:any)=>x.input),words);assert(multiResult.text.includes('airport')&&multiResult.text.includes('luggage')&&multiResult.text.includes('delay'));
  for(const response of [{choices:[{finish_reason:'length'}]},{choices:[{finish_reason:'stop',message:{content:'invalid'}}]}]){const bad=imageReader(env,(async()=>new Response(JSON.stringify(response))) as any)!;await assert.rejects(bad.read(png,'image/png'),{code:'OCR_FAILED'});}
  assert.equal(imageReader({}),undefined);assert.throws(()=>imageReader({...env,OCR_WORKSPACE_ID:'attacker/../'}),{code:'OCR_CONFIGURATION_INVALID'});
+});
+test('poem image transcription preserves visible text without using vocabulary generation',async()=>{
+ const env={OCR_PROVIDER:'qwen',OCR_API_KEY:'private-test',OCR_WORKSPACE_ID:'workspace-test',OCR_MODEL:'qwen-test'};let body:any;
+ const reader=imageReader(env,(async(_url:any,init:any)=>{body=JSON.parse(init.body);return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:'静夜思\n李白\n床前明月光。'}}]}));}) as any)!;
+ assert.deepEqual(await reader.readText!(png,'image/png'),{text:'静夜思\n李白\n床前明月光。'});assert.match(body.messages[0].content,/不要补全/);assert.equal(body.response_format,undefined);
+});
+test('spreadsheet extraction preserves blank columns by cell reference',()=>{
+ const sheet=office('xl/worksheets/sheet1.xml','<worksheet><row><c r="A1" t="inlineStr"><is><t>标题</t></is></c><c r="C1" t="inlineStr"><is><t>正文</t></is></c></row></worksheet>');assert.equal(parseFile('poems.xlsx',sheet).text,'标题\t\t正文');
 });

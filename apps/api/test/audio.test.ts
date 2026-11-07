@@ -13,7 +13,7 @@ import {audioCharacters,audioCost,audioTariff} from '../src/audio-tariff.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 async function fixture(){
  const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/004_voice_previews.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/005_audio_autoplay.sql','utf8'));
- for(const file of ['017_ai_accounts.sql','018_family_ai.sql','020_audio_billing.sql'])await pg.exec(readFileSync('apps/api/migrations/'+file,'utf8'));
+ for(const file of ['017_ai_accounts.sql','018_family_ai.sql','020_audio_billing.sql','030_audio_feedback.sql','031_word_feedback.sql'])await pg.exec(readFileSync('apps/api/migrations/'+file,'utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  const spoolDir=await mkdtemp(join(tmpdir(),'word-audio-'));
  const objects=new Map<string,Uint8Array>();let calls=0,uploadError=false,readError=false,gate:Promise<void>|undefined,now=new Date();
@@ -99,6 +99,16 @@ test('audio: historical completed files remain playable without a new billing en
   const job=await f.core.audio.create(f.dad,'old-cache',f.request);await f.core.audio.processOne();
   await f.pg.exec("DELETE FROM wordmate.ai_family_wallet_entries WHERE kind='charge';DELETE FROM wordmate.ai_calls WHERE kind='audio';UPDATE wordmate.ai_family_wallets SET balance_micros=20000000,gift_remaining_micros=20000000;UPDATE wordmate.generation_jobs SET payload=payload-'billing_id'-'audio_tariff' WHERE kind='audio';");
   assert.equal((await f.newCore().audio.create(f.dad,'reuse-old',f.request)).status,'succeeded');assert.deepEqual(await f.core.audio.content(f.dad,job.audio_id),f.bytes);assert.equal(f.calls(),1);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.ai_calls')).rows[0].n,0);
+ }finally{await f.close();}
+});
+test('a missing repaired audio cannot silently regenerate the original incorrect voice',async()=>{
+ const f=await fixture();try{
+  for(const file of ['028_word_tutor.sql','029_tutor_learning.sql','032_admin_feedback.sql','033_admin_audio_repairs.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+file,'utf8'));
+  const job=await f.core.audio.create(f.dad,'repair-missing',f.request);await f.core.audio.processOne();
+  await f.pg.query("INSERT INTO wordmate.admin_audio_repairs(child_id,audio_id,status,voice_id,accent,original_sha256,content_version,new_storage_profile_id,new_storage_key) VALUES($1,$2,'applied','gb','en-GB','old',1,'test-storage','repair.mp3')",[f.child.id,job.audio_id]);
+  f.objects.clear();await assert.rejects(f.core.audio.content(f.dad,job.audio_id),{code:'AUDIO_OBJECT_MISSING'});
+  const failed=await f.core.audio.get(f.dad,job.job_id);assert.equal(failed.error_code,'AUDIO_REPAIR_RECOVERY_REQUIRED');assert.equal(failed.retryable,false);
+  await assert.rejects(f.core.audio.retry(f.dad,'wrong-retry',job.job_id),{code:'AUDIO_NOT_RETRYABLE'});
  }finally{await f.close();}
 });
 test('audio: insufficient balance stops synthesis; forbidden storage access does not regenerate; missing object can retry',async()=>{
@@ -205,5 +215,16 @@ test('voice preview serializes concurrent workers and caps repeated failures',as
   const exhausted=await f.core.audio.previews.create(f.dad,{accent:'en-GB',voice_id:'gb'});
   assert.equal(exhausted.attempts,3);assert.equal(exhausted.status,'failed');assert.equal(exhausted.retryable,false);assert.equal(f.calls(),1);
   await assert.rejects(f.core.audio.previews.get('00000000-0000-4000-8000-000000000000',preview.job_id),{code:'ACCOUNT_UNAVAILABLE'});
+ }finally{await f.close();}
+});
+
+test('pronunciation feedback is authorized, deduplicated and does not synthesize audio',async()=>{
+ const f=await fixture();try{const job=await f.core.audio.create(f.dad,'feedback-audio',f.request);await assert.rejects(f.core.audio.reportPronunciation(f.dad,'feedback-not-ready',job.audio_id),{code:'AUDIO_NOT_READY'});await f.core.audio.processOne();await assert.rejects(f.core.audio.reportPronunciation(f.mom,'feedback-outsider',job.audio_id),{code:'FAMILY_NOT_FOUND'});const result=await f.core.audio.reportPronunciation(f.dad,'feedback-one',job.audio_id);const same=await f.core.audio.reportPronunciation(f.dad,'feedback-one',job.audio_id);assert.equal(same.id,result.id);const again=await f.core.audio.reportPronunciation(f.dad,'feedback-two',job.audio_id);assert.equal(again.already_reported,true);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.audio_feedback')).rows[0].n,1);assert.equal(f.calls(),1);}finally{await f.close();}
+});
+
+test('word feedback keeps categories separate and protects word, sentence and audio scope',async()=>{
+ const f=await fixture();try{const word=f.words[0],example=(await f.pg.query("INSERT INTO wordmate.sentences(child_id,text_en,translation_zh,level,model,prompt_version,status,created_by) VALUES($1,'I eat an apple.','我吃苹果。','A1','test','test','validated',$2) RETURNING id,content_version",[f.child.id,f.dad])).rows[0];await f.pg.query("INSERT INTO wordmate.sentence_targets(child_id,sentence_id,child_word_id,surface,start_utf16,end_utf16) VALUES($1,$2,$3,'apple',9,14)",[f.child.id,example.id,word.id]);const audio=await f.core.audio.create(f.dad,'word-feedback-audio',f.request);await f.core.audio.processOne();
+ const pronunciation={kind:'pronunciation',word_version:word.version,audio_id:audio.audio_id};await assert.rejects(f.core.audio.reportWord(f.mom,'feedback-other',word.id,pronunciation),{code:'FAMILY_NOT_FOUND'});const a=await f.core.audio.reportWord(f.dad,'word-feedback-1',word.id,pronunciation);const b=await f.core.audio.reportWord(f.dad,'word-feedback-2',word.id,pronunciation);assert.equal(a.id,b.id);assert.equal(b.already_reported,true);
+ await f.core.audio.reportWord(f.dad,'word-feedback-3',word.id,{kind:'translation',word_version:word.version});await f.core.audio.reportWord(f.dad,'word-feedback-4',word.id,{kind:'example',word_version:word.version,sentence_id:example.id,sentence_version:example.content_version});await assert.rejects(f.core.audio.reportWord(f.dad,'word-feedback-wrong',word.id,{kind:'example_pronunciation',word_version:word.version,sentence_id:example.id,sentence_version:example.content_version,audio_id:audio.audio_id}),{code:'AUDIO_RESOURCE_NOT_FOUND'});assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.word_feedback')).rows[0].n,3);assert.equal(f.calls(),1);
  }finally{await f.close();}
 });

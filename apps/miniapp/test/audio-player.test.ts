@@ -24,8 +24,8 @@ const target={word_id:'word',content_version:1};
 test('opening an audio player reads settings without generating or downloading audio',async()=>{
  const p=player();await tick();assert.equal(p.requests.length,1);assert.equal(p.requests[0].path,'/me/audio-settings');assert.equal(p.downloads(),0);p.cleanup();
 });
-test('replaying a word reuses its file and settings instead of another request and download',async()=>{
- const p=player();await p.audio.play(target);p.contexts[0].callbacks.ended();await p.audio.play(target);assert.equal(p.downloads(),1);assert.equal(p.requests.filter(request=>request.path==='/audio').length,1);assert.equal(p.requests.filter(request=>request.path==='/me/audio-settings').length,1);assert.equal(p.contexts.length,2);p.cleanup();assert(p.removed.includes('/temp-1'));
+test('replaying a word fetches the latest audio so a pronunciation repair takes effect',async()=>{
+ const p=player();await p.audio.play(target);p.contexts[0].callbacks.ended();await p.audio.play(target);assert.equal(p.downloads(),2);assert.equal(p.requests.filter(request=>request.path==='/audio').length,2);assert.equal(p.requests.filter(request=>request.path==='/me/audio-settings').length,1);assert.equal(p.contexts.length,2);p.cleanup();assert(p.removed.includes('/temp-1'));
 });
 test('changed voice and account scope cannot reuse the previous private audio file',async()=>{
  const p=player();await p.audio.play(target);p.hide();p.voice('voice-two');p.show();await tick();await p.audio.play(target);assert.equal(p.downloads(),2);p.audio.stop();p.cache.set('access_token','another-account');await p.audio.play(target);assert.equal(p.downloads(),3);assert(p.removed.includes('/temp-1'));assert(p.removed.includes('/temp-2'));p.cleanup();

@@ -118,7 +118,7 @@ export function createTextGenerator(env: Record<string, string | undefined> = pr
 
 export type Accent = 'en-GB' | 'en-US';
 export type Voice = { id: string; accent: Accent; gender: string };
-export type SpeechRequest = { text: string; accent: Accent; voiceId: string; rate: number; languageHints?: ('zh'|'en')[] };
+export type SpeechRequest = { text: string; accent: Accent | 'zh-CN'; voiceId: string; rate: number; languageHints?: ('zh'|'en')[] };
 export type SpeechProfile = Readonly<{
   provider: string; region: string; model: string; revision: string;
   format: 'mp3'; sampleRate: number;
@@ -163,11 +163,11 @@ export function createCosyVoiceProvider(env: Record<string, string | undefined>,
     profile: Object.freeze({provider:'cosyvoice',region:'cn-beijing',model,revision:'cosy-http-plain-aigc-v1',format:'mp3',sampleRate:24000}),
     async listVoices() { return voices.map(v => ({ ...v })); },
     async synthesize(r) {
-      if (!['en-GB', 'en-US'].includes(r.accent) || !Number.isFinite(r.rate) || r.rate < 0.5 || r.rate > 1.5 ||
+      if (!['en-GB', 'en-US', 'zh-CN'].includes(r.accent) || !Number.isFinite(r.rate) || r.rate < 0.5 || r.rate > 1.5 ||
           !r.text?.trim() || r.text.length > 1000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(r.text))
         throw new ProviderError('INVALID_SPEECH_REQUEST');
       if (r.languageHints&&(!r.languageHints.length||r.languageHints.length>2||r.languageHints.some(v=>!['zh','en'].includes(v))))throw new ProviderError('INVALID_SPEECH_REQUEST');
-      if (!voices.some(v => v.id === r.voiceId && v.accent === r.accent)) throw new ProviderError('VOICE_ACCENT_UNAVAILABLE');
+      if (r.accent==='zh-CN' ? r.voiceId!=='longxiaochun_v3'||r.languageHints?.length!==1||r.languageHints[0]!=='zh' : !voices.some(v => v.id === r.voiceId && v.accent === r.accent)) throw new ProviderError('VOICE_ACCENT_UNAVAILABLE');
       const result = await json(await request(fetcher, `${base}/api/v1/services/audio/tts/SpeechSynthesizer`, {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, input: { text: r.text, voice: r.voiceId, format: 'mp3', sample_rate: 24000,

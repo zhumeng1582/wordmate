@@ -17,8 +17,16 @@ export class WordTutor {
   if(!s)s=await one(q,'INSERT INTO word_tutor_sessions(child_id,sense_key,lemma,part_of_speech,meaning_zh,example_en,example_zh) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[child,key,w.lemma,w.part_of_speech,w.meaning_zh,w.example_en??'',w.example_zh??'']);
   return this.dto(q,s);
  });}
- private async dto(q:Sql,s:Row){return {id:s.id,child_id:s.child_id,lemma:s.lemma,part_of_speech:s.part_of_speech,meaning_zh:s.meaning_zh,created_at:s.created_at,updated_at:s.updated_at,messages:(await q.query("SELECT m.id,m.role,m.content,m.sources,m.created_at,i.id AS image_id FROM word_tutor_messages m LEFT JOIN word_tutor_images i ON i.message_id=m.id AND i.state='succeeded' WHERE m.session_id=$1 ORDER BY m.ordinal LIMIT 500",[s.id])).rows};}
- async answer(actor:string,id:string,turnId:string,question?:string){
+ private async dto(q:Sql,s:Row){return {id:s.id,child_id:s.child_id,lemma:s.lemma,part_of_speech:s.part_of_speech,meaning_zh:s.meaning_zh,created_at:s.created_at,updated_at:s.updated_at,exercise_completed:!!await one(q,"SELECT 1 FROM word_tutor_learning_events WHERE session_id=$1 AND kind='exercise_completed' LIMIT 1",[s.id]),exercise_attempted:!!await one(q,"SELECT 1 FROM word_tutor_learning_events WHERE session_id=$1 AND kind='exercise_answered' LIMIT 1",[s.id]),messages:(await q.query("SELECT m.id,m.role,m.content,m.sources,m.created_at,i.id AS image_id FROM word_tutor_messages m LEFT JOIN word_tutor_images i ON i.message_id=m.id AND i.state='succeeded' WHERE m.session_id=$1 ORDER BY m.ordinal LIMIT 500",[s.id])).rows};}
+ async learningEvent(actor:string,id:string,eventId:string,kind:string,messageId?:string){return this.access.tx(async q=>{
+  uuid(eventId);await this.session(q,actor,id);const kinds=['lesson_opened','exercise_started','exercise_answered','exercise_completed','feedback_wrong','feedback_hard','feedback_unnatural'];ensure(kinds.includes(kind),422,'INVALID_TUTOR_EVENT');
+  if(kind.startsWith('feedback_')){ensure(messageId,422,'INVALID_TUTOR_EVENT');ensure(await one(q,"SELECT id FROM word_tutor_messages WHERE id=$1 AND session_id=$2 AND role='assistant'",[uuid(messageId),id]),404,'TUTOR_MESSAGE_NOT_FOUND');}else ensure(!messageId,422,'INVALID_TUTOR_EVENT');
+  if(kind==='exercise_completed')ensure(await one(q,"SELECT 1 FROM word_tutor_learning_events WHERE session_id=$1 AND kind='exercise_answered' LIMIT 1",[id]),409,'TUTOR_EXERCISE_NOT_ATTEMPTED');
+  const old=await one(q,'SELECT session_id,actor_id,kind,message_id FROM word_tutor_learning_events WHERE id=$1',[eventId]);if(old){ensure(old.session_id===id&&old.actor_id===actor&&old.kind===kind&&(old.message_id??null)===(messageId??null),409,'IDEMPOTENCY_CONFLICT');return {recorded:true};}
+  ensure(Number((await one(q,'SELECT count(*)::int n FROM word_tutor_learning_events WHERE session_id=$1',[id])).n)<1000,429,'TUTOR_EVENT_LIMIT');
+  await q.query('INSERT INTO word_tutor_learning_events(id,session_id,actor_id,kind,message_id) VALUES($1,$2,$3,$4,$5)',[eventId,id,actor,kind,messageId??null]);return {recorded:true};
+ });}
+ async answer(actor:string,id:string,turnId:string,question?:string,useSchoolGrade=false,exerciseAnswer=false){
   uuid(turnId);ensure(this.accounts,503,'AI_NOT_CONFIGURED');
   if(question!==undefined)ensure(typeof question==='string'&&question.trim().length>0&&question.length<=1000&&!/[\u0000-\u001f\u007f]/.test(question),422,'INVALID_TEXT');
   const initial=await this.access.tx(async q=>{
@@ -32,12 +40,13 @@ export class WordTutor {
    const child=await this.access.child(q,actor,session.child_id);
    await q.query("INSERT INTO word_tutor_turns(id,session_id,question,status) VALUES($1,$2,$3,'running')",[turnId,id,question??null]);
    const generate=await this.accounts!.tutor(q,actor,`word-tutor:${turnId}`,child.family_id);
-   return {done:false,session,history,generate};
+   const grades=['幼儿园','小学一年级','小学二年级','小学三年级','小学四年级','小学五年级','小学六年级','初中一年级','初中二年级','初中三年级','高中一年级','高中二年级','高中三年级'];
+   return {done:false,session,history,generate,schoolGrade:useSchoolGrade&&grades.includes(child.school_grade)?child.school_grade:''};
   });
   if(initial.done)return initial.session;
   let billingId:string|undefined;
   try{
-   const s=initial.session as Row,result=await initial.generate!({lemma:s.lemma,part_of_speech:s.part_of_speech,meaning_zh:s.meaning_zh,example_en:s.example_en,example_zh:s.example_zh},initial.history!,question);billingId=result.id;
+   const s=initial.session as Row,result=await initial.generate!({lemma:s.lemma,part_of_speech:s.part_of_speech,meaning_zh:s.meaning_zh,example_en:s.example_en,example_zh:s.example_zh,school_grade:initial.schoolGrade},initial.history!,question,exerciseAnswer);billingId=result.id;
    return await this.access.tx(async q=>{
     const current=await this.session(q,actor,id);const turn=await one(q,"SELECT * FROM word_tutor_turns WHERE id=$1 FOR UPDATE",[turnId]);ensure(turn?.status==='running',409,'TUTOR_GENERATING');
     if(question!==undefined)await q.query("INSERT INTO word_tutor_messages(session_id,role,content) VALUES($1,'user',$2)",[id,question.trim()]);
@@ -47,6 +56,6 @@ export class WordTutor {
   }catch(error){if(billingId)await this.accounts!.failId(billingId);await this.access.tx(q=>q.query("UPDATE word_tutor_turns SET status='failed',updated_at=now() WHERE id=$1 AND status='running'",[turnId]));throw error;}
  }
  async get(actor:string,id:string){return this.access.tx(async q=>this.dto(q,await this.session(q,actor,id)));}
- async list(actor:string,child:string){return this.access.tx(async q=>{await this.access.child(q,actor,child);return {items:(await q.query('SELECT id,lemma,part_of_speech,meaning_zh,created_at,updated_at FROM word_tutor_sessions WHERE child_id=$1 ORDER BY updated_at DESC,id DESC LIMIT 100',[child])).rows};});}
+ async list(actor:string,child:string){return this.access.tx(async q=>{await this.access.child(q,actor,child);return {items:(await q.query('SELECT s.id,s.lemma,s.part_of_speech,s.meaning_zh,s.created_at,s.updated_at,(SELECT m.content FROM word_tutor_messages m WHERE m.session_id=s.id ORDER BY m.ordinal DESC LIMIT 1) AS last_message FROM word_tutor_sessions s WHERE s.child_id=$1 ORDER BY s.updated_at DESC,s.id DESC LIMIT 1000',[child])).rows};});}
  async delete(actor:string,id:string){return this.access.tx(async q=>{await this.session(q,actor,id);await q.query('DELETE FROM word_tutor_sessions WHERE id=$1',[id]);return {id,deleted:true};});}
 }

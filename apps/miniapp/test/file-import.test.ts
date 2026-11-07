@@ -7,7 +7,7 @@ import {deferred} from './page-harness.ts';
 const require=createRequire(import.meta.url),ts=require('typescript');
 function imports(options:{choose?:(callbacks:any)=>any;response?:()=>Promise<any>}={}){
  const cache=new Map<string,string>([['access_token','account-a'],['child_id','child-a'],['family_id','family-a']]),calls:any[]=[],events:string[]=[];
- const taro={canIUse:()=>false,chooseMedia:options.choose??(async()=>({tempFiles:[{tempFilePath:'/private/image.jpg',size:1}]})),chooseMessageFile:options.choose??(async()=>({tempFiles:[{path:'/private/words.txt',name:'words.txt',size:1}]})),getImageInfo:async()=>{events.push('image-info');return {type:'jpg',width:100,height:100};},getFileSystemManager:()=>({readFile:({success}:any)=>{events.push('read');success({data:'eA=='});}})};
+ const taro={canIUse:()=>false,showModal:async()=>({confirm:true}),chooseMedia:options.choose??(async()=>({tempFiles:[{tempFilePath:'/private/image.jpg',size:1}]})),chooseMessageFile:options.choose??(async()=>({tempFiles:[{path:'/private/words.txt',name:'words.txt',size:1}]})),getImageInfo:async()=>{events.push('image-info');return {type:'jpg',width:100,height:100};},getFileSystemManager:()=>({readFile:({success}:any)=>{events.push('read');success({data:'eA=='});}})};
  const api=async(...args:any[])=>{calls.push(args);return options.response?options.response():{source:'image',text:'apple'};};
  const module={exports:{} as any},code=ts.transpileModule(readFileSync('apps/miniapp/src/services/files.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
  vm.runInNewContext(code,{module,exports:module.exports,require:(id:string)=>id==='@tarojs/taro'?taro:{api,storage:{get:(key:string)=>cache.get(key)}}});return {extract:module.exports.extractFile,isCancel:module.exports.isFileCancel,calls,cache,events};
@@ -54,4 +54,9 @@ test('switching children while the native picker is open prevents an image uploa
 });
 test('switching accounts while the import response is pending never returns private recognition data',async()=>{
  const waiting=deferred(),started=deferred(),page=imports({response:async()=>{started.resolve();return waiting.promise;}}),work=page.extract('child-a','album');await started.promise;page.cache.set('access_token','account-b');waiting.resolve({text:'private recognized text',source:'image'});await assert.rejects(work,/SESSION_CHANGED/);
+});
+
+test('PDF is selectable for poems and vocabulary with consent before upload',async()=>{
+ let picker:any;const page=imports({choose:async options=>{picker=options;return {tempFiles:[{path:'/private/a.pdf',name:'poems.pdf',size:100}]};},response:async()=>({source:'file',text:'poem'})});await page.extract('child-a','file','','',undefined,'poem');assert(picker.extension.includes('pdf'));assert.equal(page.calls[0][2].purpose,'poem');assert.equal(page.calls[0][4],300000);
+ const words=imports({choose:async options=>{picker=options;return {tempFiles:[{path:'/private/a.pdf',name:'words.pdf',size:100}]};},response:async()=>({source:'file',text:'apple'})});await words.extract('child-a','file','banana');assert(picker.extension.includes('pdf'));assert.equal(words.calls[0][2].existing_text,'banana');assert.equal(words.calls[0][4],300000);
 });

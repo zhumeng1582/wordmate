@@ -27,19 +27,19 @@ test('opening the simplified page only reads data and keeps optional configurati
 test('large input survives draft restoration and bulk progress uses server totals instead of preview length',async()=>{
  const raw=Array.from({length:8000},(_,i)=>`word${i}`).join('\n');const page=fixture({write:async()=>job({is_bulk:true,saved_count:6000,total_count:8000,bulk:{completed_parts:200,total_parts:267},items:entries.map(item=>({...item,word_id:'saved'}))})});
  await page.show();input(page,raw);const reopened=fixture({cache:Object.fromEntries(page.cache)});await reopened.show();assert.equal(reopened.all(reopened.render()).find(node=>node.type==='Textarea').props.value,raw);
- await page.button('整理并加入词本').onClick();await tick();assert.match(page.text(page.render()),/已完成 200 \/ 267 批 · 已保存 6000 词/);assert.equal(page.calls.find(call=>call.method==='POST')?.body.raw_text,raw);
+ await page.button('整理并选择词义').onClick();await tick();assert.match(page.text(page.render()),/已完成 200 \/ 267 批 · 已保存 6000 词/);assert.equal(page.calls.find(call=>call.method==='POST')?.body.raw_text,raw);
 });
 
 test('text submission is durable before posting and success shows the result without another form',async()=>{
  let page!:ReturnType<typeof fixture>;
  page=fixture({write:async(_,body)=>{const pending=page.cache.get(vocabularyKeys('account-a','child-a').pending);assert.equal(pending.body.raw_text,'apple\nbanana');assert.equal(body.source_type,'text');return job({status:'succeeded',items:[{ordinal:1,input:'apple',word_id:'word-a'},{ordinal:2,input:'banana',word_id:'word-b'}]});}});
- await page.show();input(page,'apple\nbanana');await page.button('整理并加入词本').onClick();await tick();
- assert.match(page.text(page.render()),/已加入 2 个单词/);assert(!page.all(page.render()).some(node=>node.type==='Textarea'));assert(!page.cache.has(vocabularyKeys('account-a','child-a').pending));assert.equal(page.cache.get(vocabularyKeys('account-a','child-a').draft).raw,'');
+ await page.show();input(page,'apple\nbanana');await page.button('整理并选择词义').onClick();await tick();
+ assert.match(page.text(page.render()),/已加入 2 个词义/);assert(!page.all(page.render()).some(node=>node.type==='Textarea'));assert(!page.cache.has(vocabularyKeys('account-a','child-a').pending));assert.equal(page.cache.get(vocabularyKeys('account-a','child-a').draft).raw,'');
  page.button('开始学习').onClick();assert.deepEqual(page.routes,['/pages/review/index']);assert.equal(page.cache.get('review_source').source,'new_words');assert.equal(page.cache.get('study_intent'),'start');
 });
 
 test('lost submission response keeps the material and retries the identical request',async()=>{
- let attempts=0;const page=fixture({write:async()=>{if(++attempts===1)throw Error('NETWORK_TIMEOUT');return job();}});await page.show();input(page,'apple');await page.button('整理并加入词本').onClick();
+ let attempts=0;const page=fixture({write:async()=>{if(++attempts===1)throw Error('NETWORK_TIMEOUT');return job();}});await page.show();input(page,'apple');await page.button('整理并选择词义').onClick();
  assert.equal(page.all(page.render()).find(node=>node.type==='Textarea').props.disabled,true);const first=page.calls.find(call=>call.method==='POST');assert(first);assert(page.cache.has(vocabularyKeys('account-a','child-a').pending));
  await page.button('重试上次提交').onClick();await tick();const writes=page.calls.filter(call=>call.method==='POST');assert.equal(writes.length,2);assert.equal(writes[0].key,writes[1].key);assert.deepEqual(writes[0].body,writes[1].body);assert.match(page.text(page.render()),/正在整理单词/);
 });
@@ -83,10 +83,17 @@ test('image recognition previews entries and removal reindexes the saved result 
  page.all(page.render()).find(node=>node.props?.['aria-label']==='移除 apple').props.onClick();page.render();await page.button('确认加入 2 个单词').onClick();await tick();
  const write=page.calls.find(call=>call.method==='POST');assert.equal(imports,1);assert.equal(write?.body.source_type,'vision');assert.deepEqual(Array.from(write?.body.prepared_items,(item:any)=>item.input),['banana','pear']);assert.deepEqual(Array.from(write?.body.prepared_items,(item:any)=>item.input_index),[0,1]);
 });
+test('image preview lets the user remove one sense while retaining another',async()=>{
+ const senses=[{...entries[0],input:'match',lemma:'match',meaning_zh:'比赛',part_of_speech:'noun',sentence_en:'The match is fun.'},{...entries[1],input:'match',lemma:'match',meaning_zh:'匹配',part_of_speech:'verb',sentence_en:'The colours match.'}];
+ const page=fixture({extract:async()=>({source:'image',text:'match n. 比赛 v. 匹配',prepared_items:senses})});await page.show();page.button('拍照 / 图片').onClick();await page.button('从相册选择').onClick();
+ assert.match(page.text(page.render()),/noun · 比赛/);assert.match(page.text(page.render()),/verb · 匹配/);assert.match(page.text(page.render()),/The colours match/);
+ const removes=page.all(page.render()).filter(node=>String(node.props?.['aria-label']||'').startsWith('移除 match '));assert.equal(removes.length,2);removes[0].props.onClick();page.render();await page.button('确认加入 1 个单词').onClick();await tick();
+ const sent=page.calls.find(call=>call.method==='POST')?.body.prepared_items;assert.equal(sent.length,1);assert.equal(sent[0].meaning_zh,'匹配');assert.equal(sent[0].input_index,0);
+});
 
 test('editing recognized text invalidates prepared entries only when its content changes',async()=>{
  const page=fixture({extract:async()=>({source:'image',text:'apple banana pear',prepared_items:entries})});await page.show();page.button('拍照 / 图片').onClick();await page.button('从相册选择').onClick();page.button('查看 / 修改原文').onClick();assert.match(page.text(page.render()),/确认加入 3 个单词/);
- input(page,'apple\nbanana');assert.doesNotMatch(page.text(page.render()),/检查识别结果/);assert.match(page.text(page.render()),/整理并加入词本/);assert(page.calls.every(call=>call.method==='GET'));
+ input(page,'apple\nbanana');assert.doesNotMatch(page.text(page.render()),/检查识别结果/);assert.match(page.text(page.render()),/整理并选择词义/);assert(page.calls.every(call=>call.method==='GET'));
 });
 
 test('an active batch can be opened with no input and new material can be prepared while it runs',async()=>{
@@ -100,7 +107,7 @@ test('a late image result cannot enter another childs form or local draft',async
 });
 
 test('book list reordering never changes the chosen destination',async()=>{
- const page=fixture();await page.show();page.all(page.render()).find(node=>node.type==='Picker').props.onChange({detail:{value:1}});page.render();page.backend.books.reverse();page.hide();await page.show();input(page,'apple');await page.button('整理并加入词本').onClick();assert.equal(page.calls.find(call=>call.method==='POST')?.body.wordbook_id,'book-b');
+ const page=fixture();await page.show();page.all(page.render()).find(node=>node.type==='Picker').props.onChange({detail:{value:1}});page.render();page.backend.books.reverse();page.hide();await page.show();input(page,'apple');await page.button('整理并选择词义').onClick();assert.equal(page.calls.find(call=>call.method==='POST')?.body.wordbook_id,'book-b');
 });
 
 test('discarding all recognized entries cannot silently submit the original material',()=>{
@@ -108,6 +115,6 @@ test('discarding all recognized entries cannot silently submit the original mate
 });
 
 test('an expired login during submission returns to a clear login action',async()=>{
- let page!:ReturnType<typeof fixture>;page=fixture({write:async()=>{page.cache.clear();throw Object.assign(Error('UNAUTHENTICATED'),{status:401});}});await page.show();input(page,'apple');await page.button('整理并加入词本').onClick();
+ let page!:ReturnType<typeof fixture>;page=fixture({write:async()=>{page.cache.clear();throw Object.assign(Error('UNAUTHENTICATED'),{status:401});}});await page.show();input(page,'apple');await page.button('整理并选择词义').onClick();
  assert.match(page.text(page.render()),/微信登录/);assert.doesNotMatch(page.text(page.render()),/正在提交|正在准备添加单词|apple/);
 });

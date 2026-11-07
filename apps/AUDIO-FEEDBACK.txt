@@ -1,0 +1,23 @@
+发音反馈（2026-11-04）
+
+用户在单词本或学习页面播放实际音频后，可点击“发音有误？”；系统只记录音频、孩子和提交账号的关联，不生成新语音或扣费。相同账号对同一音频重复反馈只保留一条。反馈成功后可打开学习设置尝试切换音色；切换后首次生成对应音频按既有规则计费。
+
+这是反馈收集，不是自动校准。当前没有运营后台或自动替换音频，也不保证更换音色后发音正确。运营者可在具备数据库访问权限的环境中按音频汇总，检查词条/例句、口音、音色及次数；不要向无关人员暴露家庭或孩子数据。例如：
+
+SELECT a.id, a.child_word_id, a.sentence_id, a.content_version, a.accent, a.voice_id,
+       count(*) AS reports, max(f.created_at) AS last_reported
+FROM wordmate.audio_feedback f JOIN wordmate.audio_assets a ON a.id=f.audio_id
+GROUP BY a.id ORDER BY reports DESC, last_reported DESC;
+
+删除孩子时删除反馈；注销账号时移除反馈的提交者身份。隐私政策版本及摘要发生变化，现有账号需要重新同意新政策。
+
+本地 PGlite 启动自动应用 030_audio_feedback.sql。现有 PostgreSQL 应先备份并按项目迁移台账流程核验，然后运行 migrate:managed apply；未执行生产迁移或部署。功能依赖服务端和小程序同时更新。
+
+2026-11-04 分类反馈更新：学习卡片右上角统一“反馈”入口，选择单词发音、拼写、中文翻译、例句内容或例句发音。例句相关选项仅在该词有例句时显示。选择后以微信提示反馈提交结果，不在正文插入提示；如果刚播放过对应音频，会附加该音频标识，否则仍可提交类别。旧音频反馈入口保持服务端兼容。新分类保存在 word_feedback，删除孩子时清除，账号注销时去掉提交人。部署需先应用 031_word_feedback.sql 并发布新后端，再更新小程序；隐私政策已更新，账号需重新同意。
+
+分类反馈排查示例（仅授权运营者使用）：
+SELECT kind, child_word_id, word_version, sentence_id, sentence_version, audio_id,
+       count(*) AS reports, max(created_at) AS last_reported
+FROM wordmate.word_feedback
+GROUP BY kind, child_word_id, word_version, sentence_id, sentence_version, audio_id
+ORDER BY reports DESC, last_reported DESC;

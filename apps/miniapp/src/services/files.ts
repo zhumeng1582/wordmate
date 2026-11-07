@@ -2,7 +2,7 @@ import Taro from '@tarojs/taro';
 import {api,storage} from './api';
 const fs=()=>Taro.getFileSystemManager();
 type MaterialKind='camera'|'album'|'file';
-function chooseMaterial(kind:MaterialKind){
+function chooseMaterial(kind:MaterialKind,purpose?:'poem'){
  return new Promise<{tempFiles?:any[]}>((resolve,reject)=>{
   // Settle from native callbacks too: cancellation must not depend on the
   // returned Promise being forwarded by the picker on every WeChat version.
@@ -12,17 +12,17 @@ function chooseMaterial(kind:MaterialKind){
   };
   const callbacks={success:resolve,fail:reject,complete};
   const request=kind==='file'
-   ?Taro.chooseMessageFile({count:1,type:'file',extension:['txt','md','csv','tsv','xlsx','docx'],...callbacks})
+   ?Taro.chooseMessageFile({count:1,type:'file',extension:['txt','md','csv','tsv','xlsx','docx','pdf'],...callbacks})
    :Taro.chooseMedia({count:1,mediaType:['image'],sourceType:[kind],sizeType:['compressed'],...callbacks});
   request?.then(resolve,reject);
  });
 }
-export async function extractFile(child:string,kind:MaterialKind,existingText='',theme='',onSelected?:()=>void){
+export async function selectImportMaterial(kind:MaterialKind,onSelected?:()=>void,purpose?:'poem'){
  const token=storage.get('access_token'),selectedChild=storage.get('child_id'),family=storage.get('family_id');
  const checkScope=()=>{if(token!==storage.get('access_token')||selectedChild!==storage.get('child_id')||family!==storage.get('family_id'))throw Error('SESSION_CHANGED');};
  if(Taro.canIUse('requirePrivacyAuthorize'))await new Promise<void>((resolve,reject)=>Taro.requirePrivacyAuthorize({success:()=>resolve(),fail:()=>reject(Error('IMPORT_PRIVACY_REQUIRED'))}));
  checkScope();
- const result=await chooseMaterial(kind),file=result?.tempFiles?.[0];
+ const result=await chooseMaterial(kind,purpose),file=result?.tempFiles?.[0];
  if(!file||!(kind==='file'?file.path:file.tempFilePath))throw Error('IMPORT_CANCELLED');
  checkScope();
  let path:string,name:string,size:number;
@@ -33,12 +33,18 @@ export async function extractFile(child:string,kind:MaterialKind,existingText=''
   const info=await Taro.getImageInfo({src:path});if(!['jpeg','jpg','png'].includes(info.type))throw Error('IMPORT_FORMAT_UNSUPPORTED');
   if(info.width*info.height>20000000)throw Error('IMPORT_IMAGE_TOO_LARGE');name=`image.${info.type==='png'?'png':'jpg'}`;
  }
- if(size>4*1024*1024)throw Error('IMPORT_FILE_TOO_LARGE');
- checkScope();onSelected?.();
+ if(size>(name.toLowerCase().endsWith('.pdf')?10:4)*1024*1024)throw Error(name.toLowerCase().endsWith('.pdf')?'PDF_FILE_TOO_LARGE':'IMPORT_FILE_TOO_LARGE');
+ checkScope();if(name.toLowerCase().endsWith('.pdf')){const notice=await Taro.showModal({title:'读取 PDF',content:'PDF 中的扫描页和图片页将发送给图片 AI 识别，纯文字页直接提取；后续整理也会使用 AI 额度。',confirmText:'继续'});if(!notice.confirm)throw Error('IMPORT_CANCELLED');checkScope();}onSelected?.();
  const data=await new Promise<string>((resolve,reject)=>fs().readFile({filePath:path,encoding:'base64',success:r=>resolve(r.data as string),fail:reject}));
  checkScope();
+ return {name,data};
+}
+export async function extractFile(child:string,kind:MaterialKind,existingText='',theme='',onSelected?:()=>void,purpose?:'poem'){
+ const token=storage.get('access_token'),selectedChild=storage.get('child_id'),family=storage.get('family_id');
+ const checkScope=()=>{if(token!==storage.get('access_token')||selectedChild!==storage.get('child_id')||family!==storage.get('family_id'))throw Error('SESSION_CHANGED');};
+ const {name,data}=await selectImportMaterial(kind,onSelected,purpose);checkScope();
  const separateImage=kind!=='file'&&existingText.length>8000;
- const material=await api<{text:string;prepared_items?:any[];source:'image'|'file'}>(`/children/${child}/import-file`,'POST',{name,base64:data,existing_text:separateImage?'':existingText,theme},undefined,60000);
+ const material=await api<{text:string;prepared_items?:any[];source:'image'|'file'}>(`/children/${child}/import-file`,'POST',{name,base64:data,existing_text:separateImage?'':existingText,theme,...(purpose?{purpose}:{})},undefined,name.toLowerCase().endsWith('.pdf')?300000:60000);
  checkScope();return separateImage?{...material,text:[existingText.trim(),material.text].filter(Boolean).join('\n'),prepared_items:undefined}:material;
 }
 export async function shareCsv(content:string){

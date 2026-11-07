@@ -3,14 +3,14 @@ import {mergeStudyCardWithWord} from './study-cards';
 import {emptyStudy,studyKeys,sourceIdentity,studyComplete,studyCard,moveStudyForward,beginStudyPractice,mergeStudyFlow,type StudyFlow,type StudySource,type StudyCard,type StudyPending} from './study-flow';
 
 type Store={get:(key:string)=>any;set:(key:string,value:any)=>void;remove:(key:string)=>void};
-type Dependencies={token:string;child:string;source:StudySource;intent?:'start'|'resume';storage:Store;api:(path:string,method?:'GET'|'POST',body?:any,key?:string)=>Promise<any>;eventId:()=>string;now?:()=>number;isCurrent:()=>boolean};
+type Dependencies={token:string;child:string;source:StudySource;mode?:'review'|'dictation';intent?:'start'|'resume';storage:Store;api:(path:string,method?:'GET'|'POST',body?:any,key?:string)=>Promise<any>;eventId:()=>string;now?:()=>number;isCurrent:()=>boolean};
 export type StudyScreen={flow:StudyFlow|null;pending:StudyPending|null;conflict:StudyFlow|null;busy:boolean;error:unknown;notice:string;rejected:boolean};
 const errorCode=(error:unknown)=>error instanceof Error?error.message:'';
 const expired=(error:unknown)=>['SESSION_EXPIRED','SESSION_NOT_FOUND'].includes(errorCode(error));
 
 export class StudySessionController{
  state:StudyScreen={flow:null,pending:null,conflict:null,busy:false,error:null,notice:'',rejected:false};
- private deps:Dependencies;private keys:ReturnType<typeof studyKeys>;private listener?:()=>void;private locked=false;private alive=true;private visible=true;private reload=false;private details=new Map<string,Promise<void>>();private detailTail:Promise<unknown>=Promise.resolve();
+ private deps:Dependencies;private keys:ReturnType<typeof studyKeys>;private listener?:()=>void;private locked=false;private exitRequested=false;private alive=true;private visible=true;private reload=false;private details=new Map<string,Promise<void>>();private detailTail:Promise<unknown>=Promise.resolve();
  constructor(deps:Dependencies){this.deps=deps;this.keys=studyKeys(deps.token,deps.child);}
  subscribe(listener:()=>void){this.alive=true;this.visible=true;this.listener=listener;return()=>{this.listener=undefined;};}
  private emit(update:Partial<StudyScreen>={}){this.state={...this.state,...update};if(this.alive)this.listener?.();}
@@ -32,7 +32,7 @@ export class StudySessionController{
   if(this.locked)return false;this.locked=true;this.emit({busy:true,error:null});let success=false;
   try{if(!this.deps.isCurrent())throw Error('SESSION_CHANGED');await action();success=true;}
   catch(error){this.emit({error});if(['SESSION_EXPIRED','CARD_CONFLICT','WORD_UNAVAILABLE','ANSWER_LOCKED'].includes(errorCode(error))&&this.state.pending)this.emit({rejected:true});}
-  finally{this.locked=false;this.emit({busy:false});if(this.reload&&this.visible&&this.alive){this.reload=false;void this.resume();}}
+  finally{this.locked=false;this.emit({busy:false});if(this.exitRequested){this.exitRequested=false;this.leave();}else if(this.reload&&this.visible&&this.alive){this.reload=false;void this.resume();}}
   return success;
  }
  private legacy(){
@@ -43,7 +43,7 @@ export class StudySessionController{
  }
  begin(){return this.run(async()=>{
   const previous=this.stored();this.emit({flow:previous,pending:this.deps.storage.get(this.keys.pending)||null});this.legacy();
-  if(previous&&!studyComplete(previous)&&sourceIdentity(previous.source)!==sourceIdentity(this.deps.source)){this.emit({conflict:previous});return;}
+  if(previous&&!studyComplete(previous)&&(sourceIdentity(previous.source)!==sourceIdentity(this.deps.source)||(previous.mode??'review')!==(this.deps.mode??'review'))){this.emit({conflict:previous});return;}
   if(previous&&studyComplete(previous)&&(this.deps.intent!=='resume'||sourceIdentity(previous.source)!==sourceIdentity(this.deps.source))&&!this.state.pending){await this.close(previous);this.assertFlowUnchanged(previous);this.assertNoPending();this.deps.storage.remove(this.keys.resume);this.emit({flow:null});}
   await this.open();
  });}
@@ -53,7 +53,7 @@ export class StudySessionController{
  });}
  private async open(){
   if(this.state.pending)await this.flush();
-  let previous=this.state.flow??emptyStudy(this.deps.source,this.now());
+  let previous=this.state.flow??{...emptyStudy(this.deps.source,this.now()),mode:this.deps.mode??'review'};
   if(studyComplete(previous)){this.emit({flow:previous,notice:''});return;}
   const remaining=previous.cards.filter(card=>!previous.results[card.id]?.saved).map(card=>card.child_word_id);
   const createSource:StudySource=previous.loaded&&remaining.length?{source:'manual',word_ids:remaining}:previous.source;
@@ -151,5 +151,6 @@ export class StudySessionController{
   await this.open();
  });}
  heartbeat(){const flow=this.state.flow;if(!this.visible||this.locked||this.state.pending||!flow?.session||flow.sessionClosed||studyComplete(flow))return Promise.resolve();return this.deps.api(`/study-sessions/${flow.session.id}/heartbeat`,'POST',{lease_generation:flow.session.lease_generation}).catch(error=>{if(!this.alive||!this.visible)return;if(expired(error))void this.resume();else this.emit({error});});}
+ leave(){this.visible=false;this.listener=undefined;if(this.locked){this.exitRequested=true;return;}if(this.state.conflict||this.state.pending||!this.state.flow){this.dispose();return;}void this.pause().finally(()=>this.dispose());}
  dispose(){this.alive=false;this.visible=false;this.listener=undefined;}
 }

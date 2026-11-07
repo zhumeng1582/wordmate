@@ -30,7 +30,7 @@ test('a parent awaiting approval sees the application instead of a misleading cr
 });
 test('the home page focuses on learning and does not load or poll family details',async()=>{
  const page=pageHarness('pages/home/index',async path=>{if(path==='/me')return {families:[family],referral_code:'referral'};assert.equal(path,'/children/child-a/today?wordbook_id=book-a');return {child:{nickname:'小明'},completed_words:0,goal:10,due_count:0,new_count:8,remaining_new_limit:8};});await page.show();
- const text=page.text(page.render());assert.match(text,/今日学习小明/);assert.match(text,/学习新词/);assert.match(text,/分享小程序/);assert.doesNotMatch(text,/一起陪学|切换孩子|复习安排/);
+ const text=page.text(page.render());assert.match(text,/小明，今天一起学/);assert.match(text,/学习新词/);assert.match(text,/分享小程序/);assert.match(text,/古诗词/);assert.doesNotMatch(text,/一起陪学|切换孩子|复习安排/);
  page.button('设置').onClick();assert.equal(page.routes.at(-1),'/pages/settings/index');
  const reads=page.calls.length;await page.poll();assert.equal(page.calls.length,reads);assert(page.calls.every(call=>!call.path.includes('/families/')));
 });

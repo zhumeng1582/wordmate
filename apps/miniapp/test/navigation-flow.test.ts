@@ -4,7 +4,11 @@ import {pageHarness,tick} from './page-harness.ts';
 
 test('home keeps date review separate when nothing is due',async()=>{
  const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[]}:{child:{nickname:'小明'},completed_words:0,goal:10,due_count:0,new_count:0});
- await page.show();assert.equal(page.button('复习单词').disabled,true);assert.match(page.text(page.render()),/今日无待复习/);page.button('按日期复习').onClick();assert.equal(page.routes.at(-1),'/pages/calendar/index');
+ await page.show();assert.equal(page.button('复习单词').disabled,false);assert.match(page.text(page.render()),/按日期复习/);page.button('复习单词').onClick();await tick();assert.equal(page.routes.at(-1),'/pages/calendar/index');
+});
+test('review menu offers calendar review even when words are due',async()=>{
+ const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[]}:{child:{nickname:'小明'},completed_words:0,goal:10,due_count:3,new_count:0},undefined,{actionIndex:1});
+ await page.show();page.button('复习单词').onClick();await tick();assert.equal(page.routes.at(-1),'/pages/calendar/index');assert.equal(page.cache.get('study_intent'),undefined);page.dispose();
 });
 
 test('wordbook selector switches the visible book and saves the selection',async()=>{
@@ -33,7 +37,7 @@ test('wordbook uses its heading for switching and leaves management in settings'
 });
 
 test('settings groups tools and preferences into clear subpages',async()=>{
- const page=pageHarness('pages/settings/index',async()=>({}));await page.show();const tree=page.render();assert.match(page.text(tree),/家庭与 AI/);assert.doesNotMatch(page.text(tree),/词本管理与发现|答题后自动切换/);page.button('学习工具').onClick();page.button('学习设置').onClick();assert.deepEqual(page.routes,['/pages/settings-tools/index','/pages/settings-learning/index']);page.cache.set('child_id','');await page.show();assert.equal(page.button('学习工具').disabled,true);assert.equal(page.button('单词聊天记录').disabled,true);
+ const page=pageHarness('pages/settings/index',async()=>({}));await page.show();const tree=page.render();assert.match(page.text(tree),/家庭与 AI/);assert.doesNotMatch(page.text(tree),/词本管理与发现|答题后自动切换/);page.button('学习工具').onClick();page.button('学习设置').onClick();assert.deepEqual(page.routes,['/pages/settings-tools/index','/pages/settings-learning/index']);page.cache.set('child_id','');await page.show();assert.equal(page.button('学习工具').disabled,true);assert.equal(page.button('AI 学童聊天记录').disabled,true);
 });
 
 test('a failed quiz scope change clears the previous count and can be retried',async()=>{

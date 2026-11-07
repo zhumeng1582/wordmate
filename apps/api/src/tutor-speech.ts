@@ -11,16 +11,16 @@ export class TutorSpeech {
  private access:Access;private runtime?:AudioRuntime;
  constructor(access:Access,runtime?:AudioRuntime){this.access=access;this.runtime=runtime;}
  private async message(q:Sql,actor:string,id:string){const m=await one(q,"SELECT m.*,s.child_id FROM word_tutor_messages m JOIN word_tutor_sessions s ON s.id=m.session_id WHERE m.id=$1 AND m.role='assistant'",[uuid(id)]);ensure(m,404,'TUTOR_MESSAGE_NOT_FOUND');await this.access.child(q,actor,m.child_id);ensure(await one(q,'SELECT id FROM word_tutor_messages WHERE id=$1',[id]),404,'TUTOR_MESSAGE_NOT_FOUND');return m;}
- async create(actor:string,id:string,accent:'en-GB'|'en-US',voiceId:string){
+ async create(actor:string,id:string,accent:'en-GB'|'en-US',voiceId:string,part?:'example'){
   const runtime=this.runtime;ensure(runtime?.synthesize,503,'AUDIO_NOT_CONFIGURED');ensure(runtime.voices.some(v=>v.id===voiceId&&v.accent===accent),422,'VOICE_ACCENT_UNAVAILABLE');
-  const profileKey=createHash('sha256').update(JSON.stringify([runtime.profile,'tutor-zh-en-v1'])).digest('hex');
-  const initial=await this.access.tx(async q=>{const m=await this.message(q,actor,id);ensure(m.content.length<=1000,422,'TUTOR_AUDIO_TOO_LONG');
+  const profileKey=createHash('sha256').update(JSON.stringify([runtime.profile,part==='example'?'tutor-example-en-v1':'tutor-zh-en-v1'])).digest('hex');
+  const initial=await this.access.tx(async q=>{const m=await this.message(q,actor,id);const example=String(m.content).match(/【看例句】\n([^\n]+)\n[^\n]+\n\n【你来试试】/);if(part==='example')ensure(example,422,'TUTOR_EXAMPLE_NOT_AVAILABLE');const speechText=part==='example'?example![1]:String(m.content).replace(/(?:^|\n)【可添加词义】[^\n]+/g,'');ensure(speechText.length<=1000,422,'TUTOR_AUDIO_TOO_LONG');
    let a=await one(q,'SELECT * FROM word_tutor_audio WHERE message_id=$1 AND voice_id=$2 AND accent=$3 AND profile_key=$4 FOR UPDATE',[id,voiceId,accent,profileKey]);
    if(a?.state==='succeeded')return {ready:true,id:a.id};
    if(a?.state==='running'){ensure(Date.now()-new Date(a.updated_at).getTime()>600000,409,'TUTOR_AUDIO_GENERATING');if(a.billing_id)await releaseAiCall(q,a.billing_id,'AUDIO_REQUEST_EXPIRED',true);await q.query("UPDATE word_tutor_audio SET state='failed',updated_at=now() WHERE id=$1",[a.id]);}
    if(!a)a=await one(q,"INSERT INTO word_tutor_audio(message_id,voice_id,accent,profile_key,state) VALUES($1,$2,$3,$4,'running') RETURNING *",[id,voiceId,accent,profileKey]);
    else await q.query("UPDATE word_tutor_audio SET state='running',updated_at=now() WHERE id=$1",[a.id]);
-   const tariff=audioTariff(String(runtime.profile.model),runtime.pricePer10000Characters),billing=await reserveAudio(q,actor,m.child_id,a.id,m.content,tariff),attempt=randomUUID();await q.query('UPDATE word_tutor_audio SET billing_id=$2,attempt_id=$3 WHERE id=$1',[a.id,billing,attempt]);return {ready:false,id:a.id,billing,attempt,text:m.content};
+   const tariff=audioTariff(String(runtime.profile.model),runtime.pricePer10000Characters),billing=await reserveAudio(q,actor,m.child_id,a.id,speechText,tariff),attempt=randomUUID();await q.query('UPDATE word_tutor_audio SET billing_id=$2,attempt_id=$3 WHERE id=$1',[a.id,billing,attempt]);return {ready:false,id:a.id,billing,attempt,text:speechText};
   });
   if(initial.ready)return {id:initial.id,resource_path:`/word-tutor-audio/${initial.id}/content`};
   try{const result=await runtime.synthesize!({text:initial.text!,accent,voiceId,rate:1,languageHints:['zh','en']});const bytes=Buffer.from(result.bytes);

@@ -26,6 +26,14 @@ export async function connect(url:string,options:{initializeLocal?:boolean}={}):
     await pg.exec(readFileSync(resolve(__dirname,'../migrations/026_textbook_volumes.sql'),'utf8'));
     await pg.exec(readFileSync(resolve(__dirname,'../migrations/027_textbook_corrections.sql'),'utf8'));
     await pg.exec(readFileSync(resolve(__dirname,'../migrations/028_word_tutor.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/029_tutor_learning.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/030_audio_feedback.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/031_word_feedback.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/032_admin_feedback.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/033_admin_audio_repairs.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/034_poems.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/035_poem_fields.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/036_poem_import_ai.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/037_poem_import_jobs.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/038_poem_import_page_progress.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/039_poem_chat_audio.sql'),'utf8'));
     }}catch(error){await pg.close();throw error;}
     const db:Database={query:async(s,p)=>({rows:(await pg.query(s,p)).rows as any}),transaction:fn=>pg.transaction(tx=>fn({query:async(s,p)=>({rows:(await tx.query(s,p)).rows as any})}))};
     return {db,source:{destroy:()=>pg.close()}};
