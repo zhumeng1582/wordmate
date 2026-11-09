@@ -106,6 +106,7 @@ class ApiController {
       else if(method==='GET'&&p.join('/')==='voices')data=await core.audio.voices(req.query.accent);
       else if(method==='POST'&&p.join('/')==='audio'){data=await core.audio.create(actor,key,b);res.status(data.status==='succeeded'?200:202);}
       else if(method==='POST'&&p[0]==='audio'&&p.length===3&&p[2]==='feedback')data=await core.audio.reportPronunciation(actor,key,p[1]);
+      else if(method==='GET'&&p[0]==='words'&&p.length===3&&p[2]==='feedback')data=await core.audio.wordFeedbackStatus(actor,p[1],req.query.version);
       else if(method==='POST'&&p[0]==='words'&&p.length===3&&p[2]==='feedback')data=await core.audio.reportWord(actor,key,p[1],b);
       else if(method==='GET'&&p[0]==='jobs'&&p.length===2)data=await core.audio.get(actor,p[1]);
       else if(method==='POST'&&p[0]==='jobs'&&p[2]==='retry'&&p.length===3){data=await core.audio.retry(actor,key,p[1]);res.status(202);}
@@ -162,7 +163,11 @@ class ApiController {
        else if(p.length===7&&p[4]==='sessions'&&p[6]==='transcriptions'&&method==='POST')data=await tutorAsr.transcribe(actor,p[5],b.request_id,b.audio_base64,{child,id});
        else if(p.length===8&&p[4]==='sessions'&&p[6]==='message-audio'&&method==='POST')data=await core.poems.messageAudio(actor,child,id,p[5],p[7]);
        else if(p.length===9&&p[4]==='sessions'&&p[6]==='message-audio'&&method==='GET'){const bytes=await core.poems.messageAudioContent(actor,child,id,p[5],p[7],p[8]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(bytes);}
+       else if(p.length===7&&p[4]==='sessions'&&p[6]==='audio'&&method==='POST')data=await core.poems.audio(actor,child,id,p[5]);
+       else if(p.length===8&&p[4]==='sessions'&&p[6]==='audio'&&method==='GET'){const bytes=await core.poems.audioContent(actor,child,id,p[7],p[5]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(bytes);}
        else if(p.length===7&&p[4]==='sessions'&&p[6]==='messages'&&method==='POST')data=await core.poems.answer(actor,child,id,p[5],b.request_id,b.question);
+       else if(p.length===7&&p[4]==='audio-sections'&&method==='POST')data=await core.poems.audio(actor,child,id,undefined,p[5] as 'annotations'|'translation',Number(p[6]));
+       else if(p.length===8&&p[4]==='audio-sections'&&method==='GET'){const bytes=await core.poems.audioContent(actor,child,id,p[7],undefined,p[5] as 'annotations'|'translation',Number(p[6]));res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(bytes);}
        else if(p.length===5&&p[4]==='audio'&&method==='POST')data=await core.poems.audio(actor,child,id);
        else if(p.length===6&&p[4]==='audio'&&method==='GET'){const bytes=await core.poems.audioContent(actor,child,id,p[5]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(bytes);}
       }

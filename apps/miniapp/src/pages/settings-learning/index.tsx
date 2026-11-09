@@ -12,8 +12,9 @@ export default function SettingsLearning(){
  useDidShow(()=>{const token=storage.get('access_token'),currentChild=storage.get('child_id');setSignedIn(!!token);setAccount(token||'');setChild(currentChild||'');setHasChild(!!token&&!!currentChild);setAutoNext(storage.get(`study_auto_next:${token}`)!==false);});
  return <View className='page settings-page'><View className='title'>学习设置</View>
  {!signedIn&&<View className='muted settings-hint'>请先登录后调整学习设置。</View>}
- {signedIn&&<><View className='subtitle settings-section-title'>学习节奏</View><View className='card'><View className='autoplay-setting'><View>答题后自动切换<View className='muted small'>关闭后手动进入下一题；本机生效</View></View><Switch checked={autoNext} onChange={event=>{const value=event.detail.value;storage.set(`study_auto_next:${account}`,value);setAutoNext(value);}}/></View></View></>}
- {hasChild&&<><View className='subtitle settings-section-title'>学习目标</View><View className='card'><LearningGoal key={account+':'+child}/></View></>}
- {signedIn&&<><View className='subtitle settings-section-title'>发音设置</View><View className='card'><AudioPreferences key={account}/></View></>}
+ {signedIn&&<><View className='subtitle settings-section-title'>英语单词 · 学习节奏</View><View className='card'><View className='autoplay-setting'><View>答题后自动切换<View className='muted small'>关闭后手动进入下一题；本机生效</View></View><Switch checked={autoNext} onChange={event=>{const value=event.detail.value;storage.set(`study_auto_next:${account}`,value);setAutoNext(value);}}/></View></View></>}
+ {hasChild&&<><View className='subtitle settings-section-title'>英语单词 · 每日目标</View><View className='card'><LearningGoal key={account+':'+child}/></View></>}
+ {signedIn&&<><View className='subtitle settings-section-title'>英语单词 · 发音设置</View><View className='card'><AudioPreferences key={account}/></View></>}
+ <View className='subtitle settings-section-title'>古诗词</View><View className='card'><View>朗读：标准普通话</View><View className='muted small'>诗词朗读不受单词发音设置影响。诗词背诵不计入单词每日目标、打卡或连续天数。</View></View>
  </View>;
 }

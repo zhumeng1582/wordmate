@@ -12,5 +12,5 @@ const sections=[
 export default function SettingsTools(){
  const [hasChild,setHasChild]=useState(()=>!!storage.get('access_token')&&!!storage.get('child_id'));
  useDidShow(()=>setHasChild(!!storage.get('access_token')&&!!storage.get('child_id')));
- return <View className='page settings-page'><View className='title'>学习工具</View>{!hasChild&&<View className='muted settings-hint'>请先登录并选择孩子。</View>}{sections.map(section=><View key={section.title}><View className='subtitle settings-section-title'>{section.title}</View><View className='card settings-menu'>{section.entries.map(([page,title])=><Button key={page} className='settings-entry' disabled={!hasChild} onClick={()=>go(page)}><View className='settings-entry-title'>{title}</View><Chevron className='settings-chevron'/></Button>)}</View></View>)}</View>;
+ return <View className='page settings-page'><View className='title'>单词工具</View>{!hasChild&&<View className='muted settings-hint'>请先登录并选择孩子。</View>}{sections.map(section=><View key={section.title}><View className='subtitle settings-section-title'>{section.title}</View><View className='card settings-menu'>{section.entries.map(([page,title])=><Button key={page} className='settings-entry' disabled={!hasChild} onClick={()=>go(page)}><View className='settings-entry-title'>{title}</View><Chevron className='settings-chevron'/></Button>)}</View></View>)}</View>;
 }

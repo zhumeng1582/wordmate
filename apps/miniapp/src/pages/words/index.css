@@ -81,3 +81,6 @@
 .wordbook-export-cancel{background:var(--field);color:var(--text)}
 .wordbook-export-confirm{background:var(--primary);color:var(--on-primary)}
 .wordbook-export-confirm[disabled],.wordbook-export-cancel[disabled]{background:var(--disabled-bg);color:var(--disabled-text)}
+
+.word-marks .wordbook-feedback-button{background:var(--field);color:var(--primary)}
+.word-correction-note{display:flex;align-items:center;gap:12px;margin-top:8px;color:var(--muted);font-size:21px}.word-correction-note .text-action{width:auto;margin:0;padding:6px;font-size:21px}

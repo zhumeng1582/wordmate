@@ -7,8 +7,8 @@ import './index.css';
 
 const sections=[
  {title:'学习',entries:[
-  {page:'settings-tools',title:'学习工具',description:'单词本、收藏、测试与复习',needsChild:true},
-  {page:'settings-learning',title:'学习设置',description:'学习目标、发音与自动切换',needsChild:false}
+  {page:'settings-tools',title:'单词工具',description:'单词本、收藏、测试与复习',needsChild:true},
+  {page:'settings-learning',title:'学习设置',description:'单词学习目标、发音及诗词朗读',needsChild:false}
  ]},
  {title:'家庭与 AI',entries:[
   {page:'family',title:'家庭与孩子',description:'家庭成员和孩子档案',needsChild:false},
