@@ -6,7 +6,7 @@ import {Core} from '../src/core.ts';
 import {DevIdentity,FixtureDictionary} from '../src/providers.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 test('wordbook locates the next eligible word in learning order and reports each status across pages',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),{} as any,'test');
  try{

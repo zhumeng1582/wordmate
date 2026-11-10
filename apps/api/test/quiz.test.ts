@@ -12,7 +12,7 @@ test('grading uses exact integer thresholds, including rounded-display boundarie
  for(const [right,total,expected] of [[90,100,'excellent'],[89,100,'good'],[80,100,'good'],[79,100,'pass'],[60,100,'pass'],[59,100,'needs_work'],[8999,10000,'good'],[0,1,'needs_work'],[1,1,'excellent']] as const)assert.equal(grade(right,total),expected);
 });
 test('monthly scope, frozen questions, leases, answer replay, grading and immutable mistakes',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'test',()=>now),svc=core.quizzes;
  try{
@@ -71,7 +71,7 @@ test('monthly scope, frozen questions, leases, answer replay, grading and immuta
  }finally{await pg.close();}
 });
 test('full test keeps all 105 eligible entries, pages safely, and expired sessions cannot answer',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'large',()=>now),svc=core.quizzes;
  try{

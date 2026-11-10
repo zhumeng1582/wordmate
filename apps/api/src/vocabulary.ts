@@ -1,3 +1,4 @@
+import {mergeExistingWord,isSingleWord} from './word-senses.ts';
 import type {AiAccounts,AiSelection} from './ai-accounts.ts';
 import {usageBudget,recordUsage} from './usage-budget.ts';
 import {createHash} from 'node:crypto';
@@ -150,8 +151,10 @@ export class Vocabulary {
      return target!;
  }
  private async saveCandidate(q:Sql,job:Row,item:Row,r:Row,provider?:VocabularyProvider){
+     if(!isSingleWord(r.lemma)){await q.query("UPDATE batch_items SET status='invalid',candidates=$2 WHERE id=$1",[item.id,JSON.stringify([{reason:'短语或句子不能作为单词录入，请填写单个英文单词。'}])]);return;}
      const sense=`ai:${digest([r.part_of_speech,r.meaning_zh.normalize('NFKC').trim()])}`;
-     const word=await one(q,`INSERT INTO child_words(child_id,lemma,normalized_lemma,part_of_speech,sense_key,meaning_zh,dictionary_source,ipa_gb,ipa_us,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(child_id,normalized_lemma,part_of_speech,sense_key) DO UPDATE SET normalized_lemma=excluded.normalized_lemma RETURNING *`,[job.child_id,r.lemma,r.lemma.toLowerCase(),r.part_of_speech,sense,r.meaning_zh,`ai:${job.payload.provider}:${job.payload.model}`,r.ipa_gb,r.ipa_us,job.requested_by]);
+     const existing=await mergeExistingWord(q,job.child_id,r.lemma,{part_of_speech:r.part_of_speech,meaning_zh:r.meaning_zh});
+     const word=existing??await one(q,`INSERT INTO child_words(child_id,lemma,normalized_lemma,part_of_speech,sense_key,meaning_zh,dictionary_source,ipa_gb,ipa_us,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(child_id,normalized_lemma,part_of_speech,sense_key) DO UPDATE SET normalized_lemma=excluded.normalized_lemma RETURNING *`,[job.child_id,r.lemma,r.lemma.toLowerCase(),r.part_of_speech,sense,r.meaning_zh,`ai:${job.payload.provider}:${job.payload.model}`,r.ipa_gb,r.ipa_us,job.requested_by]);
      if(word.archived_at){await q.query("UPDATE batch_items SET status='invalid',candidates=$2 WHERE id=$1",[item.id,JSON.stringify([{reason:'该义项已归档，请先恢复后再添加。'}])]);return;}
      await q.query('INSERT INTO wordbook_words(child_id,wordbook_id,child_word_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[job.child_id,job.payload.wordbook_id,word.id]);
      await q.query('INSERT INTO review_cards(child_id,child_word_id,scheduler_state,scheduler_version,parameter_version,due_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',[job.child_id,word.id,JSON.stringify(this.scheduler.empty(this.a.now())),this.scheduler.version,this.scheduler.parameterVersion,this.a.now()]);
@@ -235,6 +238,7 @@ export class Vocabulary {
      const r=data.items[n],item=job.items[n];ensure(r.input_index===n&&r.input===item.raw_text,422,'GENERATED_CONTENT_REJECTED');
      if(r.status==='invalid'){await q.query("UPDATE batch_items SET status='invalid',candidates=$2 WHERE id=$1",[item.id,JSON.stringify([{reason:r.reason}])]);continue;}
      ensure(r.status==='ok',422,'GENERATED_CONTENT_REJECTED');
+     if(!isSingleWord(r.lemma)){await q.query("UPDATE batch_items SET status='invalid',candidates=$2 WHERE id=$1",[item.id,JSON.stringify([{reason:'短语或句子不能作为单词录入，请填写单个英文单词。'}])]);continue;}
      if(job.payload.review_before_save){const target=this.target(r,provider);await q.query("UPDATE batch_items SET status='needs_confirmation',candidates=$2 WHERE id=$1",[item.id,JSON.stringify([{...r,_target:target}])]);continue;}
      await this.saveCandidate(q,job,item,r,provider);
     }

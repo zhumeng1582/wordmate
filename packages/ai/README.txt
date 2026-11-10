@@ -1,17 +1,19 @@
-Wordmate 0.1 服务端 AI/TTS 适配层
+Wordmate 服务端 AI/TTS 适配层
+
+2026-11-10：本文件后半保留历史实施和测试记录；历史段落中的“待接入”“未调用”只描述当时，不能推断当前代码或线上状态。当前 AI 录词、诗词、汉字与语音链路以 apps/AI-VOCABULARY.txt、apps/POEMS.txt、apps/HANZI.md 和现行代码为准。真实音质、模型权限和服务配置需要在目标环境单独验证。
 
 现已实现：千问 Chat Completions（默认，JSON Schema）、OpenAI Responses、DeepSeek Chat Completions（显式配置时使用）、阿里云CosyVoice北京HTTP。
 统一 TextGenerator.generate 接口；TtsProvider 独立，不随大模型供应商切换。
 其他供应商必须新增并验证适配器，不能仅换base_url就假设协议兼容。
-文本生成现已接入NestJS后台持久任务与自动保存；TTS/OSS尚未接入。业务边界见 apps/AI-VOCABULARY.txt。
+文本生成、语音及存储已接入业务流程；不同功能是否可用取决于服务端配置和访问权限。业务边界见上述功能文档。
 
 配置
 项目根目录.env.example复制为.env，仅服务器加载；不要提交真实密钥或放进小程序。
 LLM_PROVIDER=qwen（默认）：读取 QWEN_API_KEY、QWEN_MODEL、QWEN_BASE_URL；也可复用 OCR_API_KEY、OCR_MODEL、OCR_WORKSPACE_ID。当前验证模型为 qwen3.7-flash-2026-07-15，百炼兼容接口使用 JSON Schema，并继续执行业务层 validate。
 LLM_PROVIDER=openai：读取OPENAI_API_KEY和OPENAI_MODEL，调用官方Responses API。
-LLM_PROVIDER=qwen：读取QWEN_API_KEY、QWEN_MODEL、QWEN_BASE_URL。
+LLM_PROVIDER=deepseek：读取 DEEPSEEK_API_KEY 和 DEEPSEEK_MODEL；图片输入不支持该适配器。
 三家凭证隔离，模型ID必填；不猜测账号可用模型，不静默切换或降级。
-切换配置后重启Worker；新任务保存provider/model/prompt_version/schema_version快照，已有任务按原快照构建适配器（密钥仍从服务器取），不能在重试时悄悄换模型。业务Worker接入时落实该快照。
+切换配置后重启对应服务；词汇任务保存 provider/model/prompt_version/schema_version 等快照，密钥仍从服务器取，不能在重试时悄悄换模型。具体模型选择、账户和计费逻辑以 apps/api/src/ai-accounts.ts 为准。
 TTS_PROVIDER=cosyvoice：读取COSYVOICE_API_KEY、COSYVOICE_WORKSPACE_ID及COSYVOICE_ENABLED_VOICES。
 仅使用百炼北京地域，模型固定cosyvoice-v3-flash；更换模型须重新验证音色兼容性。音色接口返回配置白名单，并非实时账号目录；部署前逐个合成验证开通情况。
 Node 23.11.0已用于本次测试；无运行时npm依赖，源代码为可剥离类型的TypeScript。正式NestJS工程仍须固定受支持Node/TypeScript版本并执行完整类型检查。

@@ -12,7 +12,7 @@ import type {AudioRuntime} from '../src/audio-runtime.ts';
 import {audioCharacters,audioCost,audioTariff} from '../src/audio-tariff.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 async function fixture(){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/004_voice_previews.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/005_audio_autoplay.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/002_audio.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/003_audio_preferences.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/004_voice_previews.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/005_audio_autoplay.sql','utf8'));
  for(const file of ['017_ai_accounts.sql','018_family_ai.sql','020_audio_billing.sql','030_audio_feedback.sql','031_word_feedback.sql'])await pg.exec(readFileSync('apps/api/migrations/'+file,'utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  const spoolDir=await mkdtemp(join(tmpdir(),'word-audio-'));

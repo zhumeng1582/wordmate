@@ -1,3 +1,4 @@
+import {displayWordSenses} from './word-senses.ts';
 import {ensure,uuid} from './errors.ts';
 import type {Sql,Row} from './ports.ts';
 export function csvCell(value:unknown){let s=String(value??'').replace(/\u0000/g,'');if(/^[\s\uFEFF]*[=+@-]/.test(s)||/^[\t\r\n]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}
@@ -10,9 +11,9 @@ export async function exportWords(q:Sql,child:string,b:any){
  // Selected IDs outside the current child's active list fail the whole export.
  const belongs=book?' AND EXISTS(SELECT 1 FROM wordbook_words bw WHERE bw.child_id=w.child_id AND bw.child_word_id=w.id AND bw.wordbook_id=$3)':'';
  if(ids.length){const count=(await q.query(`SELECT count(*)::int n FROM child_words w WHERE w.child_id=$1 AND w.archived_at IS NULL AND w.id=ANY($2::uuid[])${belongs}`,[child,ids,...(book?[book]:[])])).rows[0].n;ensure(count===ids.length,409,'EXPORT_SELECTION_CHANGED');}
- const rows=(await q.query(`SELECT ${wordColumns} FROM child_words w WHERE w.child_id=$1 AND w.archived_at IS NULL AND ${all?'NOT':''}(w.id=ANY($2::uuid[]))${belongs} ORDER BY w.created_at DESC,w.id DESC LIMIT 10001`,[child,ids,...(book?[book]:[])])).rows;
+ const rows=(await q.query(`SELECT ${wordColumns} FROM child_words w WHERE w.child_id=$1 AND w.archived_at IS NULL AND ${all?'w.library_archived_at IS NULL AND NOT':''}(w.id=ANY($2::uuid[]))${belongs} ORDER BY w.created_at DESC,w.id DESC LIMIT 10001`,[child,ids,...(book?[book]:[])])).rows;
  ensure(rows.length>0,422,'EXPORT_EMPTY');ensure(rows.length<=10000,422,'EXPORT_TOO_LARGE');
  const header=['单词','词性','中文释义','英式音标','美式音标','英文例句','例句翻译','内容来源'];
- const lines=[header,...rows.map((w:Row)=>[w.lemma,w.part_of_speech,w.meaning_zh,w.ipa_gb,w.ipa_us,w.example?.text_en,w.example?.translation_zh,String(w.dictionary_source).startsWith('ai:')?'AI 生成，仅供学习参考':w.dictionary_source])];
+ const lines=[header,...rows.map((w:Row)=>[w.lemma,displayWordSenses(w.part_of_speech,w.meaning_zh).part_of_speech,displayWordSenses(w.part_of_speech,w.meaning_zh).meaning_zh,w.ipa_gb,w.ipa_us,w.example?.text_en,w.example?.translation_zh,String(w.dictionary_source).startsWith('ai:')?'AI 生成，仅供学习参考':w.dictionary_source])];
  return {filename:'单词本.csv',count:rows.length,content:'\uFEFF'+lines.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'};
 }

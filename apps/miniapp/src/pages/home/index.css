@@ -79,6 +79,7 @@
 .home-poems-copy{min-width:0;flex:1}
 .home-poems .home-child-heading{font-size:32px}
 .home-poems .home-child-heading::before{content:'诗';width:52px;height:52px;font-size:27px;font-weight:600}
+.home-hanzi .home-child-heading::before{content:'字'}
 .home-poems-stats{margin:10px 0 0 64px;color:var(--secondary-text);font-size:25px}
 .home-poems-arrow{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:58px;height:58px;margin-left:16px;border-radius:50%;background:var(--surface);color:var(--primary)}
 .home-poems-arrow .ui-chevron{margin:0}
@@ -89,3 +90,20 @@
 .home-progress-card .home-book-chevron{width:30px;height:30px;margin-left:0}
 .home-progress-card .home-book-chevron::before{left:8px;top:8px;width:14px;height:14px}
 .home-progress-summary{margin:12px 0 20px}
+
+.home-library-card .home-library-today{font-size:26px;color:var(--secondary-text)}
+.home-library-card .home-checkin{margin-top:14px;padding:10px 2px 0;border-top:1px solid var(--border)}
+
+/* Compact, consistent cards with progress and check-in information kept visible. */
+.home-page .home-toolbar{margin-bottom:12px}
+.home-page .home-progress-card{margin:14px 0;padding:20px 24px}
+.home-progress-card .home-current-book{min-height:54px}
+.home-progress-card .home-progress-summary{margin:4px 0 10px}
+.home-progress-card .home-progress-summary .progress{font-size:36px}
+.home-learning-actions{gap:12px}
+.home-page .home-study-button{min-height:92px;padding:10px 8px;gap:2px;border-radius:18px}
+.home-page .home-action-title{font-size:27px}
+.home-page .home-action-detail{font-size:21px}
+.home-progress-card .home-checkin,.home-library-card .home-checkin{margin-top:10px;padding:8px 2px 0}
+.home-checkin-row .text-action{min-height:52px;padding:4px 0}
+.home-library-card .home-checkin-row{min-height:48px}

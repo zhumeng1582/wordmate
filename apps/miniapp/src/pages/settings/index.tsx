@@ -7,13 +7,14 @@ import './index.css';
 
 const sections=[
  {title:'学习',entries:[
+  {page:'settings-home',title:'首页显示',description:'选择首页显示的学习内容',needsChild:false,needsAccount:true},
   {page:'settings-tools',title:'单词工具',description:'单词本、收藏、测试与复习',needsChild:true},
-  {page:'settings-learning',title:'学习设置',description:'单词学习目标、发音及诗词朗读',needsChild:false}
+  {page:'settings-learning',title:'学习设置',description:'单词学习目标、发音与朗读',needsChild:false}
  ]},
  {title:'家庭与 AI',entries:[
   {page:'family',title:'家庭与孩子',description:'家庭成员和孩子档案',needsChild:false},
   {page:'ai-settings',title:'AI 助手',description:'AI 服务与使用额度',needsChild:false},
-  {page:'word-tutor',title:'AI 学童聊天记录',description:'查看单词和诗词的对话',needsChild:true}
+  {page:'word-tutor',title:'AI 学童聊天记录',description:'查看单词、诗词和汉字的对话',needsChild:true}
  ]},
  {title:'其他',entries:[
   {page:'help',title:'应用说明',description:'使用帮助',needsChild:false},
@@ -22,10 +23,11 @@ const sections=[
 ];
 export default function Settings(){
  const [hasChild,setHasChild]=useState(()=>!!storage.get('access_token')&&!!storage.get('child_id'));
- useDidShow(()=>{setHasChild(!!storage.get('access_token')&&!!storage.get('child_id'));});
+ const [account,setAccount]=useState(()=>String(storage.get('access_token')||''));
+ useDidShow(()=>{const token=String(storage.get('access_token')||'');setHasChild(!!token&&!!storage.get('child_id'));setAccount(token);});
  return <View className='page settings-page'><View className='title'>设置</View>
  {!hasChild&&<View className='muted settings-hint'>登录并选择孩子后，可使用学习相关功能。</View>}
- {sections.map(section=><View key={section.title}><View className='subtitle settings-section-title'>{section.title}</View><View className='card settings-menu'>{section.entries.map(item=><Button key={item.page} className='settings-entry' disabled={item.needsChild&&!hasChild} onClick={()=>go(item.page)}><View className='settings-entry-copy'><View className='settings-entry-title'>{item.title}</View><View className='settings-entry-description'>{item.description}</View></View><Chevron className='settings-chevron'/></Button>)}</View></View>)}
+ {sections.map(section=><View key={section.title}><View className='subtitle settings-section-title'>{section.title}</View><View className='card settings-menu'>{section.entries.filter(item=>!('needsAccount' in item)||!!account).map(item=><Button key={item.page} className='settings-entry' disabled={item.needsChild&&!hasChild} onClick={()=>go(item.page)}><View className='settings-entry-copy'><View className='settings-entry-title'>{item.title}</View><View className='settings-entry-description'>{item.description}</View></View><Chevron className='settings-chevron'/></Button>)}</View></View>)}
  {DEV_AUTH&&<View className='muted small'>开发环境 · 测试身份与正式数据分开，AI 生成使用真实额度。</View>}
  </View>;
 }

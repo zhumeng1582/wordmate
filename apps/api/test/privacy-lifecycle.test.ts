@@ -13,7 +13,7 @@ import type {Database} from '../src/ports.ts';
 import type {AudioRuntime} from '../src/audio-runtime.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 async function fixture(){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));
  for(const file of readdirSync('apps/api/migrations').sort())await pg.exec(readFileSync(`apps/api/migrations/${file}`,'utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s:string,p?:any[])=>tx.query(s,p)}))};
  const privacy=new Privacy(db,{NODE_ENV:'development'}),objects=new Map<string,Uint8Array>(),spool=mkdtempSync(join(tmpdir(),'wordmate-privacy-'));
@@ -153,3 +153,5 @@ test('data management login requires an existing account and never restores lear
   await f.life.deleteAccount(f.other.user.id);await assert.rejects(f.core.login('dev-outsider',undefined,true),{code:'ACCOUNT_NOT_FOUND'});
  }finally{await f.close();}
 });
+
+test('deleting a child also removes hanzi, its audio and background import materials',async()=>{const f=await fixture();try{const actor=f.dad.user.id,item=await f.core.hanzi.create(actor,'hanzi-privacy',f.child.id,{character:'春'});await f.pg.query("INSERT INTO wordmate.hanzi_audio(hanzi_id,content_hash,voice_id,profile_key,state,content) VALUES($1,'hash','voice','profile','succeeded',$2)",[item.id,Buffer.from('ID3audio')]);await f.core.hanziImports.create(actor,f.child.id,{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'chars.txt',base64:Buffer.from('春夏').toString('base64')});const job=await f.life.deleteChild(actor,f.child.id,{confirm_nickname:f.child.nickname,expected_version:1});await f.life.processOne();assert.equal((await f.life.job(actor,job.id)).status,'succeeded');for(const table of ['hanzi','hanzi_audio','hanzi_import_jobs'])assert.equal((await f.pg.query(`SELECT count(*)::int n FROM wordmate.${table}`)).rows[0].n,0,table);}finally{await f.close();}});

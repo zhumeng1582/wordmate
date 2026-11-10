@@ -1,9 +1,19 @@
+单词共学 / Wordmate — 项目入口
+
+当前工作区代码与运行说明（2026-11-10）
+- 小程序包含英语单词、古诗词和汉字学习；首页模块可在设置中选择显示，三类学习各自统计打卡。当前产品和限制以 apps/AI-VOCABULARY.txt、apps/POEMS.txt、apps/HANZI.md 为准。
+- 本地运行见 LOCAL-RUN.txt，构建、契约和迁移见 ARCHITECTURE-OPERATIONS.md，服务器发布见 infra/SERVER-DEPLOYMENT.txt。
+- 工作区源码、已提交版本、服务器部署和微信线上版本可能不同；请分别核实，不能根据本文件推断上线状态。
+- deliverables/0.1/ 是早期需求、设计和交付资料的编辑源；它不是 apps/、packages/ 现行实现的唯一源码。deliverables/wordmate-0.1/ 是生成副本，不要手工修改。
+
+以下为 2026 年 10 月的历史记录，仅用于追溯当时的设计、验证与发布状态；其中“当前”“尚未实现”等描述不代表现行代码。
+
 词伴 Wordmate — 0.1 私有项目
 
 入口：deliverables/0.1/index.html
 所有功能版本均为0.1；包含需求、设计、接口、数据库、AI/TTS适配器以及开发中的后端和小程序工程；完整0.1尚未全部实现。
 
-唯一编辑源：deliverables/0.1/
+早期交付文档编辑源：deliverables/0.1/
   tools/content.py        PRD、技术方案、权限规则
   api/openapi.json        接口契约
   database/001_schema.sql 空库初始迁移（不能重跑已有库）

@@ -6,8 +6,7 @@
 .word-search .field-picker{padding:16px 20px;white-space:nowrap}
 .word-search .btn{grid-column:1/-1;margin:0;min-height:76px}
 .wordbook-list{background:var(--surface);border-radius:24px;padding:0 24px;overflow:hidden}
-.wordbook-item{padding:4px 0;border-bottom:1px solid var(--border)}
-.wordbook-item:last-child{border-bottom:0}
+.wordbook-item{position:relative;padding:4px 0}
 .wordbook-summary{display:flex;align-items:center;min-height:100px;gap:16px;flex-wrap:wrap}
 .wordbook-lemma{font-size:34px;font-weight:600;line-height:1.35;overflow-wrap:anywhere;max-width:100%}
 .wordbook-pronunciation{display:flex;align-items:center;flex:1;min-width:150px;gap:8px;color:var(--muted)}

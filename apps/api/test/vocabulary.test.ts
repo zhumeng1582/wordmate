@@ -16,21 +16,21 @@ test('provider retains the prompt for queued legacy imports',async()=>{
  await p!.generateRaw!('cat','','A2','vocabulary-raw-0.1-2');await p!.generateRaw!('cat','','A2',p!.rawPromptVersion);
  assert.doesNotMatch(instructions[0],/以这些学习目标为优先/);assert.match(instructions[1],/以这些学习目标为优先/);
 });
-test('explicit senses from text or image are saved as separate learning cards',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+test('explicit senses from text or image share one word and learning card',async()=>{
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  const senses=[{...result('match',0),meaning_zh:'比赛',sentence_en:'The match is fun.'},{...result('match',1),part_of_speech:'verb',meaning_zh:'匹配',sentence_en:'The colours match.'}];
  const provider:VocabularyProvider={provider:'test',model:'test',promptVersion:'test',rawPromptVersion:'test',generate:async()=>{throw Error('unexpected');},generateRaw:async()=>({items:senses,error:null}),validate:(words,items,theme,level)=>validateVocabularyItems(words,items,theme,level)};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'test',()=>new Date(),provider);
  try{const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'f',{name:'家'}),c=await core.createChild(dad,'c',f.id,{nickname:'孩子'}),book=await core.createWordbook(dad,'b',c.id,{name:'本'});
   const job=await core.vocabulary.create(dad,'text',c.id,{wordbook_id:book.id,raw_text:'match n. 比赛；v. 匹配',source_type:'text'});await core.vocabulary.processOne();assert.equal((await core.vocabulary.get(dad,job.id)).status,'succeeded');
-  let words=(await core.words(dad,c.id)).items;assert.equal(words.length,2);assert.deepEqual(new Set(words.map((w:any)=>w.meaning_zh)),new Set(['比赛','匹配']));assert.equal((await pg.query('SELECT count(*)::int n FROM wordmate.review_cards')).rows[0].n,2);
-  const image=await core.vocabulary.create(dad,'image',c.id,{wordbook_id:book.id,raw_text:'match n. 比赛 v. 匹配',source_type:'vision',prepared_items:senses});await core.vocabulary.processOne();assert.equal((await core.vocabulary.get(dad,image.id)).status,'succeeded');words=(await core.words(dad,c.id)).items;assert.equal(words.length,2);
+  let words=(await core.words(dad,c.id)).items;assert.equal(words.length,1);assert.deepEqual(words[0].senses,[{part_of_speech:'noun',meaning_zh:'比赛'},{part_of_speech:'verb',meaning_zh:'匹配'}]);assert.equal((await pg.query('SELECT count(*)::int n FROM wordmate.review_cards')).rows[0].n,1);
+  const image=await core.vocabulary.create(dad,'image',c.id,{wordbook_id:book.id,raw_text:'match n. 比赛 v. 匹配',source_type:'vision',prepared_items:senses});await core.vocabulary.processOne();assert.equal((await core.vocabulary.get(dad,image.id)).status,'succeeded');words=(await core.words(dad,c.id)).items;assert.equal(words.length,1);assert.equal(words[0].senses.length,2);
   await assert.rejects(core.vocabulary.create(dad,'dup',c.id,{wordbook_id:book.id,raw_text:'match',source_type:'vision',prepared_items:[senses[0],{...senses[0],input_index:1}]}),{code:'GENERATED_CONTENT_REJECTED'});
  }finally{await pg.close();}
 });
 test('vision-prepared vocabulary is revalidated and saved without a second model request',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};let modelCalls=0;
  const provider:VocabularyProvider={provider:'qwen',model:'vision-test',promptVersion:'test',generate:async()=>{modelCalls++;throw Error('must not call model');},validate:(words,items,theme,level)=>validateVocabularyItems(words,items,theme,level)};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'vision-test',()=>new Date(),provider);
@@ -41,7 +41,7 @@ test('vision-prepared vocabulary is revalidated and saved without a second model
  }finally{await pg.close();}
 });
 test('AI jobs: shared permissions, persistent dedupe, partial retry, atomic save and review eligibility',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let mode='partial',calls:string[][]=[];let now=new Date();
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',generate:async words=>{calls.push(words);return {items:words.map((w,i)=>mode==='partial'&&w==='testword'?{input_index:i,input:w,status:'invalid',reason:'无法识别'}:mode==='broken'&&i===1?{...result(w,i),sentence_en:'Missing target.'}:result(w,i))};}};
@@ -73,7 +73,7 @@ test('AI jobs: shared permissions, persistent dedupe, partial retry, atomic save
  }finally{await pg.close();}
 });
 test('AI network calls hold no transaction; membership revoked before completion prevents saving',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let finish!:(v:any)=>void,started!:()=>void;const entered=new Promise<void>(r=>started=r);
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',generate:async()=>{started();return new Promise(r=>finish=r);}};
@@ -89,7 +89,7 @@ test('AI network calls hold no transaction; membership revoked before completion
 test('Chinese list separators are split before persistence; old malformed jobs cannot incur a retry',async()=>{
  const {splitVocabularyInput}=await import('../../miniapp/src/utils/vocabulary-input.ts');
  assert.deepEqual(splitVocabularyInput('airport、 luggage；delay;ice cream，book\r\ncat'),['airport','luggage','delay','ice cream','book','cat']);
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};let calls=0;
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',generate:async words=>{calls++;assert.deepEqual(words,['airport','luggage','delay']);return {items:words.map(result)};}};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'split',()=>new Date(),provider);
@@ -106,7 +106,7 @@ test('Chinese list separators are split before persistence; old malformed jobs c
 });
 
 test('raw text jobs preserve input, reject secrets before calls, enforce quotas and handle empty extraction',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let captured='',calls=0,mode='ok';const raw='编号\t词汇\t意思\n1、cat 猫\n2｜dog 狗';
  const provider:VocabularyProvider={provider:'deepseek',model:'test',promptVersion:'test',rawPromptVersion:'raw-test',generate:async()=>{throw Error('not expected');},generateRaw:async input=>{calls++;captured=input;return mode==='empty'?{items:[],error:'NO_WORDS_FOUND'}:{items:['cat','dog'].map(result),error:null};}};
@@ -141,7 +141,7 @@ test('raw text jobs preserve input, reject secrets before calls, enforce quotas 
 });
 
 test('reviewable text import saves only selected senses and confirmation is idempotent',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};let calls=0;
  const senses=[{...result('match',0),meaning_zh:'比赛',sentence_en:'The match is fun.'},{...result('match',1),part_of_speech:'verb',meaning_zh:'匹配',sentence_en:'The colours match.'}];
  const provider:VocabularyProvider={provider:'test',model:'test',promptVersion:'test',rawPromptVersion:'test',generate:async()=>{throw Error('unexpected');},generateRaw:async()=>{calls++;return {items:senses,error:null};}};
@@ -153,5 +153,17 @@ test('reviewable text import saves only selected senses and confirmation is idem
  const body={decisions:preview.items.map((item:any,index:number)=>({item_id:item.id,selected:index===1,...(index===1?{correction:{meaning_zh:'相配',sentence_en:'The colours matched.',sentence_zh:'这些颜色很相配。'}}:{})}))};await core.vocabulary.confirmCandidates(dad,'review-confirm',job.id,body);await core.vocabulary.confirmCandidates(dad,'review-confirm',job.id,body);
  assert.equal((await core.vocabulary.candidates(dad,job.id)).pending_count,0);const words=(await core.words(dad,c.id)).items;assert.equal(words.length,1);assert.equal(words[0].meaning_zh,'相配');assert.equal((await pg.query('SELECT text_en FROM wordmate.sentences')).rows[0].text_en,'The colours matched.');assert.equal(calls,1);assert.equal((await pg.query('SELECT count(*)::int n FROM wordmate.sentences')).rows[0].n,1);
  const again=await core.vocabulary.create(dad,'review-again',c.id,{wordbook_id:book.id,raw_text:'match n. 比赛；v. 匹配',source_type:'text',review_before_save:true});assert.notEqual(again.id,job.id);
+ }finally{await pg.close();}
+});
+test('AI import adds distinct senses to the same word',async()=>{
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};let meaning='笔；钢笔',pos='noun';
+ const provider:VocabularyProvider={provider:'test',model:'test',promptVersion:'test',generate:async words=>({items:words.map((w,i)=>({...result(w,i),part_of_speech:pos,meaning_zh:meaning}))})};
+ const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'test',()=>new Date(),provider);
+ try{const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'dedupe-family',{name:'家'}),c=await core.createChild(dad,'dedupe-child',f.id,{nickname:'孩子'}),book=await core.createWordbook(dad,'dedupe-book',c.id,{name:'本'});
+  const run=async(key:string)=>{const job=await core.vocabulary.create(dad,key,c.id,{wordbook_id:book.id,words:['pen'],theme:key});await core.vocabulary.processOne();assert.equal((await core.vocabulary.get(dad,job.id)).status,'succeeded');};
+  await run('first');meaning='钢笔';await run('again');assert.equal((await core.words(dad,c.id)).items.length,1);
+  meaning='围栏';await run('different-meaning');assert.equal((await core.words(dad,c.id)).items.length,1);
+  meaning='钢笔';pos='verb';await run('different-pos');const words=(await core.words(dad,c.id)).items;assert.equal(words.length,1);assert.ok(words[0].senses.some((x:any)=>x.meaning_zh==='围栏'));assert.ok(words[0].senses.some((x:any)=>x.part_of_speech==='verb'));
  }finally{await pg.close();}
 });

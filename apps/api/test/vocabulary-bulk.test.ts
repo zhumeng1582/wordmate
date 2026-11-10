@@ -8,16 +8,17 @@ import type {Database} from '../src/ports.ts';
 import type {VocabularyProvider} from '../src/vocabulary.ts';
 import {vocabularyImportChunks} from '../src/vocabulary-import.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
+const testWord=(i:number)=>{let n=i,s='';do{s=String.fromCharCode(97+n%26)+s;n=Math.floor(n/26)-1;}while(n>=0);return `sample${s}`;};
 const result=(word:string,input_index:number)=>({input_index,input:word,status:'ok',lemma:word,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:`测试${word}`,sentence_en:`I see ${word}.`,sentence_zh:'我看到了。',reason:null});
 async function fixture(provider:VocabularyProvider){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/021_vocabulary_bulk_index.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/021_vocabulary_bulk_index.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'bulk-test',()=>new Date(),provider),actor=(await core.login('dev-dad')).user.id;
  const family=await core.createFamily(actor,'family',{name:'测试'}),child=await core.createChild(actor,'child',family.id,{nickname:'孩子'}),book=await core.createWordbook(actor,'book',child.id,{name:'词本'});
  return {pg,core,actor,child,book};
 }
 test('bulk text keeps phrases, respects model chunk size, and rejects 8001 rows without truncation',()=>{
- const rows=Array.from({length:8000},(_,i)=>`word${i}`),chunks=vocabularyImportChunks(rows.join('\n'));
+ const rows=Array.from({length:8000},(_,i)=>testWord(i)),chunks=vocabularyImportChunks(rows.join('\n'));
  assert.equal(chunks.length,267);assert.equal(chunks.flatMap(chunk=>chunk.split('\n')).length,8000);
  assert(chunks.every(chunk=>chunk.split('\n').length<=30));assert.equal(vocabularyImportChunks('ice cream\nread a book')[0],'ice cream\nread a book');
  const annotated=vocabularyImportChunks([...Array(29).fill('apple'),'match n.比赛；v. 匹配'].join('\n'));assert(annotated.some(chunk=>chunk.includes('match n.比赛；v. 匹配')));
@@ -48,22 +49,22 @@ test('retry replans a legacy failed Markdown import without deleting its audit j
 });
 test('a failed chunk pauses the import and retry resumes without regenerating saved words',async()=>{
  let failing=true;const calls:string[][]=[];
- const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>{calls.push(words);if(failing&&words[0]==='word30')throw Object.assign(Error('offline'),{code:'UPSTREAM_NETWORK_OR_TIMEOUT'});return {items:words.map(result)};}});
+ const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>{calls.push(words);if(failing&&words[0]===testWord(30))throw Object.assign(Error('offline'),{code:'UPSTREAM_NETWORK_OR_TIMEOUT'});return {items:words.map(result)};}});
  try{
-  const words=Array.from({length:61},(_,i)=>`word${i}`),body={wordbook_id:f.book.id,words};
+  const words=Array.from({length:61},(_,i)=>testWord(i)),body={wordbook_id:f.book.id,words};
   const job=await f.core.vocabulary.create(f.actor,'create',f.child.id,body);assert.equal(job.is_bulk,true);assert.equal(job.bulk.total_parts,3);assert.equal((await f.core.vocabulary.create(f.actor,'duplicate',f.child.id,body)).id,job.id);
   assert.equal((await f.core.vocabulary.list(f.actor,f.child.id)).items.length,1);
   await f.core.vocabulary.processOne();await f.core.vocabulary.processOne();await f.core.vocabulary.processOne();let data=await f.core.vocabulary.get(f.actor,job.id);
   assert.equal(calls.length,2);assert.equal(data.saved_count,30);assert.equal(data.status,'partial');assert.equal(data.retryable,true);
   failing=false;await f.core.vocabulary.retry(f.actor,'retry',job.id);await f.core.vocabulary.processOne();await f.core.vocabulary.processOne();data=await f.core.vocabulary.get(f.actor,job.id);
-  assert.equal(data.status,'succeeded');assert.equal(data.saved_count,61);assert.equal(data.bulk.completed_parts,3);assert.equal(calls.length,4);assert.equal(calls.filter(words=>words[0]==='word0').length,1);
+  assert.equal(data.status,'succeeded');assert.equal(data.saved_count,61);assert.equal(data.bulk.completed_parts,3);assert.equal(calls.length,4);assert.equal(calls.filter(words=>words[0]===testWord(0)).length,1);
   assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.sentences')).rows[0].n,61);
  }finally{await f.pg.close();}
 });
 test('raw text over 30 words is queued as one import and every chunk is generated',async()=>{
  const calls:string[]=[];const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',rawPromptVersion:'raw-test',generate:async words=>({items:words.map(result)}),generateRaw:async raw=>{calls.push(raw);return {items:raw.split('\n').map(result),error:null};}});
  try{
-  const raw=Array.from({length:65},(_,i)=>`word${i}`).join('\n'),job=await f.core.vocabulary.create(f.actor,'create',f.child.id,{wordbook_id:f.book.id,raw_text:raw});
+  const raw=Array.from({length:65},(_,i)=>testWord(i)).join('\n'),job=await f.core.vocabulary.create(f.actor,'create',f.child.id,{wordbook_id:f.book.id,raw_text:raw});
   for(let i=0;i<3;i++)await f.core.vocabulary.processOne();const data=await f.core.vocabulary.get(f.actor,job.id);assert.equal(data.status,'succeeded');assert.equal(data.saved_count,65);assert.equal(calls.join('\n'),raw);assert.equal(data.items.length,60);
  }finally{await f.pg.close();}
 });
@@ -71,17 +72,17 @@ test('only one chunk runs per import and another child can run before the next c
  let entered!:()=>void,release!:()=>void;const start=new Promise<void>(resolve=>entered=resolve),gate=new Promise<void>(resolve=>release=resolve),calls:string[][]=[];
  const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>{calls.push(words);if(calls.length===1){entered();await gate;}return {items:words.map(result)};}});
  try{
-  await f.core.vocabulary.create(f.actor,'bulk',f.child.id,{wordbook_id:f.book.id,words:Array.from({length:31},(_,i)=>`word${i}`)});
+  await f.core.vocabulary.create(f.actor,'bulk',f.child.id,{wordbook_id:f.book.id,words:Array.from({length:31},(_,i)=>testWord(i))});
   const work=f.core.vocabulary.processOne();await start;await f.core.vocabulary.processOne();assert.equal(calls.length,1);
   const family=(await f.core.me(f.actor)).families[0],child=await f.core.createChild(f.actor,'second-child',family.id,{nickname:'另一个孩子'}),book=await f.core.createWordbook(f.actor,'second-book',child.id,{name:'另一个词本'});
   await f.core.vocabulary.create(f.actor,'other',child.id,{wordbook_id:book.id,words:['other']});release();await work;
-  await f.core.vocabulary.processOne();assert.deepEqual(calls[1],['other']);await f.core.vocabulary.processOne();assert.deepEqual(calls[2],['word30']);
+  await f.core.vocabulary.processOne();assert.deepEqual(calls[1],['other']);await f.core.vocabulary.processOne();assert.deepEqual(calls[2],[testWord(30)]);
  }finally{release?.();await f.pg.close();}
 });
 test('8000 words are accepted as a durable import and 8001 are rejected before creating jobs',async()=>{
  const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>({items:words.map(result)})});
  try{
-  const words=Array.from({length:8000},(_,i)=>`word${i}`),body={wordbook_id:f.book.id,words};
+  const words=Array.from({length:8000},(_,i)=>testWord(i)),body={wordbook_id:f.book.id,words};
   await assert.rejects(f.core.vocabulary.create(f.actor,'oversize',f.child.id,{...body,words:[...words,'extra']}),{code:'INVALID_WORD_COUNT'});
   assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.generation_jobs')).rows[0].n,0);
   const job=await f.core.vocabulary.create(f.actor,'maximum',f.child.id,body);assert.equal(job.total_count,8000);assert.equal(job.bulk.total_parts,267);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.batch_items')).rows[0].n,8000);
@@ -93,7 +94,7 @@ test('8000 words are accepted as a durable import and 8001 are rejected before c
 
 test('bulk review exposes all pending senses across pages and only saves selected entries',async()=>{
  let calls=0;const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',rawPromptVersion:'raw-test',generate:async words=>({items:words.map(result)}),generateRaw:async raw=>{calls++;return {items:raw.split('\n').map(result),error:null};}});
- try{const raw=Array.from({length:65},(_,i)=>`word${i}`).join('\n'),job=await f.core.vocabulary.create(f.actor,'review-bulk',f.child.id,{wordbook_id:f.book.id,raw_text:raw,review_before_save:true});for(let i=0;i<3;i++)await f.core.vocabulary.processOne();assert.equal((await f.core.vocabulary.get(f.actor,job.id)).pending_count,65);assert.equal((await f.core.words(f.actor,f.child.id)).items.length,0);
+ try{const raw=Array.from({length:65},(_,i)=>testWord(i)).join('\n'),job=await f.core.vocabulary.create(f.actor,'review-bulk',f.child.id,{wordbook_id:f.book.id,raw_text:raw,review_before_save:true});for(let i=0;i<3;i++)await f.core.vocabulary.processOne();assert.equal((await f.core.vocabulary.get(f.actor,job.id)).pending_count,65);assert.equal((await f.core.words(f.actor,f.child.id)).items.length,0);
  let total=0;for(let page=0;page<3;page++){const preview=await f.core.vocabulary.candidates(f.actor,job.id);total+=preview.items.length;await f.core.vocabulary.confirmCandidates(f.actor,`review-page-${page}`,job.id,{decisions:preview.items.map((item:any,index:number)=>({item_id:item.id,selected:index===0}))});}assert.equal(total,65);assert.equal((await f.core.vocabulary.candidates(f.actor,job.id)).pending_count,0);assert.equal((await f.core.words(f.actor,f.child.id)).items.length,3);assert.equal(calls,3);
  }finally{await f.pg.close();}
 });
@@ -103,7 +104,7 @@ test('long plain vocabulary with examples keeps each source sentence with its wo
 test('cancelling a running bulk import keeps saved words and prevents late results',async()=>{
  let entered!:()=>void,release!:()=>void;const start=new Promise<void>(r=>entered=r),gate=new Promise<void>(r=>release=r);let calls=0;
  const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>{if(++calls===2){entered();await gate;}return {items:words.map(result)};}});
- try{const job=await f.core.vocabulary.create(f.actor,'cancel-bulk',f.child.id,{wordbook_id:f.book.id,words:Array.from({length:61},(_,i)=>`word${i}`)});await f.core.vocabulary.processOne();const work=f.core.vocabulary.processOne();await start;const cancelled=await f.core.vocabulary.cancel(f.actor,job.id);assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.saved_count,30);release();await work;await f.core.vocabulary.processOne();const final=await f.core.vocabulary.get(f.actor,job.id);assert.equal(final.status,'cancelled');assert.equal(final.saved_count,30);assert.equal(calls,2);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,30);}finally{release?.();await f.pg.close();}
+ try{const job=await f.core.vocabulary.create(f.actor,'cancel-bulk',f.child.id,{wordbook_id:f.book.id,words:Array.from({length:61},(_,i)=>testWord(i))});await f.core.vocabulary.processOne();const work=f.core.vocabulary.processOne();await start;const cancelled=await f.core.vocabulary.cancel(f.actor,job.id);assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.saved_count,30);release();await work;await f.core.vocabulary.processOne();const final=await f.core.vocabulary.get(f.actor,job.id);assert.equal(final.status,'cancelled');assert.equal(final.saved_count,30);assert.equal(calls,2);assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,30);}finally{release?.();await f.pg.close();}
 });
 test('cancelling a pending review discards candidates and prevents confirmation',async()=>{
  const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>({items:words.map(result)})});try{const job=await f.core.vocabulary.create(f.actor,'cancel-review',f.child.id,{wordbook_id:f.book.id,words:['apple'],review_before_save:true});await f.core.vocabulary.processOne();const review=await f.core.vocabulary.candidates(f.actor,job.id);assert.equal(review.pending_count,1);assert.equal((await f.core.vocabulary.cancel(f.actor,job.id)).status,'cancelled');await assert.rejects(f.core.vocabulary.confirmCandidates(f.actor,'confirm-cancelled',job.id,{decisions:[{item_id:review.items[0].id,selected:true}]}),{code:'GENERATION_NOT_REVIEWABLE'});assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,0);}finally{await f.pg.close();}

@@ -24,6 +24,11 @@ export default function Help(){
    <View className='help-text'>在诗词详情可听普通话朗读或使用 AI 学童了解诗词；诗词背诵不计入单词目标、打卡或连续天数。</View>
   </View>
   <View className='card'>
+   <View className='help-heading'>汉字学习</View>
+   <View className='help-text'>从首页进入汉字库，可以手动录入、批量粘贴，或者拍照、选择图片和文件。文件在后台读取，可返回查看进度；材料中的汉字会列为候选，也可主动使用 AI 提取生字；AI 结果可能有遗漏，核对并排除不需要的字后保存。</View>
+   <View className='help-text'>汉字可编辑、搜索和筛选，也可以标记已学或重点字。详情编辑页可以使用 AI 补充空白拼音，核对后保存，多音字请结合组词核对。汉字和例句支持普通话朗读，多音字请结合拼音和例句核对；可通过 AI 学童用文字或语音提问。汉字学习不计入单词目标、打卡或连续天数。</View>
+  </View>
+  <View className='card'>
    <View className='help-heading'>打卡与分享</View>
    <View className='help-text'>完成当天单词学习目标后自动打卡，在首页查看连续天数、分享打卡。补卡入口会在有可用机会时显示。</View>
    <View className='help-text'>连续实际达标 15 天可获得 1 次补卡机会；补卡只恢复连续记录，不增加学习词数，也不用于重复领取奖励。</View>

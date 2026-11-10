@@ -1,4 +1,4 @@
-# 单词小老师联网搜索配置
+# AI 学童单词联网搜索配置
 
 联网搜索默认不可用。服务端需显式配置北京百炼业务空间的 `TUTOR_SEARCH_API_KEY`、`TUTOR_SEARCH_WORKSPACE_ID`、`TUTOR_SEARCH_MODEL`（当前仅允许 `qwen-plus` 或 `qwen-flash`），以及逗号分隔的 `TUTOR_SEARCH_ALLOWED_DOMAINS`。仅使用经运营方检查、适合小学生的来源域名；如果未提供可用域名，服务拒绝搜索。应根据来源许可与用途单独核查内容和链接。
 

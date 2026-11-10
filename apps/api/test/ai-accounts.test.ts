@@ -54,12 +54,12 @@ test('upstream billing refusal is distinct from family balance and never creates
  }finally{await f.close();}
 });
 test('plural example sentences save their actual target surface and settle once',async()=>{
- const sentences:Record<string,string>={bone:'😊 Our body has many bones.',strawberry:'I like strawberries.',potato:'Dad cooks the potatoes.',tomato:'The tomatoes are red.',child:'The children play.',foot:'My feet are on the floor.','candy bar':'I have two candy bars.'};
+ const sentences:Record<string,string>={bone:'😊 Our body has many bones.',strawberry:'I like strawberries.',potato:'Dad cooks the potatoes.',tomato:'The tomatoes are red.',child:'The children play.',foot:'My feet are on the floor.'};
  const f=await fixture(async(_url,init)=>{const input=JSON.parse(JSON.parse(String(init?.body)).messages[1].content);return response({items:input.words.map((word:string,i:number)=>({...vocabItem(word,i),sentence_en:sentences[word]}))});});
  try{
   const job=await f.core.vocabulary.create(f.dad,'plurals',f.child.id,{wordbook_id:f.book.id,words:Object.keys(sentences)});await f.core.vocabulary.processOne();assert.equal((await f.core.vocabulary.get(f.dad,job.id)).status,'succeeded');
   const targets=(await f.pg.query('SELECT w.lemma,t.surface,t.start_utf16,t.end_utf16,s.text_en FROM wordmate.sentence_targets t JOIN wordmate.child_words w ON w.id=t.child_word_id JOIN wordmate.sentences s ON s.id=t.sentence_id WHERE t.child_id=$1',[f.child.id])).rows;
-  assert.equal(targets.length,7);for(const target of targets)assert.equal(target.text_en.slice(target.start_utf16,target.end_utf16),target.surface);assert.equal(targets.find((t:any)=>t.lemma==='bone').surface,'bones');
+  assert.equal(targets.length,6);for(const target of targets)assert.equal(target.text_en.slice(target.start_utf16,target.end_utf16),target.surface);assert.equal(targets.find((t:any)=>t.lemma==='bone').surface,'bones');
   assert.equal((await f.accounts.overview(f.dad)).balance_micros,19999890);assert.equal((await f.accounts.history(f.dad)).entries.filter((entry:any)=>entry.kind==='charge').length,1);
  }finally{await f.close();}
 });

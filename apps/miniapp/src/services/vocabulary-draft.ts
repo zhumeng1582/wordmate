@@ -5,15 +5,17 @@ export type PreparedWord={input_index:number;input:string;status:'ok'|'invalid';
 export type VocabularyDraft={format:1;mode:MaterialMode;raw:string;theme:string;bookId:string;prepared:PreparedWord[]|null;editing:{id:string;attempts:number}|null};
 export type VocabularySubmission={jobId?:string;body:{wordbook_id:string;source_type:'vision'|'text';raw_text:string;theme:string;review_before_save?:boolean;expected_attempts?:number;prepared_items?:PreparedWord[]};key:string};
 export const vocabularyKeys=(token:string,child:string)=>({draft:`vocabulary-draft:${token}:${child}`,pending:`vocabulary-submit:${token}:${child}`,edit:`vocabulary-edit:${token}:${child}`,result:`vocabulary-result:${token}:${child}`});
+const singleWord=(value:unknown)=>typeof value==='string'&&/^[A-Za-z]+(?:[.'’\-][A-Za-z]+)*\.?$/.test(value.trim());
+const markPhrases=(items:PreparedWord[])=>items.map(item=>item.status==='ok'&&!singleWord(item.lemma)?{...item,status:'invalid' as const,lemma:null,part_of_speech:null,ipa_gb:null,ipa_us:null,meaning_zh:null,sentence_en:null,sentence_zh:null,reason:'短语或句子不能作为单词录入，请填写单个英文单词。'}:item);
 export const emptyVocabularyDraft=():VocabularyDraft=>({format:1,mode:'text',raw:'',theme:'',bookId:'',prepared:null,editing:null});
 export function readVocabularyDraft(value:any):VocabularyDraft{
  if(value?.format!==1||typeof value.raw!=='string'||value.raw.length>MAX_VOCABULARY_TEXT||typeof value.theme!=='string'||value.theme.length>80)return emptyVocabularyDraft();
- return {...emptyVocabularyDraft(),...value,mode:['text','image','file'].includes(value.mode)?value.mode:'text',bookId:typeof value.bookId==='string'?value.bookId:'',prepared:Array.isArray(value.prepared)&&value.prepared.length>0&&value.prepared.length<=MAX_VOCABULARY_WORDS?value.prepared:null};
+ return {...emptyVocabularyDraft(),...value,mode:['text','image','file'].includes(value.mode)?value.mode:'text',bookId:typeof value.bookId==='string'?value.bookId:'',prepared:Array.isArray(value.prepared)&&value.prepared.length>0&&value.prepared.length<=MAX_VOCABULARY_WORDS?markPhrases(value.prepared):null};
 }
 export function applyMaterial(draft:VocabularyDraft,result:{text:string;prepared_items?:PreparedWord[];source:'image'|'file'}):VocabularyDraft{
  const raw=result.source==='image'?result.text:[draft.raw.trim(),result.text].filter(Boolean).join('\n');
  if(raw.length>MAX_VOCABULARY_TEXT)throw Error('IMPORT_TEXT_TOO_LONG');if(!raw.trim())throw Error('IMPORT_EMPTY');
- return {...draft,mode:result.source==='image'?'image':'file',raw,prepared:result.source==='image'&&result.prepared_items?.length?result.prepared_items:null};
+ return {...draft,mode:result.source==='image'?'image':'file',raw,prepared:result.source==='image'&&result.prepared_items?.length?markPhrases(result.prepared_items):null};
 }
 export function removePreparedWord(draft:VocabularyDraft,index:number):VocabularyDraft{
  const prepared=draft.prepared?.filter((_,i)=>i!==index).map((item,input_index)=>({...item,input_index}))??[];

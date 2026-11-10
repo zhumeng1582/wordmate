@@ -11,7 +11,7 @@ export const vocabItem=(word:string,i=0)=>({input_index:i,input:word,status:'ok'
 export const response=(data:any={items:[vocabItem('cat')]},usage:any={prompt_tokens:100,completion_tokens:20,prompt_tokens_details:{cached_tokens:40}})=>new Response(JSON.stringify({id:'upstream-test',choices:[{finish_reason:'stop',message:{content:JSON.stringify(data)}}],usage}),{status:200});
 export async function fixture(fetcher:typeof fetch=async()=>response(),env:any=aiEnv,legacy=false){
  const pg=new PGlite();for(const p of ['deliverables/0.1/database/001_schema.sql','apps/api/migrations/007_import_attempts.sql','apps/api/migrations/016_security_integrity.sql','apps/api/migrations/017_ai_accounts.sql','apps/api/migrations/018_family_ai.sql'])if(!legacy||!p.includes('018_'))await pg.exec(readFileSync(p,'utf8'));
- if(!legacy)await pg.exec(readFileSync('apps/api/migrations/020_audio_billing.sql','utf8'));
+ if(!legacy)await pg.exec(readFileSync('apps/api/migrations/020_audio_billing.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));
  const db={query:async(s:string,p?:any[])=>pg.query(s,p),transaction:async(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))};
  const accounts=new AiAccounts(db,env,fetcher),core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'ai-test',()=>new Date(),undefined,undefined,undefined,undefined,undefined,undefined,accounts);
  const dad=(await core.login('dev-dad')).user.id,mom=(await core.login('dev-mom')).user.id;

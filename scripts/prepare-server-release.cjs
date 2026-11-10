@@ -21,7 +21,7 @@ const release=path.join(output,'release');
 fs.mkdirSync(release,{recursive:true,mode:0o700});
 const files=[
  'package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
- 'apps/api/package.json','apps/api/dist','apps/api/migrations','apps/admin',
+ 'apps/api/package.json','apps/api/dist','apps/api/migrations','apps/api/data/hanzi-strokes','apps/admin',
  'packages/ai/package.json','packages/ai/dist',
  'deliverables/0.1/database/001_schema.sql',
  'scripts/check-production-env.cjs','scripts/deletion-ledger.cjs','scripts/server-backup.cjs',
@@ -53,7 +53,8 @@ if(domain){
 ensureSourceUnchanged(provenance,sourceProvenance());
 fs.writeFileSync(path.join(release,'release-manifest.json'),JSON.stringify({releaseId,domain:domain??null,...provenance,build_node:process.version,files:manifest},null,2)+'\n');
 const archive=path.join(output,'wordmate-server.tar.gz');
-const tar=spawnSync('tar',['-czf',archive,'-C',release,'.'],{stdio:'inherit'});
+// macOS tar otherwise adds AppleDouble files that are mistaken for SQL migrations on Linux.
+const tar=spawnSync('tar',['-czf',archive,'-C',release,'.'],{stdio:'inherit',env:{...process.env,COPYFILE_DISABLE:'1'}});
 if(tar.status!==0)process.exit(tar.status??1);
 fs.chmodSync(archive,0o600);
 const sha256=crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex');

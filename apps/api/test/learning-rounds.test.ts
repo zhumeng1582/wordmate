@@ -10,7 +10,7 @@ import type {Database,Scheduler} from '../src/ports.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 const scheduler:Scheduler={version:'round-test',parameterVersion:'round-test',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{rating},label:'review',due:new Date(now.getTime()+86400000)})};
 async function fixture(count:number){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'rounds',()=>now),actor=(await core.login('dev-dad')).user.id,outsider=(await core.login('dev-outsider')).user.id;
  const family=await core.createFamily(actor,randomUUID(),{name:'轮次测试'}),child=await core.createChild(actor,randomUUID(),family.id,{nickname:'孩子'});

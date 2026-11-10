@@ -59,9 +59,18 @@ const {createApplication}=require('../apps/api/dist/main.js');
   for(const profile of [{gender:'invalid'},{school_grade:42},{school_grade:'x'.repeat(25)},{school_grade:'invalid\n'},{unexpected:true}])assert.equal((await request(`/families/${f.id}/children`,{nickname:'无效档案',...profile})).status,422);
   const emptyProfile=await ok(`/families/${f.id}/children`,{nickname:'选填留空',school_grade:'',gender:'unspecified'});
   assert.equal(emptyProfile.school_grade,'');assert.equal(emptyProfile.gender,'unspecified');
-  {const catalogue=await ok(`/textbook-volumes?child_id=${emptyProfile.id}`);assert.equal(catalogue.items.length,4);const volume=catalogue.items[0];const joined=await ok(`/children/${emptyProfile.id}/textbook-volumes/${volume.id}/join`,{});assert.equal((await ok(`/children/${emptyProfile.id}/words?wordbook_id=${joined.id}`)).total,volume.word_count);assert.equal((await ok(`/textbook-volumes?child_id=${emptyProfile.id}`)).items[0].joined_book_id,joined.id);}
+  {const catalogue=await ok(`/textbook-volumes?child_id=${emptyProfile.id}`);assert.equal(catalogue.items.length,4);const volume=catalogue.items[0];const joined=await ok(`/children/${emptyProfile.id}/textbook-volumes/${volume.id}/join`,{});assert.equal((await ok(`/children/${emptyProfile.id}/words?wordbook_id=${joined.id}`)).total,volume.word_count-joined.skipped_phrases);assert.equal((await ok(`/textbook-volumes?child_id=${emptyProfile.id}`)).items[0].joined_book_id,joined.id);}
   const c=await ok(`/families/${f.id}/children`,{nickname:'测试',accent:'en-GB',school_grade:'小学一年级',gender:'boy'});
   assert.equal(c.school_grade,'小学一年级');assert.equal(c.gender,'boy');
+  {const route=`/children/${c.id}/hanzi`,body={character:'春',pinyin:'chūn',strokes:9,words:'春风'};
+   assert.equal((await request(route,{...body,unexpected:true})).status,422);
+   const jobId=randomUUID();const job=await ok(`${route}/imports`,{id:jobId,name:'test.txt',base64:Buffer.from('春夏').toString('base64')});assert.equal(job.id,jobId);assert.equal((await ok(`${route}/imports`)).items.length,1);await ok(`${route}/imports/${jobId}/cancel`,{});assert.equal((await ok(`${route}/imports/${jobId}`)).status,'cancelled');
+   const item=await ok(route,body);assert.equal((await ok(`${route}?status=all&q=春`)).total,1);const batch=await ok(`${route}/batch`,{characters:['春','夏']});assert.equal(batch.added,1);assert.equal(batch.skipped,1);
+   const marked=await ok(`${route}/${item.id}/mark`,{learned:true,expected_version:item.version},undefined,'PUT');assert(marked.learned_at);
+   const hs=await ok(`${route}/${item.id}/sessions`,{});assert.equal(hs.character,'春');assert.deepEqual(hs.messages,[]);assert.equal((await request(`${route}/${item.id}/sessions/${hs.id}/messages`,{request_id:'bad'})).status,422);await ok(`${route}/${item.id}/sessions/${hs.id}`,{},undefined,'DELETE');
+   assert.equal((await request(`${route}/${item.id}/mark`,{learned:false,expected_version:item.version},undefined,'PUT')).status,409);
+   await ok(`${route}/${item.id}`,{},undefined,'DELETE');assert.equal((await ok(route)).total,1);
+  }
   {const route=`/children/${c.id}/poems`,body={title:'静夜思',author:'李白',dynasty:'唐',body:'床前明月光。',genre:'五言绝句',pinyin:'chuang qian',translation:'月光洒在床前',annotations:'疑：好像',background:'月夜',source:'教材',notes:'熟读'};
    assert.equal((await request(route,{...body,unexpected:true})).status,422);
    const poem=await ok(route,body),list=await ok(route);assert.equal(list.total,1);assert.equal(list.items[0].id,poem.id);

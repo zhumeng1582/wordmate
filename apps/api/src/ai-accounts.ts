@@ -121,6 +121,30 @@ export class AiAccounts{
   const tutor=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/word-tutor.js')).href);
   return async(word:any,history:any[],question?:string,exerciseAnswer=false)=>this.run(actor,'word_tutor',reference,selected,observed,()=>tutor.generateTutorAnswer(adapter.createTextGenerator(selected.env,observed.fetcher),word,history,question,exerciseAnswer));
  }
+ async hanziImport(q:Sql,actor:string,reference:string,familyId:string){
+  const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
+  const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
+  const importer=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/hanzi-import.js')).href);
+  return async(raw:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>importer.generateHanziImport(adapter.createTextGenerator(selected.env,observed.fetcher),raw));
+ }
+ async hanziPinyin(q:Sql,actor:string,reference:string,familyId:string){
+  const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
+  const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
+  const pinyin=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/hanzi-pinyin.js')).href);
+  return async(character:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>pinyin.generateHanziPinyin(adapter.createTextGenerator(selected.env,observed.fetcher),character));
+ }
+ async hanziWords(q:Sql,actor:string,reference:string,familyId:string){
+  const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
+  const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
+  const words=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/hanzi-words.js')).href);
+  return async(character:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>words.generateHanziWords(adapter.createTextGenerator(selected.env,observed.fetcher),character));
+ }
+ async hanziTutor(q:Sql,actor:string,reference:string,familyId:string){
+  const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
+  const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
+  const tutor=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/hanzi-tutor.js')).href);
+  return async(hanzi:any,history:any[],question:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>tutor.generateHanziAnswer(adapter.createTextGenerator(selected.env,observed.fetcher),hanzi,history,question));
+ }
  async poemTutor(q:Sql,actor:string,reference:string,familyId:string){
   const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
   const adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);
@@ -183,7 +207,7 @@ export class AiAccounts{
  async failId(id:string){await this.tx(q=>this.release(q,id,'GENERATION_FAILED'));}
  async failReference(reference:string,code='GENERATION_FAILED'){await this.tx(async q=>{const c=await one(q,'SELECT id FROM ai_calls WHERE reference=$1',[reference]);if(c)await this.release(q,c.id,code,true);});}
  async sweep(){await this.tx(async q=>{const calls=(await q.query("SELECT id FROM ai_calls WHERE state IN ('running','ready') AND created_at<now()-interval '10 minutes' ORDER BY user_id,id")).rows;for(const c of calls)await this.release(q,c.id,'AI_CALL_EXPIRED',true);});}
- async history(actor:string,familyId?:string){return this.tx(async q=>{const f=await this.family(q,actor,familyId);await this.user(q,actor);return {family_id:f?.id??null,items:(await q.query("SELECT id,user_id,family_id,capability,CASE WHEN kind='word_tutor' AND reference LIKE 'poem-tutor:%' THEN 'poem_tutor' WHEN kind='word_tutor' AND reference LIKE 'poem-import:%' THEN 'poem_import' ELSE kind END AS kind,mode,provider,model,state,input_tokens,output_tokens,cached_tokens,billable_characters,tariff->>'yuan_per_10000_characters' audio_yuan_per_10000_characters,charge_micros,error_code,created_at FROM ai_calls WHERE (family_id=$2 AND mode='system') OR (user_id=$1 AND (family_id=$2 OR family_id IS NULL)) ORDER BY created_at DESC,id DESC LIMIT 50",[actor,f?.id??null])).rows.map(r=>({...r,charge_micros:Number(r.charge_micros)})),entries:f?(await q.query('SELECT id,user_id,kind,amount_micros,gift_used_micros,created_at FROM ai_family_wallet_entries WHERE family_id=$1 ORDER BY created_at DESC,id DESC LIMIT 50',[f.id])).rows.map(r=>({...r,amount_micros:Number(r.amount_micros),gift_used_micros:Number(r.gift_used_micros)})):[]};});}
+ async history(actor:string,familyId?:string){return this.tx(async q=>{const f=await this.family(q,actor,familyId);await this.user(q,actor);return {family_id:f?.id??null,items:(await q.query("SELECT id,user_id,family_id,capability,CASE WHEN kind='word_tutor' AND reference LIKE 'hanzi-words:%' THEN 'hanzi_words' WHEN kind='word_tutor' AND reference LIKE 'hanzi-pinyin:%' THEN 'hanzi_pinyin' WHEN kind='word_tutor' AND reference LIKE 'hanzi-import:%' THEN 'hanzi_import' WHEN kind='word_tutor' AND reference LIKE 'hanzi-tutor:%' THEN 'hanzi_tutor' WHEN kind='word_tutor' AND reference LIKE 'poem-tutor:%' THEN 'poem_tutor' WHEN kind='word_tutor' AND reference LIKE 'poem-import:%' THEN 'poem_import' ELSE kind END AS kind,mode,provider,model,state,input_tokens,output_tokens,cached_tokens,billable_characters,tariff->>'yuan_per_10000_characters' audio_yuan_per_10000_characters,charge_micros,error_code,created_at FROM ai_calls WHERE (family_id=$2 AND mode='system') OR (user_id=$1 AND (family_id=$2 OR family_id IS NULL)) ORDER BY created_at DESC,id DESC LIMIT 50",[actor,f?.id??null])).rows.map(r=>({...r,charge_micros:Number(r.charge_micros)})),entries:f?(await q.query('SELECT id,user_id,kind,amount_micros,gift_used_micros,created_at FROM ai_family_wallet_entries WHERE family_id=$1 ORDER BY created_at DESC,id DESC LIMIT 50',[f.id])).rows.map(r=>({...r,amount_micros:Number(r.amount_micros),gift_used_micros:Number(r.gift_used_micros)})):[]};});}
  async test(actor:string,capability:AiCapability='text',familyId?:string){
   const ref=`test:${randomUUID()}`,selected=await this.tx(q=>this.select(q,actor,undefined,capability,familyId));ensure(selected.selection.mode==='byok',422,'AI_TEST_BYOK_ONLY');
   const observed=this.observer(),adapter=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/index.js')).href);

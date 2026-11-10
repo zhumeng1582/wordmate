@@ -15,6 +15,7 @@ export default function SettingsLearning(){
  {signedIn&&<><View className='subtitle settings-section-title'>英语单词 · 学习节奏</View><View className='card'><View className='autoplay-setting'><View>答题后自动切换<View className='muted small'>关闭后手动进入下一题；本机生效</View></View><Switch checked={autoNext} onChange={event=>{const value=event.detail.value;storage.set(`study_auto_next:${account}`,value);setAutoNext(value);}}/></View></View></>}
  {hasChild&&<><View className='subtitle settings-section-title'>英语单词 · 每日目标</View><View className='card'><LearningGoal key={account+':'+child}/></View></>}
  {signedIn&&<><View className='subtitle settings-section-title'>英语单词 · 发音设置</View><View className='card'><AudioPreferences key={account}/></View></>}
+ <View className='subtitle settings-section-title'>汉字学习</View><View className='card'><View>朗读：普通话</View><View className='muted small'>汉字朗读不受单词发音设置影响；汉字学习不计入单词每日目标、打卡或连续天数。多音字请结合拼音和例句核对。</View></View>
  <View className='subtitle settings-section-title'>古诗词</View><View className='card'><View>朗读：标准普通话</View><View className='muted small'>诗词朗读不受单词发音设置影响。诗词背诵不计入单词每日目标、打卡或连续天数。</View></View>
  </View>;
 }

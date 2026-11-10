@@ -2,7 +2,7 @@ import Taro from '@tarojs/taro';
 import {api,storage} from './api';
 const fs=()=>Taro.getFileSystemManager();
 type MaterialKind='camera'|'album'|'file';
-function chooseMaterial(kind:MaterialKind,purpose?:'poem'){
+function chooseMaterial(kind:MaterialKind,purpose?:'poem'|'hanzi'){
  return new Promise<{tempFiles?:any[]}>((resolve,reject)=>{
   // Settle from native callbacks too: cancellation must not depend on the
   // returned Promise being forwarded by the picker on every WeChat version.
@@ -17,7 +17,7 @@ function chooseMaterial(kind:MaterialKind,purpose?:'poem'){
   request?.then(resolve,reject);
  });
 }
-export async function selectImportMaterial(kind:MaterialKind,onSelected?:()=>void,purpose?:'poem'){
+export async function selectImportMaterial(kind:MaterialKind,onSelected?:()=>void,purpose?:'poem'|'hanzi'){
  const token=storage.get('access_token'),selectedChild=storage.get('child_id'),family=storage.get('family_id');
  const checkScope=()=>{if(token!==storage.get('access_token')||selectedChild!==storage.get('child_id')||family!==storage.get('family_id'))throw Error('SESSION_CHANGED');};
  if(Taro.canIUse('requirePrivacyAuthorize'))await new Promise<void>((resolve,reject)=>Taro.requirePrivacyAuthorize({success:()=>resolve(),fail:()=>reject(Error('IMPORT_PRIVACY_REQUIRED'))}));
@@ -34,12 +34,12 @@ export async function selectImportMaterial(kind:MaterialKind,onSelected?:()=>voi
   if(info.width*info.height>20000000)throw Error('IMPORT_IMAGE_TOO_LARGE');name=`image.${info.type==='png'?'png':'jpg'}`;
  }
  if(size>(name.toLowerCase().endsWith('.pdf')?10:4)*1024*1024)throw Error(name.toLowerCase().endsWith('.pdf')?'PDF_FILE_TOO_LARGE':'IMPORT_FILE_TOO_LARGE');
- checkScope();if(name.toLowerCase().endsWith('.pdf')){const notice=await Taro.showModal({title:'读取 PDF',content:'PDF 中的扫描页和图片页将发送给图片 AI 识别，纯文字页直接提取；后续整理也会使用 AI 额度。',confirmText:'继续'});if(!notice.confirm)throw Error('IMPORT_CANCELLED');checkScope();}onSelected?.();
+ checkScope();if(name.toLowerCase().endsWith('.pdf')){const notice=await Taro.showModal({title:'读取 PDF',content:purpose==='hanzi'?'PDF 中的扫描页和图片页将发送给图片 AI 识别并使用相应额度，纯文字页直接提取。':'PDF 中的扫描页和图片页将发送给图片 AI 识别，纯文字页直接提取；后续整理也会使用 AI 额度。',confirmText:'继续'});if(!notice.confirm)throw Error('IMPORT_CANCELLED');checkScope();}onSelected?.();
  const data=await new Promise<string>((resolve,reject)=>fs().readFile({filePath:path,encoding:'base64',success:r=>resolve(r.data as string),fail:reject}));
  checkScope();
  return {name,data};
 }
-export async function extractFile(child:string,kind:MaterialKind,existingText='',theme='',onSelected?:()=>void,purpose?:'poem'){
+export async function extractFile(child:string,kind:MaterialKind,existingText='',theme='',onSelected?:()=>void,purpose?:'poem'|'hanzi'){
  const token=storage.get('access_token'),selectedChild=storage.get('child_id'),family=storage.get('family_id');
  const checkScope=()=>{if(token!==storage.get('access_token')||selectedChild!==storage.get('child_id')||family!==storage.get('family_id'))throw Error('SESSION_CHANGED');};
  const {name,data}=await selectImportMaterial(kind,onSelected,purpose);checkScope();
@@ -57,3 +57,13 @@ export async function shareCsv(content:string){
  }finally{try{fs().unlinkSync(path);}catch{}}
 }
 export const isFileCancel=(e:any)=>/cancel/i.test(typeof e==='string'?e:e?.errMsg??e?.message??'');
+const copybookPath=()=>`${Taro.env.USER_DATA_PATH}/hanzi-copybook.pdf`;
+export function clearCopybook(){try{fs().unlinkSync(copybookPath());}catch{}}
+/** Keep the file until leaving the page: the native PDF viewer may read it after opening. */
+export async function shareCopybook(base64:string){
+ const path=copybookPath();
+ try{await new Promise<void>((resolve,reject)=>fs().writeFile({filePath:path,data:base64,encoding:'base64',success:()=>resolve(),fail:reject}));}
+ catch{clearCopybook();throw Error('COPYBOOK_SAVE_FAILED');}
+ try{await Taro.openDocument({filePath:path,fileType:'pdf',showMenu:true});}
+ catch{clearCopybook();throw Error('COPYBOOK_OPEN_FAILED');}
+}

@@ -1,4 +1,4 @@
-# 单词小老师语音识别配置
+# AI 学童语音识别配置
 
 语音识别默认关闭。部署前，需为百炼北京业务空间开通 `qwen-audio-3.0-asr-flash`，并在服务端配置 `TUTOR_ASR_API_KEY`、`TUTOR_ASR_WORKSPACE_ID` 和 `TUTOR_ASR_YUAN_PER_MINUTE`。价格必须与实际合同和计费单位核对；不配置价格时拒绝调用。可使用 `TUTOR_ASR_DAILY_LIMIT` 设置每个账号每日请求上限，默认 100 次。调用计入现有系统 AI 每日预算上限。
 

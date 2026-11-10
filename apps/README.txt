@@ -15,7 +15,9 @@
 
 本地运行更新：优先参阅根目录 LOCAL-RUN.txt。新增 PGlite 持久化开发数据库和 node scripts/local-dev.cjs 一键构建启动，不再要求本地安装 Docker/PostgreSQL。持久化适配器已测试，前后端编译与类型检查已通过；真实 FSRS 及 Nest 路由测试通过，端口连接与微信模拟器操作尚待用户终端联调。
 
-单词共学 0.1 · 开发工程
+单词共学 · 开发工程
+
+2026-11-10 文档说明：本文件下方保留 2026-10 的实现和验收历史，不作为当前功能状态或生产验收结论。当前运行、功能和迁移说明分别见 ../LOCAL-RUN.txt、AI-VOCABULARY.txt、POEMS.txt、HANZI.md 和 ../ARCHITECTURE-OPERATIONS.md。当前实际页面以 miniapp/src/app.config.ts 为准；代码已包含文件导入、语音、诗词和汉字，旧文中的“未接入”仅指当时。
 
 状态（2026-10-20）
 已经开始实现；当前为录词与复习主流程的开发切片，不是全部 0.1 功能完成，也不是可上线版本。

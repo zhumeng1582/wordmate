@@ -1,4 +1,4 @@
-# 单词小老师图片生成配置
+# AI 学童单词图片生成配置
 
 图片生成默认关闭。服务端需配置 `TUTOR_IMAGE_API_KEY`、`TUTOR_IMAGE_WORKSPACE_ID`、`TUTOR_IMAGE_MODEL`（当前允许 `qwen-image-3.0` 或 `qwen-image-3.0-pro`）、`TUTOR_IMAGE_YUAN_PER_IMAGE` 和 `TUTOR_IMAGE_SAFETY_INSPECTION=cip`。标准模型使用 1536×1536（2K 计费档），Pro 使用 1024×1024（1K 计费档）。价格须与北京业务空间所选模型、输出档位及实际合同核对；不配置价格时拒绝调用。每账号每天默认最多 10 次，可通过 `TUTOR_IMAGE_DAILY_LIMIT` 调整；每个孩子最多保存 100 张已生成或生成中的图片。系统 AI 预算上限同样生效。
 

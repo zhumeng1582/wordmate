@@ -33,7 +33,7 @@ test('CSV preserves quotes, newlines, Chinese and neutralizes spreadsheet formul
  for(const value of ['=cmd()',' +SUM(1)','@SUM(A1)','-1','\t=1'])assert(csvCell(value).startsWith('"\''));
 });
 test('scope, >200 word paging, arbitrary selection/all exclusions, OCR caching and budgets',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/007_import_attempts.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/007_import_attempts.sql','utf8'));
  const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))};
  let calls=0,revoke='',fail=false;const reader={profile:'test',read:async()=>{calls++;if(revoke)await pg.query("UPDATE wordmate.family_members SET status='removed' WHERE user_id=$1",[revoke]);if(fail)throw Error('provider failure');return 'airport\nluggage';}};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),{} as any,'test',()=>new Date(),undefined,undefined,undefined,reader);

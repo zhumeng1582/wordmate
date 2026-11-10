@@ -10,7 +10,7 @@ const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pgl
 const scheduler:Scheduler={version:'test',parameterVersion:'test',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{rating,due:new Date(now.getTime()+86400000)},label:'review',due:new Date(now.getTime()+86400000)})};
 
 test('15-day actual streak earns one credit and makeup restores continuity without inventing study',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  await pg.exec("ALTER TABLE wordmate.idempotency_keys ALTER COLUMN created_at SET DEFAULT '2026-10-15T12:00:00Z'::timestamptz");
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date('2026-10-15T12:00:00Z');const core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'makeup-test',()=>now);

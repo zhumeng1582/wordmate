@@ -1,3 +1,4 @@
+import {displayWordSenses} from './word-senses.ts';
 import {createHash} from 'node:crypto';
 import type {Sql,Row} from './ports.ts';
 import {ensure,uuid} from './errors.ts';
@@ -13,6 +14,7 @@ export class WordTutor {
  async open(actor:string,child:string,wordId:string){return this.access.tx(async q=>{
   await this.access.child(q,actor,child);
   const w=await one(q,"SELECT w.lemma,w.part_of_speech,w.meaning_zh,(SELECT s.text_en FROM sentences s JOIN sentence_targets t ON t.sentence_id=s.id WHERE t.child_word_id=w.id AND s.status='validated' ORDER BY s.created_at DESC,s.id DESC LIMIT 1) example_en,(SELECT s.translation_zh FROM sentences s JOIN sentence_targets t ON t.sentence_id=s.id WHERE t.child_word_id=w.id AND s.status='validated' ORDER BY s.created_at DESC,s.id DESC LIMIT 1) example_zh FROM child_words w WHERE w.id=$1 AND w.child_id=$2 AND w.archived_at IS NULL",[uuid(wordId),child]);ensure(w,404,'WORD_NOT_FOUND');
+  Object.assign(w,displayWordSenses(w.part_of_speech,w.meaning_zh));
   const key=senseKey(w);let s=await one(q,'SELECT * FROM word_tutor_sessions WHERE child_id=$1 AND sense_key=$2 ORDER BY updated_at DESC,id DESC LIMIT 1',[child,key]);
   if(!s)s=await one(q,'INSERT INTO word_tutor_sessions(child_id,sense_key,lemma,part_of_speech,meaning_zh,example_en,example_zh) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[child,key,w.lemma,w.part_of_speech,w.meaning_zh,w.example_en??'',w.example_zh??'']);
   return this.dto(q,s);

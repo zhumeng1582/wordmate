@@ -1,8 +1,7 @@
 词伴服务器域名与部署
 
-当前证据
-.local/current-status.md（2026-10-23）记录：小程序备案已通过，ECS 的 API 曾通过
-systemd 运行，公网 HTTPS 域名和反向代理未完成。该记录不是当前服务器检查结果。
+状态说明（2026-11-10）
+本文件提供发布步骤，工作区代码和历史记录不证明当前生产版本、数据库迁移或微信线上版本。部署前在目标服务器只读检查当前 release 符号链接、服务状态、迁移账本和健康信息；生产变更前核对备份及恢复方案。历史记录见仓库根目录 SERVER-DEPLOYMENT-2026-10-30.txt。
 部署前须核对：实际域名、域名备案、ECS IP、SSH 身份、系统和 Nginx/Node 版本、
 现有服务名/安装路径、RDS schema 版本及备份。保留现有生产环境变量和存储 profile。
 
@@ -12,8 +11,7 @@ systemd 运行，公网 HTTPS 域名和反向代理未完成。该记录不是�
   node scripts/prepare-server-release.cjs api.example.com
 脚本先编译 API/AI，再按白名单打包到 .local/server-releases/。
 包含编译产物、迁移 SQL、初始化 schema、锁文件、配置检查和删除清单工具。
-不包含本机 .env、数据库、node_modules 或真实凭证。不是从 Git HEAD 打包，
-会包含当前源码编译后的未提交改动，清单记录这一点。发布前仍须审阅并固定版本。
+不包含本机 .env、数据库、node_modules 或真实凭证。默认拒绝含未提交改动的工作区；确需构建候选包时，先审阅范围并显式设置 WORDMATE_ALLOW_DIRTY_RELEASE=1。包从当前工作区构建，不等同于 Git HEAD；清单记录源码指纹和未提交状态。详见 ARCHITECTURE-OPERATIONS.md。
 
 服务器部署顺序
 1. 只读核对现有部署；不要直接用示例 unit 覆盖正在运行的服务。
@@ -25,10 +23,11 @@ systemd 运行，公网 HTTPS 域名和反向代理未完成。该记录不是�
    保留原 AI_CREDENTIAL_KEY 和所有仍被文件引用的存储 profile/prefix。
    node --env-file=/etc/wordmate/api.env scripts/check-production-env.cjs
 5. 升级已有数据库前，停止旧 API/Worker，备份数据库并导出最新删除清单。
-   空库：node --env-file=/etc/wordmate/api.env apps/api/dist/migrate.js（001–018）
-   已有库：按实际版本补齐；migrate-audio.js 补 002–016，随后
-   node --env-file=/etc/wordmate/api.env apps/api/dist/migrate-ai-accounts.js（017–018）。
-   018 发现未清冻结会拒绝升级；先查明并处理，不能绕过检查。不要对旧库执行空库迁移。
+   当前空库入口 apps/api/dist/migrate.js 初始化 001–044，仅用于没有 wordmate schema 的空库。
+   现有库先运行 node --env-file=/etc/wordmate/api.env apps/api/dist/migrate-managed.js status，
+   核对真实 schema、账本、迁移文件和校验值；确认受控基线及兼容性后再按
+   ARCHITECTURE-OPERATIONS.md 执行。没有账本不等于任何历史迁移已完成，禁止盲目 baseline。
+   旧专项迁移入口仅用于经过核对的兼容场景；不要对旧库执行空库迁移。
 6. 按现有服务账户和目录适配 infra/wordmate-api.service.example。
    /usr/bin/node 必须替换为服务器实际的 Node 路径；状态目录需可写。
    新版先验证生产配置和本机 /api/health，再切换现有服务；保留上版和备份。
@@ -53,14 +52,14 @@ systemd 运行，公网 HTTPS 域名和反向代理未完成。该记录不是�
 按经过验证的兼容性方案或备份恢复，恢复后重放独立保存的最新删除清单。
 保留原生产配置和加密密钥；确认文件、账务和已删除资料状态后再开放访问。
 
-2026-10-30 实际部署
+2026-10-30 实际部署（历史快照，不代表当前状态）
 正式 API：https://api.dancigongxue.world/api；ECS：8.137.113.116。
-当前版本 /var/www/wordmate-current 指向 /var/www/wordmate-releases/2026-10-30-domain-01。
+当时 /var/www/wordmate-current 指向 /var/www/wordmate-releases/2026-10-30-domain-01；当前指向须在服务器核查。
 systemd 使用 wordmate 用户、Node 22、production.env，启动前检查生产配置。
 配置文件含密钥，0600 权限；原部署 /var/www/wordmate 与部署备份保留。
 OSS 使用 WordmateEcsOssProduction 实例角色和 IMDSv2 临时凭证。
 POSTER_POOL_PREWARM=false，海报按需生成。
-已完成 002–018 正式迁移和生产配置检查，数据库当前 52 张 wordmate 表。
+当时已完成 002–018 正式迁移和生产配置检查，数据库当时有 52 张 wordmate 表；后续版本和迁移以实际账本为准。
 备份脚本 scripts/server-backup.cjs：每日上海时间 04:15；删除清单每小时第 7 分钟；
 私有备份目录 /var/backups/wordmate，按配置 365 天保留和清理，计划在 /etc/cron.d/wordmate-backup。
 证书 certbot.timer 已启用，续期演练通过，续期后验证并重载 Nginx。

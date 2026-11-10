@@ -11,10 +11,18 @@ const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
 const schemas:Record<string,any>={
+  libraryCheckin:object({kind:{enum:['poems','hanzi']},item_id:id}),
+  archiveMark:object({archived:{type:'boolean'},expected_version:positive}),
+  hanziCopybook:object({ids:{type:'array',minItems:1,maxItems:300,uniqueItems:true,items:id}}),
+  hanziImport:object({id,name:str(120),base64:str(13981016)}),
+  hanziBatch:object({characters:{type:'array',minItems:1,maxItems:300,items:str(4)},job_id:id},['characters']),
+  hanzi:object({character:str(4),pinyin:{type:'string',maxLength:200},radical:{type:'string',maxLength:20},strokes:{type:['integer','null'],minimum:1,maximum:100},meaning:{type:'string',maxLength:2000},words:{type:'string',maxLength:1000},example:{type:'string',maxLength:1000},tags:{type:'string',maxLength:200},notes:{type:'string',maxLength:1000},expected_version:positive},['character']),
+  hanziMark:object({learned:{type:'boolean'},important:{type:'boolean'},expected_version:positive},['expected_version']),
   poem:object({title:str(100),author:{type:'string',maxLength:100},dynasty:{type:'string',maxLength:40},body:str(1000),genre:{type:'string',maxLength:80},annotations:{type:'string',maxLength:3000},translation:{type:'string',maxLength:3000},background:{type:'string',maxLength:3000},source:{type:'string',maxLength:200},notes:{type:'string',maxLength:3000},pinyin:{type:'string',maxLength:3000},expected_version:positive,reset_memorized:{type:'boolean'}},['title','body']),
   poemImport:{oneOf:[object({id,raw_text:str(MAX_IMPORT_TEXT)}),object({id,name:str(120),base64:str(13981016)})]},
   poemImportSave:object({items:{type:'array',minItems:1,maxItems:300,items:object({title:str(100),author:{type:'string',maxLength:100},dynasty:{type:'string',maxLength:40},body:str(1000),genre:{type:'string',maxLength:80},annotations:{type:'string',maxLength:3000},translation:{type:'string',maxLength:3000},background:{type:'string',maxLength:3000},source:{type:'string',maxLength:200},notes:{type:'string',maxLength:3000},pinyin:{type:'string',maxLength:3000}},['title','body'])}}),
   poemAnalyze:object({request_id:id,text:str(6000)}),
+  hanziPinyin:object({request_id:id}),
   poemMark:object({memorized:{type:'boolean'},expected_version:positive}),
   tutorOpen:object({word_id:id}),
   tutorImage:object({request_id:id}),
@@ -62,7 +70,9 @@ export function validateBody(path:string[],method:string,body:unknown){
   if(!['POST','PUT','PATCH','DELETE'].includes(method))return;
   if(method==='DELETE'){const route=path.join('/');const kind=route==='me/ai-key'?'aiKeyDelete':route==='me'||route==='me/privacy-consent'?'confirmed':path[0]==='children'&&path.length===2?'deleteChild':path[0]==='families'&&path.length===2?'deleteFamily':'empty';ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');return;}
   let kind='';const route=path.join('/');
-  if(path[0]==='children'&&path[2]==='poems'){kind=path[3]==='imports'?(path.length===4?'poemImport':path[5]==='save'?'poemImportSave':'empty'):path.length===3?'poem':path.length===4&&path[3]==='analyze'?'poemAnalyze':path.length===4?'poem':path[4]==='memorization'?'poemMark':path[4]==='sessions'&&path[6]==='messages'?'tutorAnswer':'empty';}
+  if(path[0]==='children'&&['hanzi','poems','words'].includes(path[2])&&path.length===5&&path[4]==='archive')kind='archiveMark';
+  else if(path[0]==='children'&&path[2]==='hanzi'){kind=path[4]==='sessions'?(path[6]==='messages'?'tutorAnswer':path[6]==='transcriptions'?'tutorTranscription':'empty'):path[3]==='imports'?(path.length===4?'hanziImport':'empty'):path[3]==='copybook'?'hanziCopybook':path[3]==='batch'?'hanziBatch':path[3]==='analyze'?'poemAnalyze':['pinyin','words'].includes(path[4])?'hanziPinyin':path[4]==='mark'?'hanziMark':path[4]==='audio'?'empty':'hanzi';}
+  else if(path[0]==='children'&&path[2]==='poems'){kind=path[4]==='sessions'?(path[6]==='messages'?'tutorAnswer':path[6]==='transcriptions'?'tutorTranscription':'empty'):path[3]==='imports'?(path.length===4?'poemImport':path[5]==='save'?'poemImportSave':'empty'):path.length===3?'poem':path.length===4&&path[3]==='analyze'?'poemAnalyze':path.length===4?'poem':path[4]==='memorization'?'poemMark':path[4]==='sessions'&&path[6]==='messages'?'tutorAnswer':'empty';}
   else if(route==='me/profile')kind='parentProfile';
   else if(route==='me/ai-settings')kind='aiSettings';
   else if(route==='me/ai-test')kind='aiTest';
@@ -95,6 +105,7 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='word-tutor-sessions'&&path[2]==='learning-events')kind='tutorLearningEvent';
   else if(path[0]==='children'&&path[2]==='word-tutor-sessions')kind='tutorOpen';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
+  else if(path[0]==='children'&&path[2]==='library-checkins')kind='libraryCheckin';
   else if(path[0]==='children'&&path[2]==='checkin-makeup'&&method==='POST')kind='checkinMakeup';
   else if(path[0]==='children'&&path[2]==='wordbooks'&&path.length===4&&method==='PATCH')kind='bookRename';
   else if(path[0]==='children'&&path[2]==='wordbooks'&&path.length===5&&path[4]==='share')kind='shareBook';

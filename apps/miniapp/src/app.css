@@ -125,7 +125,6 @@ input,textarea{caret-color:var(--primary)}
 
 .autoplay-setting{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:96px;margin:16px 0}
 
-.home-progress-card{min-height:330px}
 .home-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;margin:28px 0 0;padding-top:22px;border-top:2px solid var(--border)}
 .home-shortcut{display:flex;align-items:center;justify-content:space-between;min-width:0;min-height:72px;padding:12px 16px;margin:0;border-radius:14px;background:var(--field);color:var(--secondary-text);font-size:25px;text-align:left;line-height:1.4}
 .home-shortcut::after{border:0}
@@ -141,3 +140,6 @@ input,textarea{caret-color:var(--primary)}
 
 .audio-example-wrap{display:flex;align-items:flex-start;gap:12px}.audio-example-wrap .audio-text{flex:1;min-width:0}.example-copy{flex:none;margin:0;padding:12px 4px;min-width:64px;min-height:64px;background:transparent;color:var(--primary);font-size:23px;line-height:40px}.example-copy::after{border:0}
 .word-feedback-button{background:transparent;border:0;color:var(--muted);font-size:23px;line-height:1.4;margin:0;padding:10px 12px;min-height:60px}.word-feedback-button::after{border:0}
+
+/* Shared inset hairline between entries in the learning libraries. */
+.library-divider{position:absolute;top:0;left:0;right:0;height:1PX;background:var(--border);transform:scaleY(.5);transform-origin:top;pointer-events:none}
