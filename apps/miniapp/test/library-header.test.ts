@@ -1,0 +1,24 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {pageHarness,tick,deferred} from './page-harness.ts';
+const fixture=async(path:string)=>path.endsWith('/wordbooks')||path.endsWith('/hanzi-books')?{items:[{id:'book-a',name:'很长的共享学习本名称',read_only:true}]}:path.endsWith('/ai-batches')?{items:[]}:{items:[],total:0,book_total:0,learned_count:0,matched_total:0,next_cursor:null,next_offset:null};
+for(const [pageName,name] of [['words','单词'],['hanzi','汉字'],['poems','古诗']])test(`${pageName} shares header order, disabled loading controls and unified search navigation`,async()=>{
+ const waiting=deferred(),page=pageHarness(`pages/${pageName}/index`,()=>waiting.promise);
+ const loading=page.show();await tick();let header=page.all(page.render()).find(n=>n.props?.className==='library-header');assert(header);const buttons=page.all(header).filter(n=>n.type==='Button');assert.deepEqual(buttons.map(n=>n.props['aria-label']),[...(pageName==='words'?['切换词本']:pageName==='hanzi'?['切换字本']:['切换诗本']),`搜索${name}`,`更多${name}操作`]);assert(buttons.every(n=>n.props.disabled));
+ waiting.resolve({items:[],total:0,matched_total:0,next_cursor:null,next_offset:null});await loading;await tick();page.button(`搜索${name}`).onClick();assert.equal(page.routes.at(-1),'/pages/search/index');page.dispose();
+});
+for(const [label,url] of [['录入古诗','/pages/import/index?kind=poems'],['录入记录','/pages/import-records/index']])test(`poem more menu opens ${label} directly in one choice`,async()=>{
+ const page=pageHarness('pages/poems/index',fixture,undefined,{actionChoices:[label]});await page.show();page.button('更多古诗操作').onClick();await tick();assert.equal(page.actionSheets.length,1);assert.deepEqual(Array.from(page.actionSheets[0]),['录入古诗','录入记录','收藏诗词']);assert.equal(page.routes.at(-1),url);page.dispose();
+});
+for(const reason of ['hide','child','account'])test(`poem action is invalidated after changing ${reason}`,async()=>{
+ const waiting=deferred(),page=pageHarness('pages/poems/index',fixture,undefined,{actionSheet:()=>waiting.promise});await page.show();page.button('更多古诗操作').onClick();await tick();if(reason==='hide')page.hide();else page.cache.set(reason==='child'?'child_id':'access_token','changed');waiting.resolve({tapIndex:0});await tick();assert.equal(page.routes.length,0);page.dispose();
+});
+for(const [kind,name,key] of [['words','单词','current_wordbook'],['hanzi','汉字','current_hanzi_book']])test(`${kind} switching books resets the same default status scope`,async()=>{
+ const page=pageHarness(`pages/${kind}/index`,async path=>path.endsWith('/wordbooks')||path.endsWith('/hanzi-books')?{items:[{id:'book-a',name:'本一'},{id:'book-b',name:'本二'}]}:fixture(path),undefined,{cache:{[key+':child-a']:'book-a'}});await page.show();page.button(`筛选${name}`).onClick();let panel=page.all(page.render()).find(n=>n.type==='LibraryFilter');panel.props.onChange('archived');panel.props.onClose();await tick();page.button(kind==='words'?'切换词本':'切换字本').onClick();page.all(page.render()).find(n=>n.type==='Button'&&n.props.className==='book-switch-option ').props.onClick();await tick();assert.equal(page.cache.get(key+':child-a'),'book-b');assert(page.requests.some(path=>path.includes('status=all')&&path.includes('book-b')));page.button(`筛选${name}`).onClick();panel=page.all(page.render()).find(n=>n.type==='LibraryFilter');assert.equal(panel.props.value,'all');page.dispose();
+});
+test('cancelling poem actions keeps the current list and shows no error',async()=>{
+ const page=pageHarness('pages/poems/index',fixture,undefined,{actionSheetError:'showActionSheet:fail cancel'});await page.show();const requests=page.calls.length;page.button('更多古诗操作').onClick();await tick();assert.equal(page.calls.length,requests);assert.equal(page.routes.length,0);assert.doesNotMatch(page.text(page.render()),/暂时无法打开/);page.dispose();
+});
+for(const [kind,name] of [['words','单词'],['hanzi','汉字']])test(`${kind} keeps the single filter available after a failed load so the user can retry`,async()=>{
+ let failed=true;const page=pageHarness(`pages/${kind}/index`,async path=>{if(path.endsWith('/wordbooks')||path.endsWith('/hanzi-books'))return {items:[{id:'book-a',name:'本'}]};if(path.endsWith('/ai-batches'))return {items:[]};if(failed)throw Error('offline');return {items:[{id:'item',lemma:'spring',character:'春',version:1}],total:1,book_total:1,learned_count:0,next_cursor:null};});await page.show();const controls=page.all(page.render()).filter(n=>n.props?.['aria-label']===`筛选${name}`);assert.equal(controls.length,1);assert.equal(controls[0].props.disabled,false);failed=false;controls[0].props.onClick();const panel=page.all(page.render()).find(n=>n.type==='LibraryFilter');panel.props.onChange('unlearned');panel.props.onClose();await tick();assert(page.requests.some(path=>path.includes('status=unlearned')));assert(!page.text(page.render()).includes('offline'));page.dispose();
+});

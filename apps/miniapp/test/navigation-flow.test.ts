@@ -1,43 +1,43 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {pageHarness,tick} from './page-harness.ts';
+import {pageHarness,tick,selectLibraryMenu} from './page-harness.ts';
 
 test('home keeps date review separate when nothing is due',async()=>{
- const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[]}:{child:{nickname:'小明'},completed_words:0,goal:10,due_count:0,new_count:0});
+ const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[]}:path.includes('/words?')?{book_total:3,learned_count:3}:{child:{nickname:'小明'},completed_words:0,goal:10,due_count:0,new_count:0});
  await page.show();assert.equal(page.button('复习单词').disabled,false);assert.match(page.text(page.render()),/按日期复习/);page.button('复习单词').onClick();await tick();assert.equal(page.routes.at(-1),'/pages/calendar/index');
 });
-test('review menu offers calendar review even when words are due',async()=>{
- const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[]}:{child:{nickname:'小明'},completed_words:0,goal:10,due_count:3,new_count:0},undefined,{actionIndex:1});
- await page.show();page.button('复习单词').onClick();await tick();assert.equal(page.routes.at(-1),'/pages/calendar/index');assert.equal(page.cache.get('study_intent'),undefined);page.dispose();
+test('date review stays available beside the direct daily review action',async()=>{
+ const page=pageHarness('pages/home/index',async path=>path==='/me'?{families:[]}:path.includes('/words?')?{book_total:3,learned_count:3}:{child:{nickname:'小明'},completed_words:0,goal:10,due_count:3,new_count:0},undefined,{actionIndex:1});
+ await page.show();page.button('按日期复习').onClick();await tick();assert.equal(page.routes.at(-1),'/pages/calendar/index');assert.equal(page.cache.get('study_intent'),undefined);assert.equal(page.actionSheets.length,0);page.dispose();
 });
 
 test('wordbook selector switches the visible book and saves the selection',async()=>{
  const page=pageHarness('pages/words/index',async path=>path.endsWith('/wordbooks')?{items:[{id:'book-a',name:'英语一'},{id:'book-b',name:'英语二'}]}:path.includes('/ai-batches')?{items:[]}:{items:[],total:0,book_total:0,learned_count:0,next_cursor:null});
- await page.show();const picker=page.all(page.render()).find(n=>n.type==='Picker');assert(picker);assert.match(page.text(picker),/英语一/);picker.props.onChange({detail:{value:'1'}});await tick();assert.equal(page.cache.get('current_wordbook:child-a'),'book-b');assert(page.requests.some(path=>path.includes('wordbook_id=book-b')));
+ await page.show();assert.match(page.text(page.render()),/英语一/);page.button('切换词本').onClick();page.button('英语二').onClick();await tick();assert.equal(page.cache.get('current_wordbook:child-a'),'book-b');assert(page.requests.some(path=>path.includes('wordbook_id=book-b')));
 });
 
 test('wordbook export keeps whole-book selection and exclusions in the bottom bar',async()=>{
  const page=pageHarness('pages/words/index',async(path,method)=>{
   if(path.endsWith('/wordbooks'))return {items:[{id:'book-a',name:'英语一'}]};
   if(path.includes('/ai-batches'))return {items:[]};
-  if(method==='POST'&&path.endsWith('/word-exports'))return {content:'word\ncat'};
+  if(method==='POST'&&path.endsWith('/word-exports'))return {base64:'JVBERi0xLjQ='};
   return {items:[{id:'word-a',lemma:'cat',version:1},{id:'word-b',lemma:'dog',version:1}],total:5,book_total:5,learned_count:2,next_cursor:null};
  });
- await page.show();let tree=page.render();const picker=page.all(tree).find(n=>n.type==='Picker');assert(picker);assert.match(page.text(picker),/英语一/);assert.match(page.text(tree),/单词列表2\/5/);assert(!page.all(tree).some(n=>n.props?.className==='wordbook-overview'));page.button('选择导出').onClick();tree=page.render();assert(page.all(tree).some(n=>n.props?.className==='wordbook-export-bar'));assert.match(page.text(tree),/已选 0 词/);
+ await page.show();let tree=page.render();assert.match(page.text(tree),/英语一/);assert.match(page.text(tree),/单词列表已学 2\/5/);assert(!page.all(tree).some(n=>n.props?.className==='wordbook-overview'));await selectLibraryMenu(page,'列表工具','选择导出');tree=page.render();assert(page.all(tree).some(n=>n.props?.className==='wordbook-export-bar'));assert.match(page.text(tree),/已选 0 词/);
  page.button('全选整个词本').onClick();tree=page.render();assert.match(page.text(tree),/已选 5 词/);
  const word=page.all(tree).find(n=>n.props?.id==='word-word-a');assert(word);word.props.onClick();tree=page.render();assert.match(page.text(tree),/已选 4 词/);
- await page.button('导出 CSV').onClick();await tick();const call=page.calls.find(x=>x.path.endsWith('/word-exports'));assert(call);assert.equal(call.body.all,true);assert.equal(call.body.wordbook_id,'book-a');assert.deepEqual(Array.from(call.body.excluded_ids),['word-a']);
+ await page.button('导出 PDF').onClick();await tick();const call=page.calls.find(x=>x.path.endsWith('/word-exports'));assert(call);assert.equal(call.body.all,true);assert.equal(call.body.wordbook_id,'book-a');assert.deepEqual(Array.from(call.body.excluded_ids),['word-a']);
  const cancel=page.all(page.render()).find(n=>n.props?.className==='wordbook-export-cancel');assert(cancel);cancel.props.onClick();assert(!page.all(page.render()).some(n=>n.props?.className==='wordbook-export-bar'));
 });
 
 test('wordbook uses its heading for switching and leaves management in settings',async()=>{
  const page=pageHarness('pages/words/index',async path=>path.endsWith('/wordbooks')?{items:[{id:'book-a',name:'英语一'}]}:path.includes('/ai-batches')?{items:[]}:{items:[],total:0,book_total:0,learned_count:0,next_cursor:null});
- await page.show();assert(page.all(page.render()).some(n=>n.type==='Picker'));assert.doesNotMatch(page.text(page.render()),/词本工具/);
- const settings=pageHarness('pages/settings-tools/index',async()=>({}));await settings.show();settings.button('词本管理与发现').onClick();settings.button('添加单词').onClick();settings.button('搜索单词').onClick();assert.equal(settings.routes.join(','),'/pages/wordbooks/index,/pages/add-words/index,/pages/word-search/index');
+ await page.show();assert(page.button('切换词本'));assert.doesNotMatch(page.text(page.render()),/词本工具/);
+ const settings=pageHarness('pages/settings-tools/index',async()=>({}));await settings.show();settings.button('收藏单词').onClick();settings.button('单词测试').onClick();settings.button('错题集').onClick();assert.equal(settings.routes.join(','),'/pages/favorites/index,/pages/quiz/index,/pages/wrong/index');
 });
 
 test('settings groups tools and preferences into clear subpages',async()=>{
- const page=pageHarness('pages/settings/index',async()=>({}));await page.show();const tree=page.render();assert.match(page.text(tree),/家庭与 AI/);assert.doesNotMatch(page.text(tree),/词本管理与发现|答题后自动切换/);page.button('单词工具').onClick();page.button('学习设置').onClick();assert.deepEqual(page.routes,['/pages/settings-tools/index','/pages/settings-learning/index']);page.cache.set('child_id','');await page.show();assert.equal(page.button('单词工具').disabled,true);assert.equal(page.button('AI 学童聊天记录').disabled,true);
+ const page=pageHarness('pages/settings/index',async()=>({}));await page.show();const tree=page.render();assert.match(page.text(tree),/家庭与 AI/);assert.match(page.text(tree),/录入与词本/);assert.match(page.text(tree),/偏好设置/);assert.doesNotMatch(page.text(tree),/答题后自动切换/);page.button('单词工具').onClick();page.button('学习设置').onClick();assert.deepEqual(page.routes,['/pages/settings-tools/index','/pages/settings-learning/index']);page.cache.set('child_id','');await page.show();assert.equal(page.button('单词工具').disabled,true);assert.equal(page.button('AI 学童聊天记录').disabled,true);
 });
 
 test('a failed quiz scope change clears the previous count and can be retried',async()=>{
@@ -45,10 +45,7 @@ test('a failed quiz scope change clears the previous count and can be retried',a
  await page.show();assert.match(page.text(page.render()),/学习过 12/);await page.button('收藏测试').onClick();await tick();assert.match(page.text(page.render()),/已收藏 —/);assert.equal(page.button('开始收藏测试').disabled,true);fail=false;await page.button('重新加载测试范围').onClick();await tick();assert.match(page.text(page.render()),/已收藏 7/);assert.equal(page.button('开始收藏测试').disabled,false);
 });
 
-test('joining a shared book offers a direct route to the selected book',async()=>{
- const page=pageHarness('pages/discover/index',async(path,method)=>method==='POST'?{id:'joined-book'}:{items:[{id:'shared-a',title:'词本',word_count:2}],next_offset:null});
- await page.show();page.button('加入词本').onClick({stopPropagation(){}});await tick();assert.equal(page.cache.get('current_wordbook:child-a'),'joined-book');assert.match(page.text(page.render()),/已加入词本/);page.button('查看词本').onClick();assert.equal(page.routes.at(-1),'/pages/words/index');
-});
+test('joining a shared book from preview offers the selected local book',async()=>{let joined=false;const page=pageHarness('pages/book-preview/index',async(path,method)=>{if(method==='POST'){joined=true;return {id:'joined-book'};}return path.includes('/children/')?{items:joined?[{id:'joined-book',name:'词本',shared_source_id:'shared-a'}]:[]}:{id:'shared-a',title:'词本',word_count:2,items:[]};},undefined,{query:{kind:'shared_wordbook',id:'shared-a'}});await page.show();await page.button('加入词本').onClick();await tick();page.button('查看已加入的词本').onClick();await tick();assert.equal(page.cache.get('current_wordbook:child-a'),'joined-book');assert.equal(page.routes.at(-1),'/pages/words/index');page.dispose();});
 
 test('continuing a test opens the first unanswered page',async()=>{
  const quiz={id:'quiz-a',status:'in_progress',version:1,total_count:2,answered_count:1,mode:'full',month:'2026-10'};
@@ -73,5 +70,7 @@ test('a new test enters its first question when preparation completes',async()=>
  });
  await page.show();await page.button('开始月测').onClick();page.render();await page.poll();page.render();await tick();assert.match(page.text(page.render()),/apple/);assert.equal(page.calls.filter(call=>call.path.endsWith('/resume')).length,1);
 });
-test('wordbook places feedback after learning marks and preserves clearable old correction marks',async()=>{const word={id:'word-a',lemma:'whale',version:1,part_of_speech:'noun',meaning_zh:'鲸',annotations:{easy:false,error_prone:false,manual_needs_correction:true,needs_correction:true,version:1}},page=pageHarness('pages/words/index',async(path,method,body)=>path.endsWith('/wordbooks')?{items:[{id:'book-a',name:'英语一'}]}:path.includes('/ai-batches')?{items:[]}:method==='PATCH'?{...word.annotations,manual_needs_correction:body.manual_needs_correction,needs_correction:body.manual_needs_correction,version:2}:{items:[word],total:1,book_total:1,learned_count:1,next_cursor:null});await page.show();page.all(page.render()).find(n=>n.props?.id==='word-word-a').props.onClick();const nodes=page.all(page.render()),marks=nodes.find(n=>n.props?.className==='word-marks'),children=page.all(marks);assert.equal(children.findIndex(n=>n.type==='WordFeedback')>children.findIndex(n=>n.type==='Button'&&page.text(n).includes('易错词')),true);assert.match(page.text(page.render()),/已标记待纠错/);page.button('清除标记').onClick();await tick();assert.equal(page.calls.find(c=>c.method==='PATCH')?.body.manual_needs_correction,false);assert.doesNotMatch(page.text(page.render()),/已标记待纠错/);page.dispose();});
-test('word archive selector is available on an empty default list and can show archived words',async()=>{const word={id:'word-a',lemma:'apple',version:1,part_of_speech:'noun',meaning_zh:'苹果',library_archived_at:'2026-11-10',annotations:{easy:false,error_prone:false,favorite:false,version:0}};const page=pageHarness('pages/words/index',async path=>path.endsWith('/wordbooks')?{items:[{id:'book-a',name:'英语一'}]}:path.includes('/ai-batches')?{items:[]}:path.includes('archive=all')?{items:[word],total:1,book_total:0,learned_count:0,next_cursor:null}:{items:[],total:0,book_total:0,learned_count:0,next_cursor:null},undefined,{actionIndex:2});await page.show();page.button('未归档').onClick();await tick();await tick();assert(page.requests.some(p=>p.includes('archive=all')));assert.match(page.text(page.render()),/apple/);assert.match(page.text(page.render()),/已归档/);page.dispose();});
+test('word list shows a short meaning and routes to details without inline editing',async()=>{
+ const word={id:'word-a',lemma:'whale',version:1,part_of_speech:'noun',meaning_zh:'鲸',annotations:{manual_needs_correction:true,version:1}},page=pageHarness('pages/words/index',async path=>path.endsWith('/wordbooks')?{items:[{id:'book-a',name:'英语一'}]}:path.includes('/ai-batches')?{items:[]}:{items:[word],total:1,book_total:1,learned_count:1,next_cursor:null});await page.show();const before=page.calls.length;page.all(page.render()).find(n=>n.props?.id==='word-word-a').props.onClick();assert.equal(page.routes.at(-1),'/pages/word-detail/index?id=word-a');assert.equal(page.calls.length,before);assert.doesNotMatch(page.text(page.render()),/简单词|易错词|标记已掌握|反馈错误|清除标记/);assert.match(page.text(page.render()),/noun 鲸/);assert(!page.all(page.render()).some(n=>n.props?.className==='wordbook-detail'));page.dispose();
+});
+test('word archive selector is available on an empty default list and can show archived words',async()=>{const word={id:'word-a',lemma:'apple',version:1,part_of_speech:'noun',meaning_zh:'苹果',library_archived_at:'2026-11-10',annotations:{easy:false,error_prone:false,favorite:false,version:0}};const page=pageHarness('pages/words/index',async path=>path.endsWith('/wordbooks')?{items:[{id:'book-a',name:'英语一'}]}:path.includes('/ai-batches')?{items:[]}:path.includes('status=archived')?{items:[word],total:1,book_total:0,learned_count:0,next_cursor:null}:{items:[],total:0,book_total:0,learned_count:0,next_cursor:null},undefined,{actionIndex:2});await page.show();await selectLibraryMenu(page,'列表工具','筛选：全部','已掌握');await tick();await tick();assert(page.requests.some(p=>p.includes('status=archived')));assert.match(page.text(page.render()),/apple/);assert.match(page.text(page.render()),/已掌握/);page.dispose();});

@@ -1,0 +1,18 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import vm from 'node:vm';
+import {characterShareRecord} from '../src/services/character-share.ts';
+const require=createRequire(import.meta.url),ts=require('typescript'),date='2026-11-10',progress={date,completed:3,goal:10,checked_in:false,streak_days:2,completed_words:999,nickname:'不应公开'};
+test('character share validates server progress and carries no child identity or word counts',()=>{const r=characterShareRecord(progress,date);assert.equal(r.kind,'hanzi');assert.equal(r.studied_words,3);assert(!JSON.stringify(r).includes('不应公开'));assert.throws(()=>characterShareRecord(progress,'2026-11-09'));assert.throws(()=>characterShareRecord({...progress,completed:-1},date));});
+test('character share reads character progress and draws a separate canvas without calling the word-share API',async()=>{
+ const calls:string[]=[],drawn:any[]=[],module={exports:{} as any},storage={get:(key:string)=>key==='child_id'?'child-a':'account-a'};
+ const taro={env:{USER_DATA_PATH:'/tmp'},useDidHide(){},nextTick:(fn:any)=>fn(),getFileSystemManager:()=>({writeFileSync(){}})};
+ const code=ts.transpileModule(readFileSync('apps/miniapp/src/components/useCheckinShare.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ vm.runInNewContext(code,{API_BASE:'https://test.invalid/api',module,exports:module.exports,require:(id:string)=>{if(id==='react')return {useRef:(value:any)=>({current:value}),useState:(value:any)=>[value,()=>{}],useEffect(){}};if(id==='react/jsx-runtime')return {jsx:()=>null,jsxs:()=>null};if(id==='@tarojs/taro')return taro;if(id.endsWith('/character-share'))return {characterShareRecord};if(id.endsWith('/checkin-backgrounds'))return {CHECKIN_BACKGROUND_IDS:['01-lake'],CheckinBackgroundLoader:class {clear(){} async load(){return '/tmp/background.webp';}}};if(id.endsWith('/share-poster'))return {renderSharePoster:async(...args:any[])=>{drawn.push(args);return '/poster.png';}};if(id.endsWith('/api'))return {storage,message:(e:any)=>e.message,api:async(path:string)=>{calls.push(path);return path==='/me/referral-code-image'?{code:'ABC123',base64:'png',mime:'image/png'}:progress;}};return {};}});
+ await module.exports.useCheckinShare(date,'hanzi').openShare();assert.deepEqual(calls,['/me/referral-code-image','/children/child-a/hanzi-progress']);assert.equal(drawn.length,1);assert.equal(drawn[0][0],'hanziCheckinPoster');assert.equal(drawn[0][1].kind,'hanzi');assert.equal(drawn[0][1].studied_words,3);
+});
+test('poster labels follow the actual learning type',async()=>{
+ const printed:string[]=[],module={exports:{} as any},context=new Proxy({measureText:(text:string)=>({width:text.length*10}),fillText:(text:string)=>printed.push(text),draw:(_reserve:any,fn:any)=>fn()},{get:(obj:any,key:any)=>key in obj?obj[key]:()=>{}}),taro={createCanvasContext:()=>context,canvasToTempFilePath:async()=>({tempFilePath:'/poster.png'})};const code=ts.transpileModule(readFileSync('apps/miniapp/src/services/share-poster.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;vm.runInNewContext(code,{module,exports:module.exports,require:()=>taro});const r=characterShareRecord(progress,date);await module.exports.renderSharePoster('canvas',r,r.quotes[0],false,'');assert(printed.includes('个汉字'));assert(!printed.includes('个单词'));printed.length=0;await module.exports.renderSharePoster('canvas',{...r,kind:'words'},r.quotes[0],false,'');assert(printed.includes('个单词'));
+});

@@ -52,3 +52,5 @@
 .family-await-avatar{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:92px;height:92px;border-radius:50%;font-size:36px;color:var(--muted);border:2px solid var(--border)}
 .family-application .parent-text-button{justify-content:flex-start;padding-left:0}
 .family-waiting-note{font-size:25px;color:var(--muted);line-height:1.8;margin:20px 0}
+
+.child-row{display:flex;align-items:center;gap:12px}.child-row .child-choice{flex:1;min-width:0;width:auto}.child-edit{flex-shrink:0;min-width:68px;padding:16px 8px;font-size:23px}.family-inline-actions{display:flex;flex-wrap:wrap;gap:20px}

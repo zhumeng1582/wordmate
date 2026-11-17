@@ -2,11 +2,11 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
-import {fixture} from './ai-fixture.ts';
+import {fixture,seedHanziLearning} from './ai-fixture.ts';
 
 test('archives hide and restore all three libraries without losing learning state',async()=>{
  const f=await fixture();try{
-  for(const name of ['034_poems.sql','035_poem_fields.sql','040_hanzi.sql','041_hanzi_order.sql','043_library_archive.sql'])await f.pg.exec(readFileSync(`apps/api/migrations/${name}`,'utf8'));
+  for(const name of ['034_poems.sql','056_import_order.sql','035_poem_fields.sql','040_hanzi.sql','041_hanzi_order.sql','043_library_archive.sql'])await f.pg.exec(readFileSync(`apps/api/migrations/${name}`,'utf8'));
   const poem=await f.core.poems.create(f.dad,randomUUID(),f.child.id,{title:'春晓',body:'春眠不觉晓。'});
   const memorized=await f.core.poems.mark(f.dad,f.child.id,poem.id,{memorized:true,expected_version:poem.version});
   const archivedPoem=await f.core.poems.archive(f.dad,f.child.id,poem.id,{archived:true,expected_version:memorized.version});
@@ -15,7 +15,7 @@ test('archives hide and restore all three libraries without losing learning stat
   await assert.rejects(f.core.poems.archive(f.mom,f.child.id,poem.id,{archived:false,expected_version:archivedPoem.version}),{code:'FAMILY_NOT_FOUND'});
   const restoredPoem=await f.core.poems.archive(f.dad,f.child.id,poem.id,{archived:false,expected_version:archivedPoem.version});assert(restoredPoem.memorized_at);
   const character=await f.core.hanzi.create(f.dad,randomUUID(),f.child.id,{character:'春'});
-  const learned=await f.core.hanzi.mark(f.dad,f.child.id,character.id,{learned:true,expected_version:character.version});
+  const learned=await seedHanziLearning(f,character.id);
   const archivedCharacter=await f.core.hanzi.archive(f.dad,f.child.id,character.id,{archived:true,expected_version:learned.version});
   assert.equal((await f.core.hanzi.list(f.dad,f.child.id)).items.length,0);assert.equal((await f.core.hanzi.list(f.dad,f.child.id,'all','','all')).items.length,1);
   assert((await f.core.hanzi.archive(f.dad,f.child.id,character.id,{archived:false,expected_version:archivedCharacter.version})).learned_at);

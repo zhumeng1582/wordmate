@@ -3,7 +3,7 @@ import Taro,{useDidHide,useDidShow} from '@tarojs/taro';
 import {api,eventId,message,storage} from './api';
 import {AudioFileCache} from './audio-cache';
 import {AudioPrefetch,type PrefetchWord} from './audio-prefetch';
-export type AudioTarget={word_id:string;content_version:number}|{sentence_id:string;content_version:number}|{tutor_message_id:string;part?:'example'}|{preview:true;accent:'en-GB'|'en-US';voice_id:string};
+export type AudioTarget={assistant_message_id:string}|{word_id:string;content_version:number}|{sentence_id:string;content_version:number}|{tutor_message_id:string;part?:'example'}|{preview:true;accent:'en-GB'|'en-US';voice_id:string};
 type Preferences={accent:'en-GB'|'en-US';voice_id:string|null;auto_play:boolean};
 
 export function useAudio(){
@@ -40,14 +40,14 @@ export function useAudio(){
    const cacheKey=JSON.stringify({scope:expectedScope,target,...(prefs?{accent:prefs.accent,voice_id:prefs.voice_id}:{})});
    // A reported pronunciation can be replaced without changing the word version.
    // Re-fetch word and sentence audio on each play so an open page receives repairs.
-   if(!preview&&!('tutor_message_id' in target))cache.current!.remove(cacheKey);
+   if(!preview&&!('tutor_message_id' in target)&&!('assistant_message_id' in target))cache.current!.remove(cacheKey);
    let path=cache.current!.get(cacheKey);
    if(!path){
     let pending=pendingFiles.current.get(cacheKey);
     if(!pending){
     const epoch=fileEpoch.current,valid=()=>epoch===fileEpoch.current&&expectedScope===currentScope()&&!hidden.current;
     const load=async()=>{
-    let job:any=preview?await api('/voice-previews','POST',{accent:target.accent,voice_id:target.voice_id}):'tutor_message_id' in target?{...await api(`/word-tutor-messages/${target.tutor_message_id}/audio`,'POST',{accent:prefs!.accent,voice_id:prefs!.voice_id,...(target.part?{part:target.part}:{})},undefined,120000),status:'succeeded'}:await api('/audio','POST',{...target,accent:prefs!.accent,voice_id:prefs!.voice_id,speech_rate:1},eventId());
+    let job:any=preview?await api('/voice-previews','POST',{accent:target.accent,voice_id:target.voice_id}):'assistant_message_id' in target?{...await api(`/learning-assistant-messages/${target.assistant_message_id}/audio`,'POST',{accent:prefs!.accent,voice_id:prefs!.voice_id},undefined,120000),status:'succeeded'}:'tutor_message_id' in target?{...await api(`/word-tutor-messages/${target.tutor_message_id}/audio`,'POST',{accent:prefs!.accent,voice_id:prefs!.voice_id,...(target.part?{part:target.part}:{})},undefined,120000),status:'succeeded'}:await api('/audio','POST',{...target,accent:prefs!.accent,voice_id:prefs!.voice_id,speech_rate:1},eventId());
     if(!valid())return '';
     if(!preview&&job.status==='failed'&&job.retryable)job=await api(`/jobs/${job.job_id}/retry`,'POST',{},eventId());
     const deadline=Date.now()+120000;

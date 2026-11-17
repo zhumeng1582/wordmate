@@ -55,7 +55,7 @@ function screen(page='ai-settings',options:{read?:(path:string,method:string,dat
 test('novice overview is read-only and leads directly to adding words without configuration',async()=>{
  const page=screen();await page.show();const text=page.text(page.render());assert.match(text,/AI 助手/);assert.match(text,/¥20.00/);assert.doesNotMatch(text,/Token|API Key|保存设置|充值订单/);
  assert.equal(page.calls.length,2);assert(page.calls.every(call=>call.method==='GET'&&call.path.startsWith('/me/ai-settings?')));
- await page.button('去添加单词').onClick();assert.deepEqual(page.routes,['/pages/add-words/index']);assert.equal(page.calls.length,2);
+ await page.button('录入单词').onClick();assert.deepEqual(page.routes,['/pages/add-words/index']);assert.equal(page.calls.length,2);
 });
 test('new parents get a clear child setup action before adding learning material',async()=>{
  const page=screen('ai-settings',{cache:{child_id:''}});await page.show();await page.button('选择孩子，开始使用').onClick();assert.deepEqual(page.routes,['/pages/family/index']);
@@ -96,7 +96,7 @@ test('returning to the AI overview keeps its content and primary action while re
  let hold=false,release!:()=>void;const wait=new Promise<void>(resolve=>release=resolve);
  const page=screen('ai-settings',{read:async()=>{if(hold)await wait;return settings({models:[{...model,vision:true}]});}});
  await page.show();page.hide();hold=true;await page.show();
- assert.match(page.text(page.render()),/¥20.00/);assert.doesNotMatch(page.text(page.render()),/正在加载|正在准备/);assert.equal(page.button('去添加单词').disabled,false);
+ assert.match(page.text(page.render()),/¥20.00/);assert.doesNotMatch(page.text(page.render()),/正在加载|正在准备/);assert.equal(page.button('录入单词').disabled,false);
  release();await tick();assert.match(page.text(page.render()),/¥20.00/);
 });
 

@@ -8,10 +8,11 @@ const {resolve}=require('node:path');
 const name=`inprocess-${randomUUID()}`;
 Object.assign(process.env,{NODE_ENV:'development',AUTH_MODE:'development',DICTIONARY_PROVIDER:'fixture',DATABASE_URL:`pglite:.local/${name}`});
 const {createApplication}=require('../apps/api/dist/main.js');
+const {CheckinBackgrounds}=require('../apps/api/dist/checkin-backgrounds.js');
 (async()=>{
  const audioObjects=new Map();let audioCalls=0;
  const audio={profile:{provider:'mock',model:'mock'},voices:[{id:'gb',accent:'en-GB',gender:'Female'}],synthesize:async()=>{audioCalls++;return {bytes:Buffer.from('ID3-route-test')};},storageProfile:'mock',stores:{mock:{put:async(k,b)=>{audioObjects.set(k,b);},get:async k=>audioObjects.get(k),stat:async k=>audioObjects.has(k)?{size:audioObjects.get(k).length}:null,delete:async k=>{audioObjects.delete(k);}}},spoolDir:resolve('.local',name+'-spool'),pricePer10000Characters:'1'};
- const {app,dispose}=await createApplication({audio,encouragement:async()=>[{en:'Keep learning, and let your curiosity grow.',zh:'坚持学习，让好奇心不断生长。',theme:'curiosity'},{en:'Small steps can lead to wonderful discoveries.',zh:'小小的脚步，也能走向美好的发现。',theme:'discovery'},{en:'Every word you learn is a small step forward.',zh:'每学会一个单词，都是向前迈出的一小步。',theme:'growth'}],vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{if(raw==='无法识别')return {error:'NO_WORDS_FOUND',items:[]};assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
+ const {app,dispose}=await createApplication({audio,backgrounds:new CheckinBackgrounds({get:async key=>require('node:fs').readFileSync(resolve('assets/share-posters/compressed',key.split('/')[1]))}),encouragement:async()=>[{en:'Keep learning, and let your curiosity grow.',zh:'坚持学习，让好奇心不断生长。',theme:'curiosity'},{en:'Small steps can lead to wonderful discoveries.',zh:'小小的脚步，也能走向美好的发现。',theme:'discovery'},{en:'Every word you learn is a small step forward.',zh:'每学会一个单词，都是向前迈出的一小步。',theme:'growth'}],vocabulary:{provider:'deepseek',model:'offline-route-test',promptVersion:'test',rawPromptVersion:'raw-test',generateRaw:async raw=>{if(raw==='无法识别')return {error:'NO_WORDS_FOUND',items:[]};assert.equal(raw,'1. pencil 铅笔');return {error:null,items:[{input_index:0,input:'pencil',status:'ok',lemma:'pencil',part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'铅笔',sentence_en:'I see the pencil.',sentence_zh:'我看到铅笔。',reason:null}]};},generate:async words=>({items:words.map((w,i)=>({input_index:i,input:w,status:'ok',lemma:w,part_of_speech:'noun',ipa_gb:'/test/',ipa_us:'/test/',meaning_zh:'路线测试词',sentence_en:`I see the ${w}.`,sentence_zh:'这是路线测试例句。',reason:null}))})}});let token='';
  function request(path,body,key=randomUUID(),method=body?'POST':'GET'){
   return new Promise((resolve,reject)=>{
    const chunks=[];const socket=new Duplex({read(){},write(chunk,encoding,callback){chunks.push(Buffer.from(chunk));callback();}});
@@ -28,6 +29,7 @@ const {createApplication}=require('../apps/api/dist/main.js');
  async function ok(path,body,key,method){const r=await request(path,body,key,method);assert.equal(r.status,200,JSON.stringify(r));return r.data;}
  try{
   assert.equal((await request('/me')).status,401);
+  assert.equal((await request('/checkin-backgrounds/01-lake/webp')).status,401);
   assert.equal((await request('/children/'+randomUUID()+'/import-file',{name:'a.txt',base64:'YQ=='})).status,401);
   assert.equal((await request('/auth/dev',{code:'dev-dad',unexpected:true})).status,422);
   const policy=await ok('/privacy/policy');
@@ -35,6 +37,10 @@ const {createApplication}=require('../apps/api/dist/main.js');
   assert.equal((await request('/families',{name:'同意前不得创建'})).status,403);
   await ok('/me/privacy-consent',{policy_version:policy.version,policy_hash:policy.hash,guardian_confirmed:true},undefined,'PUT');
   assert.equal((await ok('/me/privacy-consent')).accepted,true);
+  for(const format of ['webp','jpg']){const image=await request('/checkin-backgrounds/01-lake/'+format);assert.equal(image.status,200);assert.equal(image.mime,format==='webp'?'image/webp':'image/jpeg');}
+  assert.equal((await request('/checkin-backgrounds/invalid/webp')).status,404);
+  assert.equal((await request('/checkin-backgrounds/01-lake/png')).status,404);
+  assert.equal((await request('/checkin-backgrounds/01-lake/webp?url=https://evil.invalid')).status,422);
   assert.equal((await request('/voice-previews',{accent:'en-GB',voice_id:'gb',text:'arbitrary text'})).status,422);
   {const previewRequest=await request('/voice-previews',{accent:'en-GB',voice_id:'gb'});assert.equal(previewRequest.status,202);let preview=previewRequest.data;
   for(let n=0;n<30&&preview.status!=='succeeded';n++){await new Promise(r=>setTimeout(r,200));preview=await ok(`/voice-previews/${preview.job_id}`);}
@@ -55,20 +61,97 @@ const {createApplication}=require('../apps/api/dist/main.js');
    await ok(`/family-invites/${invitation.id}/approve`,{});token=parent.access_token;assert.equal((await ok('/family-invites/resolve',{invite_token:invitation.invite_token})).state,'member');token=savedToken;
    await ok(`/families/${f.id}/members/${parent.user.id}`,{},undefined,'DELETE');token=parent.access_token;assert.equal((await ok('/family-invites/resolve',{invite_token:invitation.invite_token})).state,'unavailable');token=savedToken;}
   const members=await ok(`/families/${f.id}/members`);assert.equal(members.items.length,1);assert.equal(members.items[0].role,'owner');
+  // Family management uses the real authentication, body validation and routing pipeline.
+  {const ownerToken=token,parent=await ok('/auth/dev',{code:'dev-mom'});
+   for(const action of ['reject','cancel','revoke']){
+    token=ownerToken;const invitation=await ok(`/families/${f.id}/invites`,{});
+    if(action!=='revoke'){token=parent.access_token;await ok('/family-invites/claim',{invite_token:invitation.invite_token});assert.equal((await ok('/family-invites/resolve',{invite_token:invitation.invite_token})).application_id,invitation.id);}
+    token=action==='cancel'?parent.access_token:ownerToken;
+    const result=await ok(`/family-invites/${invitation.id}/${action}`,{});assert.equal(result.status,action==='reject'?'rejected':'revoked');
+    token=ownerToken;assert.equal((await request(`/family-invites/${invitation.id}/approve`,{})).status,409);
+    token=parent.access_token;assert.equal((await ok('/family-invites/resolve',{invite_token:invitation.invite_token})).state,'unavailable');
+   }
+   token=ownerToken;assert.equal((await ok(`/families/${f.id}/members`)).items.length,1);
+  }
   // Match the family page payload, including unselected optional profile fields.
   for(const profile of [{gender:'invalid'},{school_grade:42},{school_grade:'x'.repeat(25)},{school_grade:'invalid\n'},{unexpected:true}])assert.equal((await request(`/families/${f.id}/children`,{nickname:'无效档案',...profile})).status,422);
   const emptyProfile=await ok(`/families/${f.id}/children`,{nickname:'选填留空',school_grade:'',gender:'unspecified'});
   assert.equal(emptyProfile.school_grade,'');assert.equal(emptyProfile.gender,'unspecified');
+  {const body={nickname:'已编辑档案',school_grade:'小学二年级',gender:'girl',expected_version:emptyProfile.version};
+   const saved=await ok(`/children/${emptyProfile.id}`,body,undefined,'PATCH');assert.equal(saved.nickname,body.nickname);assert.equal(saved.version,emptyProfile.version+1);
+   assert.equal((await request(`/children/${emptyProfile.id}`,body,undefined,'PATCH')).status,409);
+   assert.equal((await request(`/children/${emptyProfile.id}`,{...body,owner_user_id:login.user.id},undefined,'PATCH')).status,422);
+  }
   {const catalogue=await ok(`/textbook-volumes?child_id=${emptyProfile.id}`);assert.equal(catalogue.items.length,4);const volume=catalogue.items[0];const joined=await ok(`/children/${emptyProfile.id}/textbook-volumes/${volume.id}/join`,{});assert.equal((await ok(`/children/${emptyProfile.id}/words?wordbook_id=${joined.id}`)).total,volume.word_count-joined.skipped_phrases);assert.equal((await ok(`/textbook-volumes?child_id=${emptyProfile.id}`)).items[0].joined_book_id,joined.id);}
   const c=await ok(`/families/${f.id}/children`,{nickname:'测试',accent:'en-GB',school_grade:'小学一年级',gender:'boy'});
+  {const child=await ok(`/families/${f.id}/children`,{nickname:'诗本验证'}),second=await ok(`/families/${f.id}/children`,{nickname:'诗本副本'});const base=`/children/${child.id}`;const book=await ok(`${base}/poem-books`,{name:'唐诗'});await ok(`${base}/poems`,{title:'静夜思',author:'李白',body:'床前明月光，疑是地上霜。',book_id:book.id});assert.equal((await ok(`${base}/poems?book_id=${book.id}`)).total,1);const page=await ok(`${base}/poems?book_id=${book.id}&limit=1&offset=0`);assert.equal(page.items.length,1);assert.equal(page.next_offset,null);assert.equal((await request(`${base}/poems?limit=0`)).status,422);assert.equal((await request(`${base}/poems?limit=301`)).status,422);assert.equal((await request(`${base}/poems?limit=abc`)).status,422);assert.equal((await request(`${base}/poems?unsupported_filter=1`)).status,422);const shared=await ok(`${base}/poem-books/${book.id}/share`,{published:true,title:'唐诗验证',author:'老师'},undefined,'PUT');assert.equal((await ok('/shared-poem-books?q=唐诗验证')).items[0].id,shared.id);const joined=await ok(`/children/${second.id}/shared-poem-books/${shared.id}/join`,{});assert.equal((await ok(`/children/${second.id}/poems?book_id=${joined.id}`)).total,1);assert((await ok(`${base}/import-records?kind=poems`)).items.some(r=>r.source==='manual'));assert((await ok(`${base}/search?q=唐诗&type=books`)).groups[0].items.some(i=>i.kind==='poem_book'));}
+
+  {
+   const child=await ok(`/families/${f.id}/children`,{nickname:'句子验证'}),base=`/children/${child.id}`;
+   const book=(await ok(`${base}/sentence-books`)).items[0];
+   const items=[{text_en:'Can I have some water?',translation_zh:'我可以喝点水吗？'},{text_en:'Please open the door.',translation_zh:'请打开门。'}];
+   assert.equal((await request(`${base}/sentences/save`,{book_id:book.id,items})).error.code,'SENTENCE_CHECK_REQUIRED');
+   assert.equal((await request(`${base}/sentences/imports/${randomUUID()}/save`,{items:[{...items[0],source_index:0,reviewed:true}]})).status,404);
+   assert.equal((await request(`${base}/sentences/imports/${randomUUID()}/save`,{items:[{...items[0],source_index:'0',reviewed:true}]})).status,422);
+   const saved=await ok(`${base}/sentences/save`,{reviewed:true,book_id:book.id,items:[...items,items[0]]});assert.equal(saved.saved_count,2);assert.equal(saved.skipped_count,1);
+   await ok(`${base}/sentence-progress`,{daily_goal:1,expected_version:0},undefined,'PUT');
+   const r=await ok(`${base}/sentence-study-rounds`,{source:'new',book_id:book.id});assert.equal(r.current.text_en,items[0].text_en);assert.equal(r.current.content_version,1);
+   const answer={lease_id:r.lease_id,ordinal:1,event_id:randomUUID(),rating:'good'};
+   assert.equal((await ok(`${base}/sentence-progress`)).completed,0);
+   const result=await ok(`${base}/sentence-study-rounds/${r.id}/answer`,answer);assert(result.today.checked_in);assert.equal(result.today.completed,1);assert.deepEqual(await ok(`${base}/sentence-study-rounds/${r.id}/answer`,answer),result);
+   assert.equal((await ok(`${base}/today`)).completed_words,0);
+   assert.equal((await ok(`${base}/sentence-history-range?date=${result.today.date}`)).count,1);
+   const share=await ok(`${base}/sentence-books/${book.id}/share`,{published:true,author:'家长'},undefined,'PUT');assert.equal((await ok(`/shared-sentence-books/${share.id}`)).sentence_count,2);
+   const other=await ok(`/families/${f.id}/children`,{nickname:'句子副本'}),copy=await ok(`/children/${other.id}/shared-sentence-books/${share.id}/join`,{});assert.equal((await ok(`/children/${other.id}/sentences?book_id=${copy.id}`)).total,2);
+   assert.equal((await ok(`${base}/search?q=water&type=sentences`)).counts.sentences,1);
+   assert.equal((await ok(`${base}/import-records?kind=sentences`)).items[0].kind,'sentences');
+  }
   assert.equal(c.school_grade,'小学一年级');assert.equal(c.gender,'boy');
+  {const result=await ok(`/children/${c.id}/search?q=nonexistent-zzzzz`);assert.deepEqual(result.counts,{words:0,poems:0,hanzi:0,sentences:0,books:0});assert.deepEqual(result.groups,[]);assert.equal((await request(`/children/${c.id}/search?q=x&unexpected=1`)).status,422);}
+  for(const kind of ['words','poems','hanzi']){
+   for(const status of ['unlearned,learned','unlearned,archived','learned,archived','unlearned,learned,archived'])assert.deepEqual((await ok(`/children/${c.id}/${kind}?status=${encodeURIComponent(status)}`)).items,[]);
+   assert.equal((await request(`/children/${c.id}/${kind}?status=learned,invalid`)).status,422);
+  }
+  {const child=await ok(`/families/${f.id}/children`,{nickname:'标记验证'});
+   for(const [kind,body] of [['poems',{title:'春晓',body:'春眠不觉晓。'}],['hanzi',{character:'春'}]]){
+    const base=`/children/${child.id}/${kind}`,item=await ok(base,body),route=`${base}/${item.id}/favorite`;
+    const marked=await ok(route,{favorite:true,expected_version:item.version},undefined,'PUT');assert.equal(marked.favorite,true);
+    assert.equal((await ok(`${base}?status=favorite`)).items.length,1);
+    assert.equal((await request(route,{favorite:false,expected_version:item.version},undefined,'PUT')).status,409);
+    assert.equal((await request(route,{favorite:'yes',expected_version:marked.version},undefined,'PUT')).status,422);
+    assert.equal((await ok(`${base}/${item.id}`)).favorite,true);
+   }
+  }
+  {const base=`/children/${c.id}/learning-assistant-sessions`,session=await ok(base,{}),route=`/learning-assistant-sessions/${session.id}`;
+   assert.equal((await ok(base)).items[0].id,session.id);
+   assert.equal((await request(`${route}/messages`,{request_id:randomUUID(),question:'查记录',action:'summary',child_id:emptyProfile.id})).status,422);
+   const body={request_id:randomUUID(),question:'查看今天学过的词',action:'summary',days:1};
+   const answer=await ok(`${route}/messages`,body);assert.match(answer.messages.at(-1).content,/没有查到/);
+   assert.equal((await ok(`${route}/messages`,body)).messages.length,2);assert.equal((await ok(route)).messages.length,2);
+   await ok(route,{},undefined,'DELETE');assert.equal((await request(route)).status,404);
+  }
+
+  {const child=emptyProfile.id,route=`/children/${child}/hanzi`,base=`/children/${child}/hanzi-monthly-quizzes`;
+   for(const [character,pinyin] of [['春','chūn'],['夏','xià'],['秋','qiū'],['冬','dōng']]){const item=await ok(route,{character,pinyin});await ok(`/children/${child}/hanzi-learning-events`,{event_id:randomUUID(),hanzi_id:item.id,kind:'learn'});}
+   const defaultBook=(await ok(`/children/${child}/hanzi-books`)).items[0],book=await ok(`/children/${child}/hanzi-books`,{name:'四季',grade:'一年级',textbook:'统编版',category:'课内'});const linked=await ok(`${route}/batch`,{characters:['春','夏'],book_id:book.id});assert.equal(linked.linked,2);assert.equal((await ok(`${route}?book_id=${book.id}`)).total,2);assert.equal((await ok(`/children/${child}/hanzi-progress?book_id=${book.id}`)).due_count,0);assert.equal((await ok(`${route}?book_id=${defaultBook.id}`)).total,4);const published=await ok(`/children/${child}/hanzi-books/${book.id}/share`,{published:true,title:'四季汉字',author:'测试者'},undefined,'PUT');assert.equal((await ok('/shared-hanzi-books?q=春&grade=一年级&textbook=统编版&category=课内')).items[0].id,published.id);assert.equal((await ok('/shared-hanzi-books?grade=二年级')).items.length,0);assert.equal((await ok(`/shared-hanzi-books/${published.id}`)).items.length,2);await ok(`/children/${child}/hanzi-books/${book.id}/share`,{published:false},undefined,'PUT');
+   const progress=await ok(`/children/${child}/hanzi-progress`),month=progress.date.slice(0,7);assert.equal((await ok(`${base}/preview?month=${month}`)).eligible_count,4);
+   const reviewTarget=(await ok(`${route}?limit=1`)).items[0],studyBase=`/children/${child}/hanzi-study-rounds`,startedStudy=await ok(studyBase,{source:'review',ids:[reviewTarget.id]}),studyLease={lease_id:startedStudy.session.id,lease_generation:startedStudy.session.lease_generation};assert.equal((await ok(studyBase)).round.id,startedStudy.round.id);const studyAnswer=await ok(`${studyBase}/${startedStudy.round.id}/answer`,{ordinal:1,action:'review',correct:true,event_id:randomUUID(),...studyLease});assert.equal(studyAnswer.status,'completed');assert.equal((await ok(studyBase)).round,null);
+   assert.equal((await request(base,{month,mode:'full',unexpected:true})).status,422);
+   const quiz=await ok(base,{month,mode:'full'}),started=await ok(`${base}/${quiz.id}/resume`,{expected_version:quiz.version}),lease={lease_id:started.session.id,lease_generation:started.session.lease_generation},items=(await ok(`${base}/${quiz.id}/items?cursor=0&limit=2`)).items;assert.equal(items.length,2);assert(!('correct_answer' in items[0]));
+   const answered=await ok(`${base}/${quiz.id}/items/${items[0].id}/answer`,{answer:items[0].options[0],expected_version:1,...lease},undefined,'PUT');assert.equal(typeof answered.correct,'boolean');
+   const fresh=await ok(`${base}/${quiz.id}`),submitted=await ok(`${base}/${quiz.id}/submit`,{expected_version:fresh.version,confirm_unanswered:true,...lease});assert.equal(submitted.result.unanswered_count,3);assert.equal((await ok(`${base}?limit=1`)).items[0].status,'submitted');
+   const calendar=await ok(`/children/${child}/hanzi-calendar?month=${month}`),day=calendar.days.find(x=>x.date===progress.date);assert.equal(day.studied_words,4);assert.equal(day.wrong_words,answered.correct?3:4);assert.equal(day.quiz_count,1);
+   assert.equal((await ok(`/children/${child}/hanzi-history-range?date=${progress.date}`)).count,4);assert.equal((await request(`/children/${child}/hanzi-calendar?month=invalid`)).status,422);assert.equal((await request(`/children/${child}/hanzi-checkin-makeup`,{date:progress.date})).status,422);
+   const pageOne=await ok(`${route}?limit=2&book_id=${book.id}`);assert.equal(pageOne.items.length,2);assert.equal(pageOne.next_cursor,null);const allOne=await ok(`${route}?limit=2`),allTwo=await ok(`${route}?limit=2&cursor=${allOne.next_cursor}`);assert.equal(allTwo.items.length,2);assert.equal(new Set([...allOne.items,...allTwo.items].map(x=>x.id)).size,4);
+   const historyOne=await ok(`/children/${child}/hanzi-history-range?date=${progress.date}&limit=2`),historyTwo=await ok(`/children/${child}/hanzi-history-range?date=${progress.date}&limit=2&cursor=${historyOne.next_cursor}`);assert.equal(historyOne.count,4);assert.equal(historyTwo.items.length,2);const wrongPage=await ok(`/children/${child}/hanzi-mistakes?limit=2`);assert.equal(wrongPage.items.length,2);assert(wrongPage.next_cursor);
+  }
   {const route=`/children/${c.id}/hanzi`,body={character:'春',pinyin:'chūn',strokes:9,words:'春风'};
    assert.equal((await request(route,{...body,unexpected:true})).status,422);
    const jobId=randomUUID();const job=await ok(`${route}/imports`,{id:jobId,name:'test.txt',base64:Buffer.from('春夏').toString('base64')});assert.equal(job.id,jobId);assert.equal((await ok(`${route}/imports`)).items.length,1);await ok(`${route}/imports/${jobId}/cancel`,{});assert.equal((await ok(`${route}/imports/${jobId}`)).status,'cancelled');
    const item=await ok(route,body);assert.equal((await ok(`${route}?status=all&q=春`)).total,1);const batch=await ok(`${route}/batch`,{characters:['春','夏']});assert.equal(batch.added,1);assert.equal(batch.skipped,1);
-   const marked=await ok(`${route}/${item.id}/mark`,{learned:true,expected_version:item.version},undefined,'PUT');assert(marked.learned_at);
+   assert.equal((await request(`${route}/${item.id}/mark`,{learned:true,expected_version:item.version},undefined,'PUT')).status,422);const marked=await ok(`${route}/${item.id}/mark`,{important:true,expected_version:item.version},undefined,'PUT');assert.equal(marked.learned_at,null);assert(marked.important);
    const hs=await ok(`${route}/${item.id}/sessions`,{});assert.equal(hs.character,'春');assert.deepEqual(hs.messages,[]);assert.equal((await request(`${route}/${item.id}/sessions/${hs.id}/messages`,{request_id:'bad'})).status,422);await ok(`${route}/${item.id}/sessions/${hs.id}`,{},undefined,'DELETE');
-   assert.equal((await request(`${route}/${item.id}/mark`,{learned:false,expected_version:item.version},undefined,'PUT')).status,409);
+   assert.equal((await request(`${route}/${item.id}/mark`,{important:false,expected_version:item.version},undefined,'PUT')).status,409);
    await ok(`${route}/${item.id}`,{},undefined,'DELETE');assert.equal((await ok(route)).total,1);
   }
   {const route=`/children/${c.id}/poems`,body={title:'静夜思',author:'李白',dynasty:'唐',body:'床前明月光。',genre:'五言绝句',pinyin:'chuang qian',translation:'月光洒在床前',annotations:'疑：好像',background:'月夜',source:'教材',notes:'熟读'};
@@ -110,7 +193,9 @@ const {createApplication}=require('../apps/api/dist/main.js');
   assert.equal((await ok(`/children/${c.id}/words?mark=favorite&q=${wordPage.items[0].lemma}`)).total,1);
   assert.equal((await request(`/words/${wordPage.items[0].id}/annotations`,{expected_version:1,easy:true,error_prone:true},undefined,'PATCH')).status,422);
   const wordPage2=await ok(`/children/${c.id}/words?limit=1&cursor=${wordPage.next_cursor}`);assert.equal(wordPage2.items.length,1);assert.notEqual(wordPage.items[0].id,wordPage2.items[0].id);
-  const exported=await ok(`/children/${c.id}/word-exports`,{word_ids:[wordPage.items[0].id]});assert.equal(exported.count,1);assert(exported.content.startsWith('\uFEFF'));
+  const exported=await ok(`/children/${c.id}/word-exports`,{word_ids:[wordPage.items[0].id]});assert.equal(exported.count,1);assert.equal(exported.filename,'单词本.pdf');assert(Buffer.from(exported.base64,'base64').toString('ascii').startsWith('%PDF-1.4'));
+  const copybook=await ok(`/children/${c.id}/word-exports`,{word_ids:[wordPage.items[0].id],format:'copybook'});assert.equal(copybook.filename,'英文字帖.pdf');assert.equal(copybook.count,1);assert(Buffer.from(copybook.base64,'base64').toString('ascii').startsWith('%PDF-1.4'));
+  assert.equal((await ok(`/children/${c.id}/word-exports`,{all:true,status:'unlearned,archived'})).count,2);
   assert.equal((await ok(`/children/${c.id}/word-exports`,{all:true,excluded_ids:[wordPage.items[0].id]})).count,1);
   assert.equal((await request(`/children/${c.id}/word-exports`,{all:true,word_ids:[]})).status,422);
   const audioWord=(await ok(`/children/${c.id}/words`)).items[0];
@@ -208,11 +293,13 @@ const {createApplication}=require('../apps/api/dist/main.js');
   for(let n=0;n<40&&familyDeletion.data.status!=='succeeded';n++){await new Promise(r=>setTimeout(r,100));familyDeletion=await request(`/lifecycle-jobs/${familyDeletionId}`);}
   assert.equal(familyDeletion.data.status,'succeeded',JSON.stringify(familyDeletion));
   await ok('/auth/logout',{});assert.equal((await request('/me')).status,401);
+  assert.equal((await request('/checkin-backgrounds/01-lake/webp')).status,401);
   token=(await ok('/auth/dev',{code:'dev-dad',management_only:true})).access_token;
   assert.equal((await request('/voices')).error.code,'MANAGEMENT_SESSION_ONLY');
   assert.equal((await ok('/me/privacy-consent')).management_only,true);
   assert.equal((await ok('/me',{confirm:true},undefined,'DELETE')).deleted,true);
   assert.equal((await request('/me')).status,401);
-  console.log('PASS: Nest/Express request parsing, validation, auth, word search/annotation, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results, calendar, wrong words practice async AI batch save, audio worker/cache/authorized binary download, privacy consent/withdrawal, management-only login, deletion receipts, logout and account erasure (in process; TCP not tested)');
+  assert.equal((await request('/checkin-backgrounds/01-lake/webp')).status,401);
+  console.log('PASS: sentence direct learning/progress/check-in/sharing/search/import records, Nest/Express request parsing, validation, auth, word search/annotation, batch, real FSRS, review replay, lease end and monthly quiz worker/PUT/submit/results, calendar, wrong words practice async AI batch save, audio worker/cache/authorized binary download, privacy consent/withdrawal, management-only login, deletion receipts, logout and account erasure (in process; TCP not tested)');
  }finally{await dispose();rmSync(resolve('.local',name),{recursive:true,force:true});rmSync(resolve('.local',name+'-spool'),{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,22 +1,10 @@
-.wordbook-heading{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;box-sizing:border-box}
-.wordbook-heading .title{font-size:42px}
-.wordbook-heading .text-action{flex-shrink:0;padding:16px 0}
+
 .word-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin:20px 0}
 .word-search .field{min-width:0;margin:0}
 .word-search .field-picker{padding:16px 20px;white-space:nowrap}
 .word-search .btn{grid-column:1/-1;margin:0;min-height:76px}
 .wordbook-list{background:var(--surface);border-radius:24px;padding:0 24px;overflow:hidden}
 .wordbook-item{position:relative;padding:4px 0}
-.wordbook-summary{display:flex;align-items:center;min-height:100px;gap:16px;flex-wrap:wrap}
-.wordbook-lemma{font-size:34px;font-weight:600;line-height:1.35;overflow-wrap:anywhere;max-width:100%}
-.wordbook-pronunciation{display:flex;align-items:center;flex:1;min-width:150px;gap:8px;color:var(--muted)}
-.wordbook-speaker{display:flex;align-items:center;justify-content:flex-start;flex:0 1 auto;width:auto;min-width:48px;min-height:48px;height:auto;gap:12px;margin:0;padding:0 8px;background:transparent;border:0;border-radius:12px;color:var(--muted);font-size:25px;line-height:1.5;text-align:left}
-.wordbook-speaker::after{border:0}
-.wordbook-speaker:active{background:var(--soft)}
-.wordbook-speaker .audio-icon{width:30px;height:30px;margin:0}
-.wordbook-ipa{font-size:25px;line-height:1.5;overflow-wrap:anywhere;color:var(--muted)}
-.wordbook-chevron{color:var(--muted);margin-left:auto}
-.wordbook-chevron.is-open{color:var(--primary)}
 .wordbook-detail{padding:0 0 20px}
 .wordbook-meaning{display:flex;align-items:baseline;gap:12px;font-size:28px;line-height:1.6;flex-wrap:wrap;margin-bottom:12px}
 .wordbook-pos{font-size:22px;color:var(--muted);background:var(--field);padding:2px 10px;border-radius:6px}
@@ -27,7 +15,7 @@
 .wordbook-item .audio-status{font-size:22px;margin:0 0 8px 37px}
 .word-marks{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
 .word-marks .mark-button{width:auto;min-width:116px;min-height:64px;padding:10px 16px;margin:0;font-size:23px}
-.word-marks .mark-selected{background:var(--primary);color:#fff}
+.word-marks .mark-selected{background:var(--primary);color:var(--on-primary)}
 .book-tools{margin:18px 0;padding:18px 20px}
 .book-tools-row{display:flex;align-items:center;gap:10px;margin:8px 0}
 .book-tools-row .field{flex:1;min-width:0;margin:0}
@@ -44,30 +32,13 @@
 .word-search-entry{display:flex;align-items:center;justify-content:space-between;min-height:80px;padding:16px 24px;margin:18px 0}
 .search-arrow{font-size:36px;color:var(--subtle)}
 .progress-count{font-size:28px;font-weight:650;color:var(--primary)}
-.word-learning-status{flex-shrink:0;color:var(--muted);font-size:20px;line-height:1.5;white-space:nowrap}
 
 
 .wordbook-list{border-radius:30px;box-shadow:var(--card-shadow)}
-.wordbook-summary{min-height:108px}
-.wordbook-lemma{color:var(--text)}
-.word-learning-status{padding:4px 10px;border-radius:12px;background:var(--field);color:var(--secondary-text)}
 .wordbook-example{border-radius:20px}
 
 /* Wordbook overview and actions */
 .wordbook-page.wordbook-selecting{padding-bottom:calc(270px + env(safe-area-inset-bottom))}
-.wordbook-heading{align-items:center;margin-bottom:28px}
-.wordbook-heading-picker,.wordbook-heading-choice{flex:1;min-width:0}
-.wordbook-heading-name{display:flex;align-items:center;gap:12px;min-width:0;color:var(--text)}
-.wordbook-heading-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:42px;font-weight:650;line-height:1.35}
-.wordbook-heading-name .chevron{flex:none;color:var(--muted)}
-.wordbook-heading-subtitle{margin-top:4px;color:var(--muted);font-size:23px}
-.wordbook-list-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 2px 16px;min-height:64px}
-.wordbook-list-heading{display:flex;align-items:center;gap:10px;font-size:29px;font-weight:650}
-.wordbook-list-count{color:var(--muted);font-size:22px;font-weight:400}
-.wordbook-list-actions{display:flex;align-items:center;gap:12px}
-.wordbook-list-action{width:auto;min-height:60px;margin:0;padding:0 12px;background:transparent;color:var(--primary);font-size:23px;line-height:60px;white-space:nowrap}
-.wordbook-list-action::after{border:0}
-.wordbook-list-action[disabled]{color:var(--disabled-text);background:transparent}
 .wordbook-export-bar{position:fixed;z-index:25;right:0;bottom:0;left:0;box-sizing:border-box;padding:16px 32px calc(16px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -8px 28px rgba(23,45,62,.08)}
 .wordbook-export-info{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .wordbook-export-count{font-size:25px;color:var(--text)}
@@ -83,3 +54,22 @@
 
 .word-marks .wordbook-feedback-button{background:var(--field);color:var(--primary)}
 .word-correction-note{display:flex;align-items:center;gap:12px;margin-top:8px;color:var(--muted);font-size:21px}.word-correction-note .text-action{width:auto;margin:0;padding:6px;font-size:21px}
+
+.mark-button{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+
+.wordbook-example .audio-selectable-text{align-items:flex-start;gap:10px}
+.wordbook-translation{display:block;margin-left:66px}
+.hanzi-list-example{display:block;padding-top:12px;white-space:pre-wrap}
+
+.book-switch-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.4);display:flex;align-items:flex-end}
+.book-switch-panel{box-sizing:border-box;width:100%;padding:24px 28px calc(24px + env(safe-area-inset-bottom));border-radius:32px 32px 0 0;background:var(--surface)}
+.book-switch-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:30px;font-weight:650;margin-bottom:16px}
+.book-switch-actions{display:flex;align-items:center}
+.book-switch-list{max-height:50vh}
+.book-switch-list-scroll{height:50vh}
+.book-switch-option{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;margin:8px 0;padding:22px 24px;background:var(--field);border-radius:18px;text-align:left;font-size:28px;line-height:1.5}
+.book-switch-option::after{border:0}
+.book-switch-option.selected{background:var(--soft);color:var(--primary)}
+.book-switch-name{min-width:0;overflow-wrap:anywhere;flex:1}
+.book-switch-current{flex:none;font-size:22px}
+.book-switch-close{margin-top:20px;width:100%}

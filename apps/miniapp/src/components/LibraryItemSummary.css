@@ -1,0 +1,13 @@
+.library-item-summary{display:flex;align-items:center;gap:12px;box-sizing:border-box;min-height:172px;padding:12px 0}
+.library-item-copy{flex:1;min-width:0}
+.library-item-top,.library-item-meta{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;min-height:72px}
+.library-item-title{display:block;flex:1;min-width:0;font-size:36px;font-weight:600;line-height:1.4;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.library-item-meta-text{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:24px;line-height:1.6}
+.library-item-reading,.library-item-detail{display:flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;min-height:72px;margin:0;padding:0;border:0;border-radius:12px;background:transparent;color:var(--primary);line-height:1}
+.library-item-reading{width:72px;min-width:72px}
+.library-item-reading::after,.library-item-detail::after{border:0}
+.library-item-reading:active,.library-item-detail:active{background:var(--field)}
+.library-item-reading[disabled]{background:transparent;opacity:.5}
+.library-item-reading .audio-icon,.library-item-reading .app-icon{width:32px;height:32px;margin:0;color:var(--primary)}
+.library-item-detail{gap:0;min-width:88px;font-size:22px}
+.library-item-detail .ui-chevron{width:24px;height:24px;margin:0;color:var(--primary)}

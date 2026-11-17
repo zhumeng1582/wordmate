@@ -10,20 +10,36 @@ const ajv=new Ajv({allErrors:false,strict:true});addFormats(ajv);
 const str=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const id={type:'string',format:'uuid'},positive={type:'integer',minimum:1};
 const object=(properties:any,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
+const poemImportFields=Object.fromEntries(Object.entries({title:100,author:100,dynasty:40,body:1000,genre:80,annotations:3000,translation:3000,background:3000,source:200,notes:3000,pinyin:3000}).map(([name,maxLength])=>[name,{type:'string',maxLength}]));
+const poemImportItems={type:'array',minItems:1,maxItems:300,items:object({...poemImportFields,title:str(100),body:str(1000)},['title','body'])};
+const poemReviewBatch={type:'array',maxItems:2000,items:object({draft:object(poemImportFields,['title','author','dynasty','body']),key:str(100),saved:{type:'boolean'},locked:{type:'boolean'},issues:{type:'array',maxItems:6,items:{type:'string',maxLength:180}},issuesReviewed:{type:'boolean'}},['draft','key','saved','locked'])};
+const poemReviewGeneration={type:'integer',minimum:0};
 const schemas:Record<string,any>={
+  sentenceSave:object({book_id:id,reviewed:{type:'boolean'},items:{type:'array',minItems:1,maxItems:300,items:object({text_en:str(1000),translation_zh:str(1000),source_index:{type:'integer',minimum:0,maximum:299},reviewed:{type:'boolean'}},['text_en','translation_zh'])}},['items']),
+  sentenceImport:object({id,book_id:id,raw_text:str(12000)},['id','raw_text']),
+  sentenceUpdate:object({text_en:str(1000),translation_zh:str(1000),notes:{type:'string',maxLength:1000},favorite:{type:'boolean'},archived:{type:'boolean'},expected_version:positive},['expected_version']),
+  sentenceGoal:object({daily_goal:{type:'integer',minimum:1,maximum:100},expected_version:{type:'integer',minimum:0}}),
+  sentenceRound:object({source:{enum:['new','review','favorite','wrong','history']},book_id:id,date:{type:'string',format:'date'},date_from:{type:'string',format:'date'},date_to:{type:'string',format:'date'}},['source']),
+  sentenceLease:object({lease_id:id}),
+  sentenceReveal:object({lease_id:id,ordinal:positive}),
+  sentenceAnswer:object({lease_id:id,ordinal:positive,event_id:id,rating:{enum:['again','hard','good']}}),
+
   libraryCheckin:object({kind:{enum:['poems','hanzi']},item_id:id}),
   archiveMark:object({archived:{type:'boolean'},expected_version:positive}),
   hanziCopybook:object({ids:{type:'array',minItems:1,maxItems:300,uniqueItems:true,items:id}}),
-  hanziImport:object({id,name:str(120),base64:str(13981016)}),
-  hanziBatch:object({characters:{type:'array',minItems:1,maxItems:300,items:str(4)},job_id:id},['characters']),
-  hanzi:object({character:str(4),pinyin:{type:'string',maxLength:200},radical:{type:'string',maxLength:20},strokes:{type:['integer','null'],minimum:1,maximum:100},meaning:{type:'string',maxLength:2000},words:{type:'string',maxLength:1000},example:{type:'string',maxLength:1000},tags:{type:'string',maxLength:200},notes:{type:'string',maxLength:1000},expected_version:positive},['character']),
-  hanziMark:object({learned:{type:'boolean'},important:{type:'boolean'},expected_version:positive},['expected_version']),
-  poem:object({title:str(100),author:{type:'string',maxLength:100},dynasty:{type:'string',maxLength:40},body:str(1000),genre:{type:'string',maxLength:80},annotations:{type:'string',maxLength:3000},translation:{type:'string',maxLength:3000},background:{type:'string',maxLength:3000},source:{type:'string',maxLength:200},notes:{type:'string',maxLength:3000},pinyin:{type:'string',maxLength:3000},expected_version:positive,reset_memorized:{type:'boolean'}},['title','body']),
-  poemImport:{oneOf:[object({id,raw_text:str(MAX_IMPORT_TEXT)}),object({id,name:str(120),base64:str(13981016)})]},
-  poemImportSave:object({items:{type:'array',minItems:1,maxItems:300,items:object({title:str(100),author:{type:'string',maxLength:100},dynasty:{type:'string',maxLength:40},body:str(1000),genre:{type:'string',maxLength:80},annotations:{type:'string',maxLength:3000},translation:{type:'string',maxLength:3000},background:{type:'string',maxLength:3000},source:{type:'string',maxLength:200},notes:{type:'string',maxLength:3000},pinyin:{type:'string',maxLength:3000}},['title','body'])}}),
+  hanziImport:object({id,name:str(120),base64:str(13981016),book_id:id},['id','name','base64']),
+  hanziBatch:object({characters:{type:'array',minItems:1,maxItems:300,items:str(4)},job_id:id,book_id:id},['characters']),
+  hanzi:object({character:str(4),pinyin:{type:'string',maxLength:200},radical:{type:'string',maxLength:20},strokes:{type:['integer','null'],minimum:1,maximum:100},meaning:{type:'string',maxLength:2000},words:{type:'string',maxLength:1000},example:{type:'string',maxLength:1000},tags:{type:'string',maxLength:200},notes:{type:'string',maxLength:1000},expected_version:positive,book_id:id},['character']),
+  hanziMark:object({important:{type:'boolean'},expected_version:positive},['important','expected_version']),
+  poem:object({title:str(100),author:{type:'string',maxLength:100},dynasty:{type:'string',maxLength:40},body:str(1000),genre:{type:'string',maxLength:80},annotations:{type:'string',maxLength:3000},translation:{type:'string',maxLength:3000},background:{type:'string',maxLength:3000},source:{type:'string',maxLength:200},notes:{type:'string',maxLength:3000},pinyin:{type:'string',maxLength:3000},expected_version:positive,reset_memorized:{type:'boolean'},book_id:id},['title','body']),
+  poemImport:{oneOf:[object({id,raw_text:str(MAX_IMPORT_TEXT),book_id:id},['id','raw_text']),object({id,name:str(120),base64:str(13981016),book_id:id},['id','name','base64'])]},
+  poemImportSave:{oneOf:[object({items:poemImportItems}),object({items:poemImportItems,request_id:id,expected_batch:poemReviewGeneration,remaining_batch:poemReviewBatch})]},
+  poemImportDraft:object({batch:poemReviewBatch,expected_batch:poemReviewGeneration}),
   poemAnalyze:object({request_id:id,text:str(6000)}),
   hanziPinyin:object({request_id:id}),
+  favoriteMark:object({favorite:{type:'boolean'},expected_version:positive}),
   poemMark:object({memorized:{type:'boolean'},expected_version:positive}),
+  assistantAnswer:object({request_id:id,question:str(1000),action:{enum:['auto','summary','article','rewrite','quiz','mistakes','practice','quiz_answer']},days:{enum:[1,7,30]},source:{enum:['studied','mistakes']},date_from:{type:'string',format:'date'},date_to:{type:'string',format:'date'},quiz_id:id,index:{type:'integer',minimum:0,maximum:2},choice:{type:'integer',minimum:0,maximum:2}},['request_id','question']),
   tutorOpen:object({word_id:id}),
   tutorImage:object({request_id:id}),
   tutorSearch:object({request_id:id,question:str(1000)}),
@@ -41,11 +57,20 @@ const schemas:Record<string,any>={
   deleteChild:object({confirm_nickname:str(40),expected_version:positive}),
   deleteFamily:object({confirm_name:str(40),expected_version:positive,confirm_data_deletion:{const:true}}),
   transferOwner:object({member_user_id:id,expected_version:positive}),
-  importFile:object({name:str(120),base64:str(13981016),existing_text:{type:'string',maxLength:MAX_IMPORT_TEXT},theme:{type:'string',maxLength:80},purpose:{enum:['poem']}},['name','base64']),
-  exportWords:{oneOf:[object({word_ids:{type:'array',items:id,minItems:1,maxItems:10000,uniqueItems:true},wordbook_id:id},['word_ids']),object({all:{const:true},excluded_ids:{type:'array',items:id,maxItems:10000,uniqueItems:true},wordbook_id:id},['all'])]},
+  importFile:object({name:str(120),base64:str(13981016),existing_text:{type:'string',maxLength:MAX_IMPORT_TEXT},theme:{type:'string',maxLength:80},purpose:{enum:['poem','sentence']}},['name','base64']),
+  exportWords:{oneOf:[object({word_ids:{type:'array',items:id,minItems:1,maxItems:10000,uniqueItems:true},format:{enum:['list','copybook']},wordbook_id:id,status:{enum:['all','unlearned','learned','archived','unlearned,learned','unlearned,archived','learned,archived','unlearned,learned,archived']}},['word_ids']),object({all:{const:true},excluded_ids:{type:'array',items:id,maxItems:10000,uniqueItems:true},format:{enum:['list','copybook']},wordbook_id:id,status:{enum:['all','unlearned','learned','archived','unlearned,learned','unlearned,archived','learned,archived','unlearned,learned,archived']}},['all'])]},
   checkinShare:checkinShareSchema,
   checkinMakeup:object({date:{type:'string',format:'date'}}),
   learningGoal:object({daily_goal:{type:'integer',minimum:1,maximum:500},expected_version:positive}),
+  hanziRoundCreate:object({source:{enum:['new','review','important','wrong','history']},ids:{type:'array',items:id,minItems:1,maxItems:5000,uniqueItems:true},book_id:id},['source','ids']),
+  hanziRoundAnswer:object({ordinal:positive,action:{enum:['learn','review','skip']},correct:{type:'boolean'},event_id:id,lease_id:id,lease_generation:positive},['ordinal','action','event_id','lease_id','lease_generation']),
+  hanziGoal:object({daily_goal:{type:'integer',minimum:1,maximum:500},expected_version:{type:'integer',minimum:0}}),
+  hanziLearningEvent:object({event_id:id,hanzi_id:id,kind:{enum:['learn','review','test']},correct:{type:'boolean'}},['event_id','hanzi_id','kind']),
+  hanziQuizCreate:object({month:{type:'string',pattern:'^\\d{4}-(0[1-9]|1[0-2])$'},mode:{enum:['sample','full']},sample_count:{enum:[10,20,30,50]},book_id:id},['month','mode']),
+  hanziQuizAnswer:object({answer:str(100),expected_version:positive,lease_id:id,lease_generation:positive}),
+  hanziQuizSubmit:object({expected_version:positive,confirm_unanswered:{type:'boolean'},lease_id:id,lease_generation:positive},['expected_version','lease_id','lease_generation']),
+  hanziQuizAbandon:object({expected_version:positive,lease_id:id,lease_generation:positive}),
+  hanziQuizLease:object({lease_id:id,lease_generation:positive}),
   annotations:wordAnnotationsSchema,
   voicePreview:object({accent:{enum:['en-GB','en-US']},voice_id:str(100)}),
   audioSettings:object({accent:{enum:['en-GB','en-US']},voice_id:str(100),auto_play:{type:'boolean'},expected_version:positive},['accent','voice_id','expected_version']),
@@ -62,6 +87,7 @@ const schemas:Record<string,any>={
   login:object({code:str(512),management_only:{type:'boolean'},invite_code:{type:'string',minLength:6,maxLength:32,pattern:'^[a-zA-Z0-9_-]+$'}},['code']),family:object({name:str(40)}),child:object({nickname:str(40),accent:{enum:['en-US','en-GB']},school_grade:{type:'string',maxLength:24,pattern:'^[^\\u0000-\\u001f\\u007f]*$'},gender:{enum:['unspecified','girl','boy']}},['nickname']),book:object({name:str(60),grade:{type:'string',maxLength:40},textbook:{type:'string',maxLength:40},category:{type:'string',maxLength:40}},['name']),bookRename:object({name:str(60),grade:{type:'string',maxLength:40},textbook:{type:'string',maxLength:40},category:{type:'string',maxLength:40},expected_version:positive},['name','expected_version']),shareBook:object({published:{type:'boolean'},title:{type:'string',minLength:1,maxLength:60},description:{type:'string',maxLength:300},author:{type:'string',minLength:1,maxLength:60},target_level:{type:'string',maxLength:40}},['published']),
   batch:object({wordbook_id:id,words:{type:'array',items:str(120),minItems:1,maxItems:30},theme:{type:'string',maxLength:80}},['wordbook_id','words']),
   confirm:object({expected_version:positive,selections:{type:'array',minItems:1,maxItems:30,items:{oneOf:[object({item_id:id,action:{const:'select'},candidate_id:str(256)}),object({item_id:id,action:{const:'skip'}})]}}}),
+  childUpdate:object({nickname:str(40),school_grade:{type:'string',maxLength:24},gender:{enum:['unspecified','girl','boy']},expected_version:positive}),
   claim:object({invite_token:str(256)}),session:studySessionSchema,lease:object({lease_generation:positive}),empty:object({}),
   review:object({session_id:id,card_id:id,event_id:id,expected_version:positive,lease_generation:positive,rating:{enum:['again','hard','good','easy']},wordbook_id:id},['session_id','card_id','event_id','expected_version','lease_generation','rating'])
 };
@@ -70,9 +96,12 @@ export function validateBody(path:string[],method:string,body:unknown){
   if(!['POST','PUT','PATCH','DELETE'].includes(method))return;
   if(method==='DELETE'){const route=path.join('/');const kind=route==='me/ai-key'?'aiKeyDelete':route==='me'||route==='me/privacy-consent'?'confirmed':path[0]==='children'&&path.length===2?'deleteChild':path[0]==='families'&&path.length===2?'deleteFamily':'empty';ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');return;}
   let kind='';const route=path.join('/');
-  if(path[0]==='children'&&['hanzi','poems','words'].includes(path[2])&&path.length===5&&path[4]==='archive')kind='archiveMark';
+  if(path[0]==='children'&&['hanzi','poems'].includes(path[2])&&path.length===5&&path[4]==='favorite')kind='favoriteMark';
+  else if(path[0]==='children'&&['hanzi','poems','words'].includes(path[2])&&path.length===5&&path[4]==='archive')kind='archiveMark';
+  else if(path[0]==='children'&&['hanzi-books','poem-books'].includes(path[2]))kind=path[4]==='share'?'shareBook':path.length===3?'book':'bookRename';
+  else if(path[0]==='children'&&['shared-hanzi-books','shared-poem-books'].includes(path[2]))kind='empty';
   else if(path[0]==='children'&&path[2]==='hanzi'){kind=path[4]==='sessions'?(path[6]==='messages'?'tutorAnswer':path[6]==='transcriptions'?'tutorTranscription':'empty'):path[3]==='imports'?(path.length===4?'hanziImport':'empty'):path[3]==='copybook'?'hanziCopybook':path[3]==='batch'?'hanziBatch':path[3]==='analyze'?'poemAnalyze':['pinyin','words'].includes(path[4])?'hanziPinyin':path[4]==='mark'?'hanziMark':path[4]==='audio'?'empty':'hanzi';}
-  else if(path[0]==='children'&&path[2]==='poems'){kind=path[4]==='sessions'?(path[6]==='messages'?'tutorAnswer':path[6]==='transcriptions'?'tutorTranscription':'empty'):path[3]==='imports'?(path.length===4?'poemImport':path[5]==='save'?'poemImportSave':'empty'):path.length===3?'poem':path.length===4&&path[3]==='analyze'?'poemAnalyze':path.length===4?'poem':path[4]==='memorization'?'poemMark':path[4]==='sessions'&&path[6]==='messages'?'tutorAnswer':'empty';}
+  else if(path[0]==='children'&&path[2]==='poems'){kind=path[4]==='sessions'?(path[6]==='messages'?'tutorAnswer':path[6]==='transcriptions'?'tutorTranscription':'empty'):path[3]==='imports'?(path.length===4?'poemImport':path[5]==='save'?'poemImportSave':path[5]==='draft'?'poemImportDraft':'empty'):path.length===3?'poem':path.length===4&&path[3]==='analyze'?'poemAnalyze':path.length===4?'poem':path[4]==='memorization'?'poemMark':path[4]==='sessions'&&path[6]==='messages'?'tutorAnswer':'empty';}
   else if(route==='me/profile')kind='parentProfile';
   else if(route==='me/ai-settings')kind='aiSettings';
   else if(route==='me/ai-test')kind='aiTest';
@@ -88,8 +117,9 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(route==='families')kind='family';
   else if(route==='reviews')kind='review';
   else if(['family-invites/claim','family-invites/resolve'].includes(route))kind='claim';
+  else if(path[0]==='children'&&path.length===2&&method==='PATCH')kind='childUpdate';
   else if(path[0]==='families'&&path[2]==='children')kind='child';
-  else if(path[0]==='families'&&path[2]==='invites'||path[0]==='family-invites'&&path[2]==='approve')kind='empty';
+  else if(path[0]==='families'&&path[2]==='invites'||path[0]==='family-invites'&&['approve','reject','revoke','cancel'].includes(path[2]))kind='empty';
   else if(path[0]==='monthly-quizzes'){kind=path[2]==='items'&&path[4]==='answer'?'quizAnswer':path[2]==='submit'?'quizSubmit':path[2]==='takeover'?'quizTakeover':['resume','abandon'].includes(path[2])?'quizVersion':'';}
   else if(path[0]==='ai-batches'&&path.length===2&&method==='PUT')kind='aiReplace';
   else if(path[0]==='words'&&path[2]==='annotations'&&method==='PATCH')kind='annotations';
@@ -97,16 +127,32 @@ export function validateBody(path:string[],method:string,body:unknown){
   else if(path[0]==='audio'&&path.length===3&&path[2]==='feedback')kind='empty';
   else if(path[0]==='words'&&path.length===3&&path[2]==='feedback')kind='wordFeedback';
   else if(path[0]==='ai-batches'&&['retry','cancel'].includes(path[2]))kind='empty';
+  else if(path[0]==='children'&&path[2]==='sentence-books')kind=path[4]==='share'?'shareBook':method==='POST'?'book':method==='PATCH'?'bookRename':'';
+  else if(path[0]==='children'&&path[2]==='shared-sentence-books')kind='empty';
+  else if(path[0]==='children'&&path[2]==='sentence-progress')kind='sentenceGoal';
+  else if(path[0]==='children'&&path[2]==='sentence-checkin-makeup')kind='checkinMakeup';
+  else if(path[0]==='children'&&path[2]==='sentence-study-rounds')kind=path.length===3?'sentenceRound':path[4]==='reveal'?'sentenceReveal':path[4]==='answer'?'sentenceAnswer':'sentenceLease';
+  else if(path[0]==='children'&&path[2]==='sentences')kind=path[3]==='save'?'sentenceSave':path[3]==='imports'?path.length===4?'sentenceImport':path[5]==='save'?'sentenceSave':'empty':'sentenceUpdate';
+  else if(path[0]==='children'&&path[2]==='learning-assistant-sessions')kind='empty';
+  else if(path[0]==='learning-assistant-sessions'&&path[2]==='messages')kind='assistantAnswer';
+  else if(path[0]==='learning-assistant-messages'&&path[2]==='audio')kind='tutorSpeech';
   else if(path[0]==='word-tutor-messages'&&path[2]==='audio')kind='tutorSpeech';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='images')kind='tutorImage';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='search')kind='tutorSearch';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='transcriptions')kind='tutorTranscription';
+  else if(path[0]==='word-tutor-sessions'&&path[2]==='adopt')kind='empty';
+  else if(path[0]==='word-tutor-sessions'&&path[2]==='agent')kind='assistantAnswer';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='messages')kind='tutorAnswer';
   else if(path[0]==='word-tutor-sessions'&&path[2]==='learning-events')kind='tutorLearningEvent';
   else if(path[0]==='children'&&path[2]==='word-tutor-sessions')kind='tutorOpen';
   else if(path[0]==='children'&&path[2]==='monthly-quizzes')kind='quizCreate';
   else if(path[0]==='children'&&path[2]==='library-checkins')kind='libraryCheckin';
+  else if(path[0]==='children'&&path[2]==='hanzi-study-rounds')kind=path.length===3?'hanziRoundCreate':path[4]==='answer'?'hanziRoundAnswer':path[4]==='takeover'?'quizTakeover':path[4]==='resume'?'quizVersion':'hanziQuizLease';
+  else if(path[0]==='children'&&path[2]==='hanzi-progress')kind='hanziGoal';
+  else if(path[0]==='children'&&path[2]==='hanzi-learning-events')kind='hanziLearningEvent';
+  else if(path[0]==='children'&&path[2]==='hanzi-monthly-quizzes')kind=path.length===3?'hanziQuizCreate':path[4]==='items'&&path[6]==='answer'?'hanziQuizAnswer':path[4]==='submit'?'hanziQuizSubmit':path[4]==='abandon'?'hanziQuizAbandon':['heartbeat','end'].includes(path[4])?'hanziQuizLease':path[4]==='takeover'?'quizTakeover':'quizVersion';
   else if(path[0]==='children'&&path[2]==='checkin-makeup'&&method==='POST')kind='checkinMakeup';
+  else if(path[0]==='children'&&path[2]==='hanzi-checkin-makeup'&&method==='POST')kind='checkinMakeup';
   else if(path[0]==='children'&&path[2]==='wordbooks'&&path.length===4&&method==='PATCH')kind='bookRename';
   else if(path[0]==='children'&&path[2]==='wordbooks'&&path.length===5&&path[4]==='share')kind='shareBook';
   else if(path[0]==='children'&&path[2]==='shared-wordbooks'&&path[4]==='join')kind='empty';

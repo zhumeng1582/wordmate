@@ -1,0 +1,17 @@
+.library-filter-mask{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-end;background:var(--overlay)}
+.library-filter-panel{box-sizing:border-box;width:100%;max-height:90vh;padding:12px 28px calc(24px + env(safe-area-inset-bottom));overflow-y:auto;border-radius:28px 28px 0 0;background:var(--surface);box-shadow:0 -8px 32px rgba(15,32,40,.12)}
+.library-filter-heading{display:flex;align-items:center;gap:12px;min-height:88px}
+.library-filter-title{display:flex;align-items:center;gap:12px;flex:1;min-width:0;font-size:31px;font-weight:600;line-height:1.4}
+.library-filter-hint{font-size:23px;font-weight:400;color:var(--muted);white-space:nowrap}
+.library-filter-reset{flex:none;display:flex;align-items:center;justify-content:center;width:auto;min-height:80px;margin:0;padding:12px 6px;background:transparent;color:var(--primary);font-size:23px;line-height:1.4}
+.library-filter-close{display:flex;align-items:center;justify-content:center;flex:none;width:80px;height:80px;min-width:80px;min-height:80px;margin:0 -12px 0 0;padding:0;border-radius:20px;background:transparent;line-height:1}
+.library-filter-close:active{background:var(--field)}
+.library-filter-options{display:flex;flex-direction:column;margin:6px 0}
+.library-filter-option{display:flex;align-items:center;justify-content:space-between;gap:20px;box-sizing:border-box;width:100%;min-width:0;min-height:94px;margin:0;padding:20px 12px;border:0;border-radius:0;background:transparent;color:var(--text);font-size:28px;line-height:1.5;text-align:left}
+.library-filter-option:last-child{border-bottom:0}.library-filter-option:active{background:var(--field)}
+.library-filter-option.is-selected{color:var(--primary)}
+.library-filter-check{display:flex;justify-content:center;align-items:center;flex:none;box-sizing:border-box;width:30px;height:30px;border:2px solid var(--muted);border-radius:7px;color:var(--muted);font-size:23px;line-height:1}
+.library-filter-option.is-selected .library-filter-check{border-color:var(--primary);background:var(--primary);color:var(--on-primary)}
+.library-filter-note{padding:10px 12px 2px;color:var(--muted);font-size:22px;line-height:1.5}
+.library-filter-reset,.library-filter-close,.library-filter-option{border:0;outline:0;box-shadow:none}
+.library-filter-reset::after,.library-filter-close::after,.library-filter-option::after{border:0;box-shadow:none;content:none}

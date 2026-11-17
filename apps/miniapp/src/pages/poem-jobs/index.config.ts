@@ -1,1 +1,1 @@
-export default definePageConfig({navigationBarTitleText:'诗词整理记录'});
+export default definePageConfig({navigationBarTitleText:'录入记录'});

@@ -13,6 +13,7 @@ export interface QuizAccess {
  child(q:Sql,actor:string,id:string):Promise<Row>;
  now():Date; day(q:Sql,c:Row):Promise<string>;
 }
+interface QuizEngineAccess extends QuizAccess {awardMakeupMilestones(q:Sql,child:string,day:string):Promise<void>}
 export interface QuizBuilder {build(word:Row):{prompt:string;options:{id:string;text:string}[];correctId:string}}
 // Explicit local fixture, never used as a production dictionary/question supplier.
 export class FixtureQuizBuilder implements QuizBuilder {
@@ -36,7 +37,7 @@ export class StoredMeaningQuizBuilder implements QuizBuilder {
  }
 }
 export class MonthlyQuizzes {
- private a:QuizAccess;constructor(a:QuizAccess){this.a=a;}
+ private a:QuizEngineAccess;constructor(a:QuizEngineAccess){this.a=a;}
  private async scope(q:Sql,actor:string,id:string){const initial=await one(q,'SELECT child_id FROM monthly_quizzes WHERE id=$1',[uuid(id)]);ensure(initial,404,'QUIZ_NOT_FOUND');const child=await this.a.child(q,actor,initial.child_id);const quiz=await one(q,'SELECT * FROM monthly_quizzes WHERE id=$1 FOR UPDATE',[id]);return {child,quiz};}
  private async month(q:Sql,c:Row,value:unknown){ensure(typeof value==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(value)&&value>='2000-01',422,'INVALID_MONTH');ensure(value<=(await this.a.day(q,c)).slice(0,7),422,'FUTURE_MONTH');return value;}
  private async candidates(q:Sql,child:string,month:string){return (await q.query(`SELECT w.*,e.example_en FROM child_words w LEFT JOIN (SELECT DISTINCT ON (t.child_word_id) t.child_word_id,s.text_en example_en FROM sentence_targets t JOIN sentences s ON s.id=t.sentence_id WHERE t.child_id=$1 AND s.status='validated' ORDER BY t.child_word_id,s.created_at DESC,s.id DESC) e ON e.child_word_id=w.id WHERE w.child_id=$1 AND EXISTS(SELECT 1 FROM daily_word_activity d WHERE d.child_id=w.child_id AND d.child_word_id=w.id AND d.local_date >= $2::date AND d.local_date < ($2::date + interval '1 month')) ORDER BY w.id`,[child,month+'-01'])).rows;}
@@ -107,6 +108,9 @@ export class MonthlyQuizzes {
   const items=(await q.query('SELECT * FROM monthly_quiz_items WHERE quiz_id=$1 ORDER BY ordinal',[id])).rows;ensure(items.length===r.total_count&&items.every(i=>i.correct_option_id&&i.options_snapshot?.length===4),409,'QUIZ_INCOMPLETE');const unanswered=items.filter(i=>i.selected_option_id===null).length;ensure(!unanswered||b.confirm_unanswered===true,422,'CONFIRM_UNANSWERED');
   const correct=items.filter(i=>i.selected_option_id===i.correct_option_id).length,now=this.a.now(),day=await this.a.day(q,{...c,timezone:r.timezone_snapshot});
   for(const i of items){const right=i.selected_option_id===i.correct_option_id;await q.query('UPDATE monthly_quiz_items SET is_correct=$2 WHERE id=$1',[i.id,right]);if(!right)await q.query("INSERT INTO mistake_events(child_id,child_word_id,source,quiz_item_id,reason,occurred_at,local_date,timezone_snapshot,word_snapshot,answer_snapshot) VALUES($1,$2,'monthly_quiz',$3,$4,$5,$6,$7,$8,$9)",[r.child_id,i.child_word_id,i.id,i.selected_option_id===null?'unanswered':'incorrect',now,day,r.timezone_snapshot,JSON.stringify(i.word_snapshot),JSON.stringify({selected_option_id:i.selected_option_id,correct_option_id:i.correct_option_id,options:i.options_snapshot})]);}
+  // Count only answered items, once per word per day, without modifying FSRS.
+  const added=await q.query(`INSERT INTO daily_word_activity(child_id,local_date,card_id,child_word_id,first_review_at,was_new) SELECT $1,$2,rc.id,i.child_word_id,$3,false FROM monthly_quiz_items i JOIN review_cards rc ON rc.child_id=i.child_id AND rc.child_word_id=i.child_word_id AND rc.card_type='meaning' WHERE i.quiz_id=$4 AND i.selected_option_id IS NOT NULL ON CONFLICT DO NOTHING RETURNING child_word_id`,[r.child_id,day,now,id]);
+  if(added.rows.length){await q.query(`INSERT INTO daily_activity(child_id,local_date,distinct_words,new_words,goal_snapshot,timezone_snapshot) SELECT $1,$2,count(*)::int,count(*) FILTER(WHERE was_new)::int,$3,$4 FROM daily_word_activity WHERE child_id=$1 AND local_date=$2 ON CONFLICT(child_id,local_date) DO UPDATE SET distinct_words=excluded.distinct_words,new_words=excluded.new_words,updated_at=now()`,[r.child_id,day,c.daily_goal,r.timezone_snapshot]);await this.a.awardMakeupMilestones(q,r.child_id,day);}
   r=await one(q,"UPDATE monthly_quizzes SET status='submitted',version=version+1,correct_count=$2,unanswered_count=$3,grade=$4,submitted_at=$5,submitted_local_date=$6 WHERE id=$1 RETURNING *",[id,correct,unanswered,grade(correct,r.total_count),now,day]);
   await q.query("UPDATE study_sessions SET status='ended',ended_at=$2 WHERE id=$1",[s.id,now]);return this.result(r);
  });}

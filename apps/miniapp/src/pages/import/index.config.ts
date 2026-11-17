@@ -1,0 +1,1 @@
+export default definePageConfig({navigationBarTitleText:'录入学习内容'});

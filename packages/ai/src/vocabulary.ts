@@ -1,3 +1,4 @@
+import {inSourceOrder} from './source-order.ts';
 import type {TextGenerator,JsonRequest} from './index.ts';
 import {locateVocabularyTarget} from './vocabulary-target.ts';
 export {locateVocabularyTarget} from './vocabulary-target.ts';
@@ -120,7 +121,7 @@ export function rawVocabularyRequest(raw:string,theme='',level='A2',version=RAW_
   if(version===LEGACY_RAW_VOCABULARY_PROMPT_VERSION)return {...vocabularyRequest(v.items.map(i=>i.input),theme,level,LEGACY_VOCABULARY_PROMPT_VERSION).validate({items:v.items}),error:null};
   if([PREVIOUS_RAW_VOCABULARY_PROMPT_VERSION,RAW_VOCABULARY_PROMPT_VERSION].includes(version))v.items=preserveSourceExamples(raw,v.items);
   if(version===RAW_VOCABULARY_PROMPT_VERSION)v.items=preserveSourceMeanings(raw,v.items);
-  const seen=new Set<string>();for(let i=0;i<v.items.length;i++){const entry=v.items[i];if(entry.input_index!==i)throw Error('INVALID_RAW_OUTPUT');vocabularyRequest([entry.input],theme,level).validate({items:[{...entry,input_index:0}]});const key=JSON.stringify([entry.input.normalize('NFKC').toLocaleLowerCase('en-US'),entry.part_of_speech,entry.meaning_zh?.normalize('NFKC').trim()]);if(seen.has(key))throw Error('INVALID_RAW_OUTPUT');seen.add(key);}return {items:v.items,error:null};
+  const seen=new Set<string>();for(let i=0;i<v.items.length;i++){const entry=v.items[i];if(entry.input_index!==i)throw Error('INVALID_RAW_OUTPUT');vocabularyRequest([entry.input],theme,level).validate({items:[{...entry,input_index:0}]});const key=JSON.stringify([entry.input.normalize('NFKC').toLocaleLowerCase('en-US'),entry.part_of_speech,entry.meaning_zh?.normalize('NFKC').trim()]);if(seen.has(key))throw Error('INVALID_RAW_OUTPUT');seen.add(key);}return {items:inSourceOrder(raw,v.items,item=>[item.input,item.meaning_zh??'']).map((item,input_index)=>({...item,input_index})),error:null};
  }};
 }
 export function generateRawVocabulary(generator:TextGenerator,raw:string,theme='',level='A2',version=RAW_VOCABULARY_PROMPT_VERSION){return generator.generate(rawVocabularyRequest(raw,theme,level,version));}

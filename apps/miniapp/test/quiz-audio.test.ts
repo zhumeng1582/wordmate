@@ -1,14 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {pageHarness,tick} from './page-harness.ts';
+import {pageHarness,tick,deferred} from './page-harness.ts';
 const question={id:'question-nose',ordinal:5,prompt:'“nose”的中文意思是？',word:{id:'word-nose',lemma:'nose',version:3,part_of_speech:'noun',example_en:'Touch your nose.'},options:[{id:'option-a',text:'阅读'},{id:'option-b',text:'鼻子'},{id:'option-c',text:'苹果'},{id:'option-d',text:'书'}],selected_option_id:null,answer_version:1};
-async function openQuiz(options:{autoPlay?:boolean;autoNext?:boolean;nextCursor?:string;endError?:boolean}={}){
+async function openQuiz(options:{autoPlay?:boolean;autoNext?:boolean;nextCursor?:string;endError?:boolean;answerWait?:Promise<any>}={}){
  const played:any[]=[],quiz={id:'quiz-a',month:'2026-10',mode:'full',status:'in_progress',version:1,total_count:10,answered_count:4};let stopped=0;
  const page=pageHarness('pages/quiz/index',async(path,method)=>{
   if(path.includes('/preview'))return {eligible_count:10,active_quiz_id:quiz.id};
   if(path.endsWith('/resume'))return {quiz,session:{id:'session-a',lease_generation:1}};
   if(path.endsWith('/end')&&options.endError)throw Error('NETWORK_TIMEOUT');
-  if(path.endsWith('/answer'))return {item:{...question,selected_option_id:'option-b',correct_option_id:'option-b'},quiz_version:2,answered_count:5};
+  if(path.endsWith('/answer')){if(options.answerWait)await options.answerWait;return {item:{...question,selected_option_id:'option-b',correct_option_id:'option-b'},quiz_version:2,answered_count:5};}
   if(path.includes('/items?'))return {items:[question,{...question,id:'question-book',ordinal:6,prompt:'“book”的中文意思是？',word:{id:'word-book',lemma:'book',version:1}}],next_cursor:options.nextCursor??null};
   return quiz;
  },undefined,{cache:{'study_auto_next:account-a':options.autoNext??false},audio:{autoPlay:options.autoPlay??false,play:async target=>{played.push(target);},stop:()=>{stopped++;}}});
@@ -30,6 +30,18 @@ test('quiz automatically reads each word and moves on only after the saved answe
 });
 test('quiz keeps the answered word until manually advanced when auto next is off',async()=>{
  const {page}=await openQuiz({autoNext:false});await page.button('鼻子').onClick();await tick();page.render();await page.runTimeouts();assert.match(page.text(page.render()),/nose/);await page.button('下一题').onClick();assert.match(page.text(page.render()),/book/);page.dispose();
+});
+test('long pressing a test example pauses automatic navigation and does not play or submit',async()=>{
+ const {page,played}=await openQuiz({autoNext:true});await page.button('鼻子').onClick();await tick();page.render();
+ const example=page.all(page.render()).find(n=>n.type==='Text'&&page.text(n)==='Touch your nose.');assert(example?.props.selectable);assert(example?.props.userSelect);
+ example.props.onLongPress({stopPropagation(){}});example.props.onTouchEnd({stopPropagation(){}});example.props.onClick({stopPropagation(){}});
+ await page.runTimeouts();assert.match(page.text(page.render()),/nose/);assert.equal(played.length,0);assert.equal(page.calls.filter(c=>c.method==='PUT').length,1);
+ const word=page.all(page.render()).find(n=>n.type==='Text'&&page.text(n)==='nose');assert(word?.props.userSelect);assert(!page.all(page.render()).some(n=>n.type==='Button'&&page.text(n)==='nose'));page.dispose();
+});
+test('selection begun while an answer is saving also prevents its late acknowledgement from advancing',async()=>{
+ const gate=deferred(),{page}=await openQuiz({autoNext:true,answerWait:gate.promise});const saving=page.button('鼻子').onClick();await tick();
+ const example=page.all(page.render()).find(n=>n.type==='Text'&&page.text(n)==='Touch your nose.');example.props.onLongPress({stopPropagation(){}});
+ gate.resolve();await saving;page.render();await page.runTimeouts();assert.match(page.text(page.render()),/nose/);assert.equal(page.calls.filter(c=>c.method==='PUT').length,1);page.dispose();
 });
 test('answer navigation still saves the answer and stops pronunciation on the next word',async()=>{
  const {page,stopped}=await openQuiz();await page.button('鼻子').onClick();await tick();assert.equal(page.calls.filter(call=>call.method==='PUT').length,1);assert.equal(page.button('下一题').disabled,false);const before=stopped();await page.button('下一题').onClick();page.render();assert(stopped()>before);assert.match(page.text(page.render()),/book/);assert.doesNotMatch(page.text(page.render()),/中文意思是/);page.dispose();

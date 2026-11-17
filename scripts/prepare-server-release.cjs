@@ -21,7 +21,7 @@ const release=path.join(output,'release');
 fs.mkdirSync(release,{recursive:true,mode:0o700});
 const files=[
  'package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
- 'apps/api/package.json','apps/api/dist','apps/api/migrations','apps/api/data/hanzi-strokes','apps/admin',
+ 'apps/api/package.json','apps/api/dist','apps/api/migrations','apps/api/data/hanzi-strokes','apps/api/data/pinyin-font','apps/admin',
  'packages/ai/package.json','packages/ai/dist',
  'deliverables/0.1/database/001_schema.sql',
  'scripts/check-production-env.cjs','scripts/deletion-ledger.cjs','scripts/server-backup.cjs',

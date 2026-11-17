@@ -7,7 +7,7 @@ import {DevIdentity,FixtureDictionary} from '../src/providers.ts';
 import {CURATED,validateEncouragement} from '../src/checkin-share.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 test('share is scoped, historical, cached, anonymous and falls back safely',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/006_checkin_shares.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/006_checkin_shares.sql','utf8'));
  const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))};
  let calls=0,fail=false,actorToRevoke='';const payloads:any[]=[];
  const now=new Date(Date.now()+86400000),today=now.toISOString().slice(0,10),previous=(n:number)=>new Date(Date.parse(today)-n*86400000).toISOString().slice(0,10);

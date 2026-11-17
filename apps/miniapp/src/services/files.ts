@@ -2,7 +2,7 @@ import Taro from '@tarojs/taro';
 import {api,storage} from './api';
 const fs=()=>Taro.getFileSystemManager();
 type MaterialKind='camera'|'album'|'file';
-function chooseMaterial(kind:MaterialKind,purpose?:'poem'|'hanzi'){
+function chooseMaterial(kind:MaterialKind,purpose?:'poem'|'hanzi'|'sentence'){
  return new Promise<{tempFiles?:any[]}>((resolve,reject)=>{
   // Settle from native callbacks too: cancellation must not depend on the
   // returned Promise being forwarded by the picker on every WeChat version.
@@ -17,7 +17,7 @@ function chooseMaterial(kind:MaterialKind,purpose?:'poem'|'hanzi'){
   request?.then(resolve,reject);
  });
 }
-export async function selectImportMaterial(kind:MaterialKind,onSelected?:()=>void,purpose?:'poem'|'hanzi'){
+export async function selectImportMaterial(kind:MaterialKind,onSelected?:()=>void,purpose?:'poem'|'hanzi'|'sentence'){
  const token=storage.get('access_token'),selectedChild=storage.get('child_id'),family=storage.get('family_id');
  const checkScope=()=>{if(token!==storage.get('access_token')||selectedChild!==storage.get('child_id')||family!==storage.get('family_id'))throw Error('SESSION_CHANGED');};
  if(Taro.canIUse('requirePrivacyAuthorize'))await new Promise<void>((resolve,reject)=>Taro.requirePrivacyAuthorize({success:()=>resolve(),fail:()=>reject(Error('IMPORT_PRIVACY_REQUIRED'))}));
@@ -39,7 +39,7 @@ export async function selectImportMaterial(kind:MaterialKind,onSelected?:()=>voi
  checkScope();
  return {name,data};
 }
-export async function extractFile(child:string,kind:MaterialKind,existingText='',theme='',onSelected?:()=>void,purpose?:'poem'|'hanzi'){
+export async function extractFile(child:string,kind:MaterialKind,existingText='',theme='',onSelected?:()=>void,purpose?:'poem'|'hanzi'|'sentence'){
  const token=storage.get('access_token'),selectedChild=storage.get('child_id'),family=storage.get('family_id');
  const checkScope=()=>{if(token!==storage.get('access_token')||selectedChild!==storage.get('child_id')||family!==storage.get('family_id'))throw Error('SESSION_CHANGED');};
  const {name,data}=await selectImportMaterial(kind,onSelected,purpose);checkScope();
@@ -47,14 +47,12 @@ export async function extractFile(child:string,kind:MaterialKind,existingText=''
  const material=await api<{text:string;prepared_items?:any[];source:'image'|'file'}>(`/children/${child}/import-file`,'POST',{name,base64:data,existing_text:separateImage?'':existingText,theme,...(purpose?{purpose}:{})},undefined,name.toLowerCase().endsWith('.pdf')?300000:60000);
  checkScope();return separateImage?{...material,text:[existingText.trim(),material.text].filter(Boolean).join('\n'),prepared_items:undefined}:material;
 }
-export async function shareCsv(content:string){
- // A fixed private sandbox path avoids accumulating exports containing learning data.
- const path=`${Taro.env.USER_DATA_PATH}/wordmate-export.csv`;
- await new Promise<void>((resolve,reject)=>fs().writeFile({filePath:path,data:content,encoding:'utf8',success:()=>resolve(),fail:reject}));
- try{
-  if(!Taro.canIUse('shareFileMessage'))throw Error('EXPORT_WECHAT_UPDATE_REQUIRED');
-  await Taro.shareFileMessage({filePath:path,fileName:'单词本.csv'});
- }finally{try{fs().unlinkSync(path);}catch{}}
+const wordPdfPath=()=>`${Taro.env.USER_DATA_PATH}/wordmate-words.pdf`;
+export function clearWordPdf(){try{fs().unlinkSync(wordPdfPath());}catch{}}
+export async function shareWordPdf(base64:string){
+ const path=wordPdfPath();
+ try{await new Promise<void>((resolve,reject)=>fs().writeFile({filePath:path,data:base64,encoding:'base64',success:()=>resolve(),fail:reject}));}catch{clearWordPdf();throw Error('WORD_PDF_SAVE_FAILED');}
+ try{await Taro.openDocument({filePath:path,fileType:'pdf',showMenu:true});}catch{clearWordPdf();throw Error('WORD_PDF_OPEN_FAILED');}
 }
 export const isFileCancel=(e:any)=>/cancel/i.test(typeof e==='string'?e:e?.errMsg??e?.message??'');
 const copybookPath=()=>`${Taro.env.USER_DATA_PATH}/hanzi-copybook.pdf`;

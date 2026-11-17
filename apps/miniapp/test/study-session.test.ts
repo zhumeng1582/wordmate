@@ -25,7 +25,7 @@ function fixture(count=8,roundSize=count){
   }
   if(path.includes('/heartbeat')||path.endsWith('/end')){if(path.endsWith('/end')&&interceptEnd)await interceptEnd();const id=path.split('/')[2],session=sessions.get(id);if(!session||session.closed||session.expires<=clock)throw Error('SESSION_EXPIRED');if(path.endsWith('/end'))session.closed=true;else session.expires=clock+120000;return {...session};}
   if(path.includes('/cards?')){const session=sessions.get(path.split('/')[2]);if(session.closed||session.expires<=clock)throw Error('SESSION_EXPIRED');const items=cards.filter(card=>session.ids.includes(card.id)&&!accepted.includes(card.id)),cursor=Number(new URL(path,'https://test.invalid').searchParams.get('cursor')??0),page=items.filter(card=>card.ordinal>cursor).slice(0,100);return {items:page.map(card=>({...card})),total:session.total,remaining:items.length,next_cursor:page.length&&page.at(-1)!.ordinal<items.at(-1)!.ordinal?String(page.at(-1)!.ordinal):null};}
-  if(path==='/children/child/words?limit=100')return {items:words};
+  if(path.startsWith('/children/child/words?limit=100'))return {items:words};
   if(path.startsWith('/children/child/words/')){const word=words.find(word=>word.id===path.split('/').pop());if(!word)throw Error('WORD_NOT_FOUND');return word;}
   if(path==='/reviews'){
    const replay=events.get(body.event_id);if(replay){if(intercept)await intercept(body,replay,true);return replay;}
@@ -54,6 +54,17 @@ test('wrong-word practice keeps the first answer and makes no additional grading
 test('explicit pause releases the lease and resumes the same learning position',async()=>{
  const f=fixture(),study=f.make();await study.begin();study.learn(1);study.learn(1);study.learn(1);const expected=flow.studyCard(study.state.flow)!.id;assert.equal(await study.pause(),true);study.dispose();
  const resumed=f.make();await resumed.begin();assert.equal(resumed.state.flow.phase,'learn');assert.equal(flow.studyCard(resumed.state.flow)!.id,expected);const creates=f.calls.filter(call=>call.path.endsWith('/study-sessions'));assert.equal(creates[1].body.source,'manual');assert.equal(creates[1].body.word_ids.length,8);
+});
+test('pausing optional wrong-word practice restores its queue without grading a word twice',async()=>{
+ const f=fixture(3),study=f.make({source:'review'});await study.begin();
+ while(study.state.flow.phase==='test'){const card=flow.studyCard(study.state.flow)!;await study.answer(card.id==='card-0'?'不记得':card.meaning_zh);study.advance();}
+ study.practice();assert.equal(study.state.flow.phase,'practice');assert.equal(await study.pause(),true);study.dispose();
+ const resumed=f.make({source:'review'});await resumed.begin();assert.equal(resumed.state.flow.phase,'practice');assert.equal(flow.studyCard(resumed.state.flow)!.id,'card-0');
+ await resumed.answer(flow.studyCard(resumed.state.flow)!.meaning_zh);resumed.advance();assert.equal(resumed.state.flow.phase,'summary');assert.equal(resumed.state.flow.results['card-0'].correct,false);assert.equal(f.calls.filter(c=>c.path==='/reviews').length,3);
+});
+test('resuming after the final saved answer opens the summary without repeating that answer',async()=>{
+ const f=fixture(1),study=f.make({source:'review'});await study.begin();await study.answer(flow.studyCard(study.state.flow)!.meaning_zh);assert.equal(study.state.flow.phase,'test');
+ await study.pause();study.dispose();const resumed=f.make({source:'review'});await resumed.begin();assert.equal(resumed.state.flow.phase,'summary');assert.equal(flow.studyCounts(resumed.state.flow).done,1);assert.equal(f.calls.filter(c=>c.path==='/reviews').length,1);
 });
 test('leaving the page releases the session and keeps the learning position',async()=>{
  const f=fixture(),study=f.make();await study.begin();study.learn(1);const expected=flow.studyCard(study.state.flow)!.id;study.leave();await tick();await tick();assert(f.calls.some(call=>call.path.endsWith('/end')));assert.equal(f.storage.get(f.keys.resume).sessionClosed,true);const resumed=f.make();await resumed.begin();assert.equal(flow.studyCard(resumed.state.flow)!.id,expected);
@@ -85,6 +96,17 @@ test('a late acknowledgment from an exited view cannot erase a newer pending ans
 });
 test('changed study filters offer a deliberate resume choice instead of silently using another group',async()=>{
  const f=fixture(4),old=f.make({source:'manual',word_ids:['word-0','word-1']});await old.begin();await old.answer(flow.studyCard(old.state.flow)!.meaning_zh);old.advance();await old.pause();old.dispose();const next=f.make({source:'manual',word_ids:['word-2','word-3']},'start');await next.begin();assert(next.state.conflict);assert.equal(f.calls.filter(call=>call.path.endsWith('/study-sessions')).length,1);await next.continuePrevious();assert.equal(flow.studyCard(next.state.flow)!.child_word_id,'word-1');
+});
+test('changing from all books to the current book requires a choice and keeps the new scope through expiry',async()=>{
+ const f=fixture(4),old=f.make();await old.begin();await old.pause();old.dispose();
+ const next=f.make({source:'new_words',wordbook_id:'current-book'},'start');await next.begin();assert(next.state.conflict);assert.equal(f.calls.filter(call=>call.path.endsWith('/study-sessions')).length,1);
+ assert.equal(await next.replacePrevious(),true);assert.equal(next.state.flow.source.wordbook_id,'current-book');assert.equal(f.calls.filter(call=>call.path.endsWith('/study-sessions')).at(-1)!.body.wordbook_id,'current-book');assert(f.calls.some(call=>call.path==='/children/child/words?limit=100&wordbook_id=current-book'));
+ f.advanceClock(121000);await next.resume();assert.equal(next.state.flow.source.wordbook_id,'current-book');assert.equal(f.calls.filter(call=>call.path.includes('/words?')).at(-1)!.path,'/children/child/words?limit=100&wordbook_id=current-book');
+});
+test('legacy all-book sessions cannot be silently adopted as a selected-book session',async()=>{
+ const f=fixture(4),old=f.make();await old.begin();const session=old.state.flow.session;old.dispose();f.storage.remove(f.keys.resume);f.storage.set('active_review_session:token:child:new_words',session);
+ const next=f.make({source:'new_words',wordbook_id:'current-book'},'start');await next.begin();assert(next.state.conflict);assert.equal(next.state.flow.source.wordbook_id,undefined);assert.equal(f.calls.filter(call=>call.path.endsWith('/study-sessions')).length,1);
+ assert.equal(await next.replacePrevious(),true);assert.equal(f.calls.filter(call=>call.path.endsWith('/study-sessions')).at(-1)!.body.wordbook_id,'current-book');assert.equal(next.state.flow.source.wordbook_id,'current-book');
 });
 test('account changes prevent stale answers from restoring another account storage',async()=>{
  const f=fixture(3),study=f.make({source:'review'});await study.begin();f.switchAccount();assert.equal(await study.answer('释义0'),false);assert.equal(f.accepted.length,0);assert.equal(f.storage.get(f.keys.pending),'');

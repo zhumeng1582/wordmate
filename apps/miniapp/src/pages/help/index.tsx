@@ -19,19 +19,31 @@ export default function Help(){
    <View className='help-text'>未到复习时间的历史单词只作巩固，不改变复习计划；已到期的单词按本次作答更新计划。同一天重复复习同一个词，只计一次学习词数。</View>
   </View>
   <View className='card'>
+   <View className='help-heading'>英语常用句</View>
+   <View className='help-text'>从首页进入句子本，按录入顺序学习新句，按到期安排复习。学习页直接显示英文和中文，点击英文前的播放图标听音跟读；熟悉后进入下一句，不熟悉时选择“还需巩固”。</View>
+   <View className='help-text'>查看句子和听音不计进度，点击“下一句”“完成本轮”或“还需巩固”才保存进度。同一句每天只计一次；达到句子每日目标后自动打卡，与单词和汉字分别统计。</View>
+   <View className='help-text'>句子与单词共用英语口音、音色和自动播放设置，可在设置的“学习设置”中调整。句子列表的详情箭头可进入详情，查看完整中英文并收藏、标记掌握或编辑。</View>
+  </View>
+  <View className='card'>
+   <View className='help-heading'>统一录入与词本</View>
+   <View className='help-text'>录入学习内容和录入记录统一支持单词、句子、古诗及汉字。可输入文字、拍照或导入文件，AI 整理后先核对再保存；未完成的任务可在录入记录中继续处理。</View>
+   <View className='help-text'>录入句子时，有中文译文优先保留用户提供的译文，没有时由 AI 补充；系统会检查中英文是否对应，疑似误译会展示原因和建议，由用户核对确认。保存前会校验重复，同一句不同译文会提示冲突，不会静默覆盖。</View>
+   <View className='help-text'>词本管理与发现统一管理四类词本，支持共享与加入。加入共享词本后，个人学习进度独立，共享副本内容只读。首页显示可选择四类内容及排列顺序。</View>
+  </View>
+  <View className='card'>
    <View className='help-heading'>古诗词</View>
-   <View className='help-text'>从首页进入古诗词，手动录入或导入文件、图片，AI 整理后核对并保存。诗词可随时编辑、搜索或筛选，背熟后标记已背诵。</View>
+   <View className='help-text'>从首页进入古诗词，粘贴文字、拍照或选择文件，通过 AI 整理后核对并保存。诗词可随时编辑、搜索或筛选，掌握后可标记已掌握。</View>
    <View className='help-text'>在诗词详情可听普通话朗读或使用 AI 学童了解诗词；诗词背诵不计入单词目标、打卡或连续天数。</View>
   </View>
   <View className='card'>
    <View className='help-heading'>汉字学习</View>
    <View className='help-text'>从首页进入汉字库，可以手动录入、批量粘贴，或者拍照、选择图片和文件。文件在后台读取，可返回查看进度；材料中的汉字会列为候选，也可主动使用 AI 提取生字；AI 结果可能有遗漏，核对并排除不需要的字后保存。</View>
-   <View className='help-text'>汉字可编辑、搜索和筛选，也可以标记已学或重点字。详情编辑页可以使用 AI 补充空白拼音，核对后保存，多音字请结合组词核对。汉字和例句支持普通话朗读，多音字请结合拼音和例句核对；可通过 AI 学童用文字或语音提问。汉字学习不计入单词目标、打卡或连续天数。</View>
+   <View className='help-text'>汉字可编辑、搜索和筛选，也可以标记已掌握或重点字。详情编辑页可以使用 AI 补充空白拼音，核对后保存，多音字请结合组词核对。汉字和例句支持普通话朗读，多音字请结合拼音和例句核对；可通过 AI 学童用文字或语音提问。汉字学习不计入单词目标、打卡或连续天数。</View>
   </View>
   <View className='card'>
    <View className='help-heading'>打卡与分享</View>
-   <View className='help-text'>完成当天单词学习目标后自动打卡，在首页查看连续天数、分享打卡。补卡入口会在有可用机会时显示。</View>
-   <View className='help-text'>连续实际达标 15 天可获得 1 次补卡机会；补卡只恢复连续记录，不增加学习词数，也不用于重复领取奖励。</View>
+   <View className='help-text'>单词、句子和汉字达到各自每日目标后分别自动打卡，在首页查看进度与连续天数；单词支持分享打卡。补卡请前往设置里的“打卡与补卡”，在日历中选择过去漏打卡的日期；今天和未来不能补卡。</View>
+   <View className='help-text'>单词、句子和汉字的补卡机会分别计算，各自连续实际达标 15 天可获得 1 次补卡机会；补卡只补记漏卡日期，不增加学习数量，也不用于重复领取奖励。</View>
   </View>
  </View>;
 }

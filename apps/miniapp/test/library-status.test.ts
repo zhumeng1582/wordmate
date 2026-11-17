@@ -1,0 +1,20 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {pageHarness,tick,selectLibraryMenu} from './page-harness.ts';
+import {libraryStatus,libraryStatusLabels,libraryFilterOptions} from '../src/services/library-status.ts';
+for(const kind of ['words','hanzi','poems'] as const)test(`${kind} exposes exactly one effective status and archives take priority over learning history`,async()=>{
+ const archived={id:'archived',lemma:'cat',character:'春',title:'春晓',learning_status:'learned',learned_at:'2026-11-10',memorized_at:'2026-11-10',library_archived_at:'2026-11-11',version:1};
+ assert.equal(libraryStatus(archived,kind),'archived');assert.equal(libraryStatus({...archived,library_archived_at:null},kind),'learned');
+ const read=async(path:string)=>path.endsWith('/wordbooks')||path.endsWith('/hanzi-books')?{items:[{id:'book-a',name:'本'}]}:path.endsWith('/ai-batches')?{items:[]}:{items:[archived],total:0,book_total:0,learned_count:0,matched_total:1,next_cursor:null,next_offset:null};
+ const page=pageHarness(`pages/${kind}/index`,read);await page.show();const labels=page.all(page.render()).filter(n=>n.props?.className==='library-item-title');assert.equal(labels.length,1);assert.match(labels[0].props['aria-label'],/已掌握$/);page.dispose();
+});
+for(const kind of ['words','hanzi'] as const)test(`${kind} status filter selects a single state and keeps it when returning`,async()=>{
+ const page=pageHarness(`pages/${kind}/index`,async path=>path.endsWith('/wordbooks')||path.endsWith('/hanzi-books')?{items:[{id:'book-a',name:'本'}]}:{items:[],total:0,book_total:0,learned_count:0,next_cursor:null});await page.show();
+ for(const status of libraryFilterOptions){const current=page.all(page.render()).find(n=>n.props?.className==='library-overview-scope');await selectLibraryMenu(page,'列表工具',`筛选：${page.text(current)}`,libraryStatusLabels[status]);await tick();assert(page.requests.some(p=>p.includes('status='+status)));assert.equal(page.text(page.all(page.render()).find(n=>n.props?.className==='library-overview-scope')),libraryStatusLabels[status]);page.hide();await page.show();assert(page.requests.some(p=>p.includes('status='+status)));}page.dispose();
+});
+test('whole-wordbook export in a learned filter sends that same state to the server',async()=>{
+ const page=pageHarness('pages/words/index',async(path,method)=>path.endsWith('/wordbooks')?{items:[{id:'book-a',name:'本'}]}:path.endsWith('/ai-batches')?{items:[]}:method==='POST'?{base64:'JVBERi0xLjQ='}:{items:[{id:'w',lemma:'cat',version:1,learning_status:'learned'}],total:1,book_total:10,learned_count:1,next_cursor:null});await page.show();await selectLibraryMenu(page,'列表工具','筛选：全部','已学');await tick();await selectLibraryMenu(page,'列表工具','选择导出');page.button('全选当前状态').onClick();page.button('导出 PDF').onClick();await tick();const call=page.calls.find(c=>c.path.endsWith('/word-exports'));assert.equal(call?.body.status,'learned');assert.equal(call?.body.all,true);page.dispose();
+});
+test('archived poem and character details block learning-state changes until restored',async()=>{
+ for(const kind of ['hanzi','poems']){const item={id:'p',character:'春',title:'春晓',body:'春眠不觉晓',version:1,learned_at:'2026-11-10',memorized_at:'2026-11-10',library_archived_at:'2026-11-11'};const page=pageHarness(kind==='hanzi'?'pages/hanzi-detail/index':'pages/poems/index',async()=>item,undefined,{query:{id:'p'},props:kind==='poems'?{detailId:'p'}:undefined,actionSheetError:'showActionSheet:fail cancel'});await page.show();if(kind==='hanzi'){assert(!page.all(page.render()).some(n=>n.type==='Button'&&/改为未学|开始学习/.test(page.text(n))));}else{const status=page.all(page.render()).find(n=>n.props?.['aria-label']==='学习状态：已掌握');assert(status);assert.equal(status.type,'View');page.button('标记诗词').onClick();await tick();assert.equal(page.actionSheets.length,0);assert(page.button('恢复学习'));assert(!page.all(page.render()).some(n=>n.type==='Button'&&/改为未学|开始学习/.test(page.text(n))));}await tick();assert(!page.calls.some(c=>c.method==='PUT'));page.dispose();}
+});

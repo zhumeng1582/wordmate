@@ -1,1 +1,1 @@
-export default definePageConfig({navigationBarTitleText:'汉字录入进度'});
+export default definePageConfig({navigationBarTitleText:'录入记录'});

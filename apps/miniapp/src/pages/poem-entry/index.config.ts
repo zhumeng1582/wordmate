@@ -1,1 +1,1 @@
-export default definePageConfig({navigationBarTitleText:'录入诗词'});
+export default definePageConfig({navigationBarTitleText:'录入古诗'});

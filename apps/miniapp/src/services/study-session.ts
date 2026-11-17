@@ -39,10 +39,13 @@ export class StudySessionController{
   const scope=`${this.deps.token}:${this.deps.child}`,source=this.deps.source.source,activeKey=`active_review_session:${scope}:${source}`,pendingKey=`review_pending:${scope}:${source}`;
   const session=this.deps.storage.get(activeKey),pending=this.deps.storage.get(pendingKey);
   if(!this.state.pending&&pending?.event_id)this.emit({pending:{body:pending,legacyKey:pendingKey}});
-  if(!this.state.flow&&['new_words','review','scheduled'].includes(source)&&session?.child_id===this.deps.child){this.write({...emptyStudy(this.deps.source,this.now()),session,total:session.total??0});this.deps.storage.remove(activeKey);}
+  if(!this.state.flow&&['new_words','review','scheduled'].includes(source)&&session?.child_id===this.deps.child){
+   const legacySource:StudySource={source:source as 'new_words'|'review'|'scheduled',...(session.wordbook_id?{wordbook_id:session.wordbook_id}:{})};
+   this.write({...emptyStudy(legacySource,this.now()),session,total:session.total??0});this.deps.storage.remove(activeKey);
+  }
  }
  begin(){return this.run(async()=>{
-  const previous=this.stored();this.emit({flow:previous,pending:this.deps.storage.get(this.keys.pending)||null});this.legacy();
+  this.emit({flow:this.stored(),pending:this.deps.storage.get(this.keys.pending)||null});this.legacy();const previous=this.state.flow;
   if(previous&&!studyComplete(previous)&&(sourceIdentity(previous.source)!==sourceIdentity(this.deps.source)||(previous.mode??'review')!==(this.deps.mode??'review'))){this.emit({conflict:previous});return;}
   if(previous&&studyComplete(previous)&&(this.deps.intent!=='resume'||sourceIdentity(previous.source)!==sourceIdentity(this.deps.source))&&!this.state.pending){await this.close(previous);this.assertFlowUnchanged(previous);this.assertNoPending();this.deps.storage.remove(this.keys.resume);this.emit({flow:null});}
   await this.open();
@@ -54,7 +57,7 @@ export class StudySessionController{
  private async open(){
   if(this.state.pending)await this.flush();
   let previous=this.state.flow??{...emptyStudy(this.deps.source,this.now()),mode:this.deps.mode??'review'};
-  if(studyComplete(previous)){this.emit({flow:previous,notice:''});return;}
+  if(studyComplete(previous)){if(previous.phase==='test')previous=this.write({...previous,phase:'summary'});this.emit({flow:previous,notice:''});return;}
   const remaining=previous.cards.filter(card=>!previous.results[card.id]?.saved).map(card=>card.child_word_id);
   const createSource:StudySource=previous.loaded&&remaining.length?{source:'manual',word_ids:remaining}:previous.source;
   const session=await enterReview({
@@ -67,7 +70,8 @@ export class StudySessionController{
    },
    save:saved=>{const latest=this.stored();if(latest&&latest.session?.id===saved.id&&sourceIdentity(latest.source)===sourceIdentity(previous.source))previous=latest;else if(!this.alive&&latest?.session)return;previous={...previous,session:saved,sessionClosed:false};this.write(previous);}
   });
-  const [response,words]=await Promise.all([this.loadCards(session.id),this.deps.api(`/children/${this.deps.child}/words?limit=100`)]);
+  const book='wordbook_id' in previous.source?previous.source.wordbook_id:undefined;
+  const [response,words]=await Promise.all([this.loadCards(session.id),this.deps.api(`/children/${this.deps.child}/words?limit=100${book?`&wordbook_id=${encodeURIComponent(book)}`:''}`)]);
   if(!this.deps.isCurrent())throw Error('SESSION_CHANGED');if(!this.alive||!this.visible)return;
   const latest=this.stored();if(latest&&latest.session?.id===session.id&&sourceIdentity(latest.source)===sourceIdentity(previous.source))previous=latest;else if(latest?.session?.id&&latest.session.id!==session.id)return;
   const known=new Map<string,any>(words.items.map((word:any)=>[word.id,word]));

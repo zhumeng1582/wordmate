@@ -1,3 +1,4 @@
+import {shortPos} from './word-pos.ts';
 // Accept one English headword, including ordinary contractions and hyphenated forms.
 export const isSingleWord=(value:unknown):boolean=>typeof value==='string'&&/^[A-Za-z]+(?:[.'’\-][A-Za-z]+)*\.?$/.test(value.trim());
 import type {Sql,Row} from './ports.ts';
@@ -39,7 +40,7 @@ export function mergeWordSenses(existing:WordSense[],incoming:WordSense[]):WordS
   const pos=sense.part_of_speech.trim(),meaning=sense.meaning_zh.trim();if(!pos||!meaning)throw Error('INVALID_WORD_SENSES');
   const newTerms=terms(meaning);let merged=false;
   for(const old of result){
-   const samePos=norm(old.part_of_speech)===norm(pos),generic=old.part_of_speech==='教材'||pos==='教材';
+   const samePos=norm(shortPos(old.part_of_speech))===norm(shortPos(pos)),generic=old.part_of_speech==='教材'||pos==='教材';
    if(!samePos&&!generic)continue;
    const oldTerms=terms(old.meaning_zh);
    const newCovered=newTerms.length>0&&newTerms.every(t=>oldTerms.includes(t));

@@ -23,3 +23,5 @@
 .preview-example{display:flex;align-items:flex-start;gap:12px}.preview-example .muted{flex:1;min-width:0}
 
 .discover-modal-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.discover-modal-heading .discover-title{flex:1;min-width:0}.discover-modal .discover-close{flex:none;width:auto;margin:0;padding:4px 8px}
+
+.discover-kind-scope{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0;color:var(--muted);font-size:25px}.discover-kind-scope .text-action{margin:0;min-height:72px}

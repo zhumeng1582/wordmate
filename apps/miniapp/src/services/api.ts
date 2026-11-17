@@ -1,8 +1,11 @@
+import {suspendAccount,establishAccount} from './session-storage';
+import {libraryPageRoute} from './library-navigation';
 import {finishPrivacyAuthorization} from './privacy-authorization';
 import {validPendingReferral} from './referral';
 import Taro from '@tarojs/taro';
+const authenticationPath=DEV_AUTH?'/auth/dev':'/auth/wechat';
 let sessionEpoch=0;
-export const storage={get:(key:string)=>Taro.getStorageSync(key),set:(key:string,value:any)=>{if(key==='access_token')sessionEpoch++;Taro.setStorageSync(key,value);}};
+export const storage={get:(key:string)=>Taro.getStorageSync(key),set:(key:string,value:any)=>{if(key==='access_token')sessionEpoch++;Taro.setStorageSync(key,value);},remove:(key:string)=>{if(key==='access_token')sessionEpoch++;Taro.removeStorageSync(key);},keys:()=>Taro.getStorageInfoSync().keys,clear:()=>clearAccountStorage()};
 export const clearAccountStorage=()=>{sessionEpoch++;finishPrivacyAuthorization(false);Taro.clearStorageSync();};
 let privacyNavigation=false;
 function platformFailureCode(error:unknown,stage:'request'|'login'='request'){
@@ -28,7 +31,7 @@ export async function api<T=any>(path:string,method:'GET'|'POST'|'PUT'|'PATCH'|'
   if(pendingKey){key=storage.get(pendingKey)||key;storage.set(pendingKey,key);}
   const response=await Taro.request<any>({url:API_BASE+path,method,data,timeout,header:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`} :{}),...(key?{'Idempotency-Key':key}:{})}}).catch(error=>{throw Error(platformFailureCode(error));});
   if(epoch!==sessionEpoch||storage.get('access_token')!==token)throw Error('SESSION_CHANGED');
-  if(response.statusCode>=400){if(response.statusCode===401)clearAccountStorage();if(pendingKey&&response.statusCode<500)Taro.removeStorageSync(pendingKey);const code=response.data?.error?.code??'请求失败';if(['PRIVACY_CONSENT_REQUIRED','MANAGEMENT_SESSION_ONLY'].includes(code)&&!privacyNavigation&&Taro.getCurrentPages().slice(-1)[0]?.route!=='pages/login/index'){privacyNavigation=true;void openLogin().catch(()=>{}).finally(()=>{privacyNavigation=false;});}throw Object.assign(Error(code),{status:response.statusCode});}if(pendingKey)Taro.removeStorageSync(pendingKey);return response.data.data;
+  if(response.statusCode>=400){if(response.statusCode===401&&token&&path!==authenticationPath){suspendAccount(storage);finishPrivacyAuthorization(false);}if(pendingKey&&response.statusCode<500&&response.statusCode!==401)Taro.removeStorageSync(pendingKey);const code=response.data?.error?.code??'请求失败';if(['PRIVACY_CONSENT_REQUIRED','MANAGEMENT_SESSION_ONLY'].includes(code)&&!privacyNavigation&&Taro.getCurrentPages().slice(-1)[0]?.route!=='pages/login/index'){privacyNavigation=true;void openLogin().catch(()=>{}).finally(()=>{privacyNavigation=false;});}throw Object.assign(Error(code),{status:response.statusCode});}if(pendingKey)Taro.removeStorageSync(pendingKey);if(path==='/me'&&response.data.data?.user?.id&&token)storage.set('account_user_id',response.data.data.user.id);return response.data.data;
 }
 export const openLogin=(identity='dev-dad',inviteFlow?:string)=>{const params=[...(DEV_AUTH?[`identity=${encodeURIComponent(identity)}`]:[]),...(inviteFlow?[`intent=join-family`,`flow=${encodeURIComponent(inviteFlow)}`]:[])];return Taro.navigateTo({url:`/pages/login/index${params.length?'?'+params.join('&'):''}`});};
 export async function login(identity='dev-dad'){
@@ -38,19 +41,19 @@ export async function login(identity='dev-dad'){
   const code=DEV_AUTH?identity:await wechatLoginCode();
   const inviteCode=validPendingReferral(storage.get('pending_referral_code'));
   if(!inviteCode)Taro.removeStorageSync('pending_referral_code');
-  const data=await api(DEV_AUTH?'/auth/dev':'/auth/wechat','POST',{code,...(inviteCode?{invite_code:inviteCode}:{})});
-  clearAccountStorage();
-  storage.set('access_token',data.access_token);storage.set('families',data.families);
+  const data=await api(authenticationPath,'POST',{code,...(inviteCode?{invite_code:inviteCode}:{})});
+  establishAccount(storage,data.user?.id??'',data.access_token,data.families);
   if(data.is_new_user&&data.user&&!data.user.avatar_path)storage.set('registration_avatar_pending',data.user);
-  Taro.removeStorageSync('child_id');Taro.removeStorageSync('review_pending');Taro.removeStorageSync('active_review_session');Taro.removeStorageSync('review_source');await api('/me/privacy-consent','PUT',{policy_version:policy.version,policy_hash:policy.hash,guardian_confirmed:true});return data;
+  await api('/me/privacy-consent','PUT',{policy_version:policy.version,policy_hash:policy.hash,guardian_confirmed:true});return data;
 }
 export async function loginForDataManagement(identity='dev-dad'){
  const code=DEV_AUTH?identity:await wechatLoginCode();
- const data=await api(DEV_AUTH?'/auth/dev':'/auth/wechat','POST',{code,management_only:true});
- clearAccountStorage();storage.set('access_token',data.access_token);storage.set('families',data.families);return data;
+ const data=await api(authenticationPath,'POST',{code,management_only:true});
+ establishAccount(storage,data.user?.id??'',data.access_token,data.families);return data;
 }
-export const go=(page:string)=>Taro.navigateTo({url:`/pages/${page}/index`});
+export const go=(page:string)=>Taro.navigateTo({url:libraryPageRoute(page)});
 const errorMessages:Record<string,string>={
+ INVALID_CHILD_PROFILE:'请填写有效的孩子昵称和年级。',
  TUTOR_IMAGE_NOT_CONFIGURED:'图片生成尚未配置，请先使用文字提问。',TUTOR_IMAGE_PRICE_NOT_CONFIGURED:'图片生成价格尚未配置。',TUTOR_IMAGE_DAILY_LIMIT:'今天生成图片的次数已用完。',TUTOR_IMAGE_STORAGE_LIMIT:'图片已达到保存上限，请先删除不需要的聊天记录。',
  SEARCH_NOT_CONFIGURED:'联网搜索尚未配置，请先使用普通提问。',SEARCH_PRICE_NOT_CONFIGURED:'联网搜索价格尚未配置，请先使用普通提问。',SEARCH_FAILED:'联网搜索未完成，请重试。',SEARCH_DAILY_LIMIT:'今天的联网搜索次数已用完。',
  TUTOR_AUDIO_TOO_LONG:'讲解太长，暂时无法朗读。',TUTOR_AUDIO_GENERATING:'音频正在生成，请稍后再试。',TUTOR_AUDIO_FAILED:'讲解朗读暂时不可用，请重试。',
@@ -78,7 +81,7 @@ const errorMessages:Record<string,string>={
   PDF_TOO_LARGE:'PDF 内容过大，请拆分后重试。',
   POEM_NOT_FOUND:'诗词已删除，请返回列表刷新。',
   POEM_DUPLICATE:'诗词库中已有相同的诗词，请直接查看或编辑已有记录。',
-  HANZI_CHANGED:'汉字已被修改，请重新打开。',HANZI_EXISTS:'这个汉字已在字库中。',HANZI_NOT_FOUND:'汉字不存在或已删除。',INVALID_HANZI:'请输入一个汉字。',
+  HANZI_CHANGED:'汉字已被修改，请重新打开。',HANZI_EXISTS:'这个汉字已在字库中。',HANZI_NOT_FOUND:'汉字不存在或已删除。',HANZI_UNAVAILABLE:'部分汉字已掌握或不在当前字本，请刷新后重新选择。',INVALID_HANZI:'请输入一个汉字。',INSUFFICIENT_PINYIN_OPTIONS:'本月需要至少四种不同的单一拼音才能出题，请先补充或学习汉字。',
   POEM_CHANGED:'诗词已被修改，请返回后重新打开。',
   TUTOR_GENERATING:'讲解正在生成，请稍候。',
   TUTOR_RETRY_NEW_REQUEST:'上次讲解未完成，请再次点击重试。',
@@ -92,6 +95,19 @@ const errorMessages:Record<string,string>={
   STUDY_NOT_FINISHED:'还有单词未完成，请继续本组学习。',
   STUDY_SESSION_CHANGED:'学习进度已在其他页面更新，请返回后继续。',
   WORD_NOT_FOUND:'这个单词已移除，请重新加载剩余内容。',
+  HANZI_LEARNING_FLOW_REQUIRED:'请从首页学习新字，学习状态会在测试作答后自动记录。',
+  LIBRARY_ITEM_ARCHIVED:'请先取消掌握，再调整学习状态。',
+  EMPTY_SENTENCE_QUEUE:'当前没有可学习的句子，可以录入新句子或按日期复习。',
+  SENTENCE_SESSION_BUSY:'另一位家长正在进行句子学习，请稍后再试。',
+  SENTENCE_CHECK_REQUIRED:'请先校验中英文对应关系，再核对保存。旧任务可使用“重新校验当前内容”。',
+  SENTENCE_REVIEW_REQUIRED:'请先核对有疑问或已修改的译文，再确认保存。',
+  SENTENCE_TRANSLATION_CONFLICT:'译文与句子本里已有的内容不同，请先在句子本中核对修改，学习进度会保留。',
+  SENTENCE_CHANGED:'句子内容已更新，请结束本轮后重新开始，已保存进度会保留。',
+  SENTENCE_NOT_REVEALED:'请先查看答案，再反馈记忆情况。',
+  SENTENCE_DUPLICATE:'这个句子已存在，请直接使用已有句子。',
+  SENTENCE_BOOK_NOT_FOUND:'句子本已移除，请重新选择。',
+  INVALID_SENTENCE:'请填写完整的英文句子和对应的中文意思。',
+  IMPORT_EXPIRED:'临时材料已过期，请重新录入。',
   EMPTY_NEW_QUEUE:'新词已经学完了，可以添加新单词或按日期复习。',
   SESSION_NOT_FOUND:'上次学习已结束，已保存的进度会保留。',
   SESSION_NOT_OWNED:'这组学习由另一位家长开始，请返回后重新选择。',
@@ -138,12 +154,13 @@ const errorMessages:Record<string,string>={
   WORDBOOK_NOT_FOUND:'这个词本已不可用，请刷新词本列表。',
   PUBLIC_SHARING_DISABLED:'首发暂不提供公开词本的发布、发现和加入。',
   SHARED_WORDBOOK_READ_ONLY:'共享词本只能学习和导出，不能编辑。',
+  HANZI_BOOK_NOT_FOUND:'该汉字本已删除或不属于当前孩子，请重新选择。',
   OWN_SHARED_WORDBOOK:'不能加入自己发布的共享词本。',
   SHARE_NOT_FOUND:'共享设置不存在，请刷新后重试。',
   SHARE_OWNER_REQUIRED:'只有发布者可以修改或停止共享。',
-  EMPTY_WORDBOOK:'词本还是空的，添加单词后再发布共享。',
+  EMPTY_WORDBOOK:'词本还是空的，录入内容后再发布共享。',
   SHARED_WORDBOOK_TOO_LARGE:'词本最多共享 3000 个单词，请拆分后发布。',
-  SHARED_WORDBOOK_SIZE_INVALID:'请先添加单词；每个共享词本最多 8000 个单词。',
+  SHARED_WORDBOOK_SIZE_INVALID:'请先录入内容；每个共享词本最多 8000 条。',
   SHARED_WORDBOOK_NOT_FOUND:'这个共享词本已停止共享或删除。',
   SHARED_WORDBOOK_INCOMPLETE:'共享词本内容不完整，请联系发布者重新发布。',
   NOT_SHARED_WORDBOOK:'这不是已加入的共享词本。',
@@ -151,6 +168,8 @@ const errorMessages:Record<string,string>={
   EXPORT_SELECTION_CHANGED:'选中的单词已变化，请刷新列表后重新选择。',
   EXPORT_EMPTY:'没有可导出的单词。',
   EXPORT_TOO_LARGE:'单次最多导出 10000 个单词，请分批勾选。',
+  WORD_PDF_SAVE_FAILED:'PDF 已生成，但保存到手机失败，请检查存储空间后重试。',
+  WORD_PDF_OPEN_FAILED:'微信无法打开 PDF，请重试或更新微信。',
   COPYBOOK_SAVE_FAILED:'字帖已生成，但保存到手机失败，请检查手机存储空间后重试。',
   COPYBOOK_OPEN_FAILED:'字帖已生成，但微信无法打开 PDF，请重试或更新微信。',
   EXPORT_WECHAT_UPDATE_REQUIRED:'当前微信不支持文件分享，请升级微信后重试。',
@@ -179,7 +198,7 @@ const errorMessages:Record<string,string>={
   AUDIO_NOT_RETRYABLE:'此音频当前无法重试，请刷新状态。',
 
   INVITE_NOT_FOUND:'邀请不存在，请向邀请人索取新卡片或口令。',
-  INVITE_UNAVAILABLE:'邀请已过期或已被领取，请向邀请人索取新邀请。',
+  INVITE_UNAVAILABLE:'邀请已失效或申请状态已变化，请刷新后重试。',
   ALREADY_MEMBER:'你已是该家庭成员，无需再次加入。',
   NO_WORDS_FOUND:'未识别到可学习的词汇，请编辑输入内容后重新提交。',
   TOO_MANY_WORDS:'一次最多添加 8000 个词。请按每行一个单词或短语整理，已有保存结果会保留。',
@@ -189,7 +208,7 @@ const errorMessages:Record<string,string>={
   INVALID_RAW_TEXT:'输入含不支持的控制字符，请粘贴纯文本后重试。',
   INVALID_INPUT_TYPE:'请先提取图片或文件中的文字，再生成单词。',
   GENERATION_NOT_EDITABLE:'任务状态已变化、已有保存结果或已达到尝试上限，请刷新记录。',
-  DUPLICATE_GENERATION:'相同内容已有生成记录，请查看已有任务或修改输入。',
+  DUPLICATE_GENERATION:'相同内容已有录入记录，请查看已有任务或修改输入。',
   AI_DAILY_LIMIT:'已达到最近 24 小时的 AI 调用额度，请稍后再试。',
 
   INPUT_REENTRY_REQUIRED:'旧任务未正确拆分单词，请重新编辑输入后提交，不要重试旧任务。',
@@ -209,10 +228,10 @@ const errorMessages:Record<string,string>={
   GENERATION_ATTEMPTS_EXHAUSTED:'任务已达到尝试上限。',
   DUPLICATE_WORDS:'输入中有重复单词，请合并后重试。',
 
-  EMPTY_REVIEW_QUEUE:'这个范围没有可练习的单词，可能已归档或暂无到期词。',
-  EMPTY_HISTORY_QUEUE:'所选日期没有可复习的单词，已归档或暂停的单词不会加入复习。',
+  EMPTY_REVIEW_QUEUE:'这个范围没有可练习的单词，可能已掌握或暂无到期词。',
+  EMPTY_HISTORY_QUEUE:'所选日期没有可复习的单词，已掌握或暂停的单词不会加入复习。',
   NEW_WORD_LIMIT:'学习状态已更新，请返回首页刷新后继续。',
-  WORD_UNAVAILABLE:'选中的单词已归档或不可复习，请返回刷新错题集。',
+  WORD_UNAVAILABLE:'选中的单词已掌握或不可复习，请返回刷新错题集。',
   INVALID_DATE:'日期无效，请重新选择。',
   INVALID_MONTH:'月份无效，请选择当前或过去的月份。',
   ROUTE_NOT_IMPLEMENTED:'服务暂时不可用，请稍后再试。',
@@ -227,7 +246,7 @@ const errorMessages:Record<string,string>={
   ANSWER_VERSION_CONFLICT:'本题答案已更新，请刷新后继续。',
   CONFIRM_UNANSWERED:'还有未答题，请确认后交卷。',
   RESUME_QUIZ_FIRST:'请先继续测验，再选择放弃。',
-  UNAUTHENTICATED:'登录已失效，请重新登录。',
+  UNAUTHENTICATED:'登录已过期，请重新登录，已保存的学习记录会保留。',
   FAMILY_NOT_FOUND:'暂无该家庭的访问权限，请刷新家庭列表。',
   CHILD_BUSY:'孩子正在其他复习会话中，请结束该会话或稍后重试。',
   SESSION_EXPIRED:'离开时间较久，请继续剩余内容，已保存的学习记录会保留。',

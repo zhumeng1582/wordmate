@@ -34,6 +34,16 @@ export async function connect(url:string,options:{initializeLocal?:boolean}={}):
     await pg.exec(readFileSync(resolve(__dirname,'../migrations/034_poems.sql'),'utf8'));
     await pg.exec(readFileSync(resolve(__dirname,'../migrations/035_poem_fields.sql'),'utf8'));
     await pg.exec(readFileSync(resolve(__dirname,'../migrations/036_poem_import_ai.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/037_poem_import_jobs.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/038_poem_import_page_progress.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/039_poem_chat_audio.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/040_hanzi.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/041_hanzi_order.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/042_word_sense_lengths.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/043_library_archive.sql'),'utf8'));await pg.exec(readFileSync(resolve(__dirname,'../migrations/044_library_checkins.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/045_hanzi_learning.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/046_hanzi_review_cards.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/047_hanzi_monthly_quizzes.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/048_hanzi_quiz_lease.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/049_hanzi_makeup.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/050_hanzi_books.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/051_hanzi_study_sessions.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/052_learning_assistant.sql'),'utf8'));
+    await pg.exec(readFileSync(resolve(__dirname,'../migrations/053_tutor_suggestions.sql'),'utf8'));
+    for(const name of ['054_poem_books.sql','055_import_records.sql','056_import_order.sql','057_sentence_learning.sql','058_word_pos_abbreviations.sql','059_prepend_library_imports.sql','060_library_favorites.sql'])await pg.exec(readFileSync(resolve(__dirname,'../migrations',name),'utf8'));
     }}catch(error){await pg.close();throw error;}
     const db:Database={query:async(s,p)=>({rows:(await pg.query(s,p)).rows as any}),transaction:fn=>pg.transaction(tx=>fn({query:async(s,p)=>({rows:(await tx.query(s,p)).rows as any})}))};
     return {db,source:{destroy:()=>pg.close()}};

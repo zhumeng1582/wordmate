@@ -1,0 +1,16 @@
+统一图标（2026-11-12）
+
+全局采用24单位网格、1.8单位圆角线条的同一套图标，默认40px，紧凑32px，工具栏48px（设计稿单位）。首页搜索和设置、单词/汉字列表筛选与更多、全局箭头、发音、收藏、例句复制、搜索清空和设置入口已接入Icon组件。
+收藏/重点选中使用实心星与主色，未选中使用描边；发音保留播放呼吸和加载圈，系统减少动态效果时停止动画。深色模式自动替换对应配色；图标只作装饰，按钮继续使用中文无障碍名称，复杂功能保留文字说明。
+主要图标按钮的触控区域统一放大，窄屏单词行将文字和发音放左侧、收藏与展开固定在右侧；长筛选摘要不撑开工具栏。
+
+为兼容微信小程序，使用由本地矢量定义生成的3倍高清PNG，作为内嵌WXSS背景。无需图标字体、外部CDN或图像运行时依赖；通过索引透明度压缩控制包体，不新增独立媒体文件。不要直接修改生成的Icon.css。
+图标名称与矢量定义：scripts/icon-sources.cjs；统一渲染组件：apps/miniapp/src/components/Icon.tsx。
+生成步骤（开发电脑需要macOS WebKit/Swift；小程序运行无此依赖）：
+  node scripts/build-icons.cjs prepare
+  swift scripts/render-icons.swift .local/icon-build/icons.html .local/icon-build/icons.json
+  node scripts/build-icons.cjs build
+颜色对应app.css中的muted、primary、on-primary，修改主题颜色后同步生成器配色并重建。
+
+检查：447项小程序测试、类型检查、51页正式构建及主包/媒体限额检查通过。375px/320px与浅深色预览见.local/icon-preview/；对照编译前后126份图像数据一致。已避开Text内嵌View，以保持微信原生文本容器兼容。
+仅前端变更，不需要发布后端；上传apps/miniapp/dist新版小程序后生效。未进行微信真机验收。

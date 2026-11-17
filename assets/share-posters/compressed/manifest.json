@@ -1,0 +1,105 @@
+{
+  "version": "compressed-v1",
+  "files": [
+    {
+      "file": "01-lake.webp",
+      "bytes": 90890,
+      "sha256": "4d5744a9d5d817f0e9778b35cd89a8e29684f44f1b869b51e2f3377222e866b2"
+    },
+    {
+      "file": "01-lake.jpg",
+      "bytes": 298532,
+      "sha256": "6f48d66ec4aa5872ddbdc02a9425823ee8d1b1b3f833471ed15e7a64e7dbb2b9"
+    },
+    {
+      "file": "02-ocean-sunrise.webp",
+      "bytes": 105508,
+      "sha256": "0d5d7eadeb9d3b2795abf26e8ef15570aaf9179870ca0068530b3ca764bd43f4"
+    },
+    {
+      "file": "02-ocean-sunrise.jpg",
+      "bytes": 326731,
+      "sha256": "1995f5ff170d5da33aa0ac705eb04ea4970ef49fcbb2402bec68d906806fd653"
+    },
+    {
+      "file": "03-cloud-sky.webp",
+      "bytes": 72794,
+      "sha256": "fed9c3d72b564b8da15059f5a2820f3da13bf28186c195808475b09f704f3ae2"
+    },
+    {
+      "file": "03-cloud-sky.jpg",
+      "bytes": 257724,
+      "sha256": "8714240830692c7b648504fd81d0c7794b05868d6c3e387c5e404056c9d03640"
+    },
+    {
+      "file": "04-desert.webp",
+      "bytes": 54798,
+      "sha256": "0ea6e39e2ccb4ac99524c04c3151efd6edc7231f61c79878bf9697e959ff39a9"
+    },
+    {
+      "file": "04-desert.jpg",
+      "bytes": 221215,
+      "sha256": "07687fd0ba0e6b59f3f46154d53628f2b321f377458e8a245236c9353f388d62"
+    },
+    {
+      "file": "05-deep-sea.webp",
+      "bytes": 81910,
+      "sha256": "8fa8b7c4bbdbc52bdbc349ae03bd44ecc040453e8d3b1d47f88529526b57c322"
+    },
+    {
+      "file": "05-deep-sea.jpg",
+      "bytes": 261346,
+      "sha256": "c3082a198bdbe4b58470b0319d69996aa253d93bf434c3a22561f5fb0a29b38f"
+    },
+    {
+      "file": "06-forest-path.webp",
+      "bytes": 208784,
+      "sha256": "04d04aa017ee67a43ba786ac6b53a21563ae8166c2690f02347ca7a46eca22e0"
+    },
+    {
+      "file": "06-forest-path.jpg",
+      "bytes": 491082,
+      "sha256": "4d7ad37fed07a439ff3768c65950502324e515d6b40103ef803ee743aee62113"
+    },
+    {
+      "file": "07-mountain-valley.webp",
+      "bytes": 186678,
+      "sha256": "777042e094e6f9509307e0aad334349e9390a90bc355b3f78dce0ed9e3fc2a81"
+    },
+    {
+      "file": "07-mountain-valley.jpg",
+      "bytes": 464155,
+      "sha256": "6414a9e7748190ba8a2d8ba9b6439c34c4cbf04c468aca74b8aaaffe5ec5dbbf"
+    },
+    {
+      "file": "08-snow-mountain.webp",
+      "bytes": 70180,
+      "sha256": "7f5195d0bbad8aea9b331c08c02c7cf691dd3baf6ebb77e1bdc4b190e5a3a7f5"
+    },
+    {
+      "file": "08-snow-mountain.jpg",
+      "bytes": 241665,
+      "sha256": "1fac7781c39d498f32269884cdf237ef5d59d802e3e574e71a4c10057323dfe8"
+    },
+    {
+      "file": "09-river-canyon.webp",
+      "bytes": 176510,
+      "sha256": "d035201dff1ae35504680fc218e792e345a90bdae5672b6e48e99c20f79d3bda"
+    },
+    {
+      "file": "09-river-canyon.jpg",
+      "bytes": 436401,
+      "sha256": "0b192a6ee7bd1ff3849ee7c6c55d7f57f732b6ea5e2d17116938908cd9297fd0"
+    },
+    {
+      "file": "10-island-bay.webp",
+      "bytes": 118518,
+      "sha256": "8ed32c29cea9505d36e6f2a14ffa2bc3ef4b0e8e05ffa90dd75f22595e13c117"
+    },
+    {
+      "file": "10-island-bay.jpg",
+      "bytes": 339490,
+      "sha256": "84a20c2f976368bb113e6adf8e521e03ea80634f6d30dbd64c504f95da64eba8"
+    }
+  ]
+}

@@ -8,9 +8,9 @@ import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts
 import type {Scheduler,Database} from '../src/ports.ts';
 const require=createRequire(import.meta.url);
 const {PGlite}=require(process.env.PGLITE_MODULE??'@electric-sql/pglite');
-test('new word rounds use the daily goal and leave a smaller final round',()=>{assert.equal(newWordsGroupSize(0),0);assert.equal(newWordsGroupSize(1),1);assert.equal(newWordsGroupSize(10),10);assert.equal(newWordsGroupSize(200,500),100);assert.equal(newWordsGroupSize(12,5),5);let remaining=23;const groups=[];while(remaining){const size=newWordsGroupSize(remaining,10);groups.push(size);remaining-=size;}assert.deepEqual(groups,[10,10,3]);});
+test('new word rounds cap at five while keeping a smaller daily goal and final remainder',()=>{assert.equal(newWordsGroupSize(0),0);assert.equal(newWordsGroupSize(1),1);assert.equal(newWordsGroupSize(10),5);assert.equal(newWordsGroupSize(200,500),5);assert.equal(newWordsGroupSize(12,5),5);let remaining=23;const groups=[];while(remaining){const size=newWordsGroupSize(remaining,10);groups.push(size);remaining-=size;}assert.deepEqual(groups,[5,5,5,5,3]);});
 test('resuming remaining new words through a manual session preserves daily counts and the original wrong answer',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db:Database={query:(sql,params)=>pg.query(sql,params),transaction:fn=>pg.transaction((tx:any)=>fn({query:(sql,params)=>tx.query(sql,params)}))};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'resume-test');
  try{
@@ -29,7 +29,7 @@ test('resuming remaining new words through a manual session preserves daily coun
 // A deterministic scheduler double validates transaction semantics, not FSRS behavior.
 const scheduler:Scheduler={version:'test-only',parameterVersion:'test-only',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{due:new Date(now.getTime()+86400000),rating},label:'review',due:new Date(now.getTime()+86400000)})};
 for (const [label,activeScheduler] of [['fixture',scheduler],['real FSRS',await createScheduler()]] as const) test(`${label}: login → isolated family → confirmed batch → durable, deduplicated review`,async()=>{
-  const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+  const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
   const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
   let now=new Date();const core=new Core(db,new DevIdentity(),new FixtureDictionary(),activeScheduler,'test-app',()=>now);
   try{

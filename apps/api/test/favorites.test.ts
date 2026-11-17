@@ -7,7 +7,7 @@ import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts
 import {FixtureQuizBuilder,StoredMeaningQuizBuilder} from '../src/quiz.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 test('favorites share one annotation across list, review and a separately scoped quiz',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))},now=new Date(),month=new Date(now.getTime()+8*3600000).toISOString().slice(0,7),core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'favorite',()=>now);
  try{
   const actor=(await core.login('dev-dad')).user.id,other=(await core.login('dev-outsider')).user.id,family=await core.createFamily(actor,'family',{name:'家'}),child=await core.createChild(actor,'child',family.id,{nickname:'孩子'}),book=await core.createWordbook(actor,'book',child.id,{name:'词本'}),batch=await core.createBatch(actor,'batch',child.id,{wordbook_id:book.id,words:['apple','book']});

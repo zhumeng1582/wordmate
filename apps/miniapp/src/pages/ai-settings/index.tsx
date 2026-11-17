@@ -23,7 +23,7 @@ export default function AiSettingsPage(){
  };
  useDidShow(()=>{shown.current=true;void refresh();});useDidHide(()=>{shown.current=false;serial.current++;});
  const settings=data?.text,families=settings?.families??[],familyChoices=settings?.family_id?families:[{id:'',name:'请选择家庭'},...families];
- const familyPicker=<Picker mode='selector' range={familyChoices.map(family=>family.name)} value={Math.max(0,familyChoices.findIndex(family=>family.id===settings?.family_id))} disabled={busy} onChange={event=>{const family=familyChoices[Number(event.detail.value)];if(!family?.id)return;selectFamilyContext(storage,family.id);setData(null);void refresh(family.id);}}><View className='ai-family-picker'>{settings?.family_name??'选择家庭'}<Text className='indicator-label'>切换<Chevron direction='down'/></Text></View></Picker>;
+ const familyPicker=<Picker mode='selector' range={familyChoices.map(family=>family.name)} value={Math.max(0,familyChoices.findIndex(family=>family.id===settings?.family_id))} disabled={busy} onChange={event=>{const family=familyChoices[Number(event.detail.value)];if(!family?.id)return;selectFamilyContext(storage,family.id);setData(null);void refresh(family.id);}}><View className='ai-family-picker'>{settings?.family_name??'选择家庭'}<View className='indicator-label'><Text>切换</Text><Chevron direction='down'/></View></View></Picker>;
  const advanced=(capability:AiCapability='text')=>Taro.navigateTo({url:`/pages/ai-advanced/index?capability=${capability}`});
  const start=()=>{if(!storage.get('child_id'))return go('family');const status=settings&&aiStatus(settings);return status?.action==='settings'?advanced():status?.action==='usage'?go('ai-usage'):go('add-words');};
  return <View className='page ai-settings-page'>
@@ -37,15 +37,15 @@ export default function AiSettingsPage(){
     <View className='muted small'>{settings.gift_remaining_micros>0?'全家共用 · 已含赠送额度':'全家共用 · 按实际使用扣减'}</View>
     {settings.frozen_micros>0&&<View className='ai-credit-note'>另有 {aiMoney(settings.frozen_micros)} 正在结算</View>}
    </View>
-   <Button className='btn primary ai-start' disabled={busy} onClick={()=>void start()}>{!storage.get('child_id')?'选择孩子，开始使用':aiStatus(settings).action==='settings'?'设置文字 AI 服务':aiStatus(settings).action==='usage'?'查看额度与用量':'去添加单词'}</Button>
+   <Button className='btn primary ai-start' disabled={busy} onClick={()=>void start()}>{!storage.get('child_id')?'选择孩子，开始使用':aiStatus(settings).action==='settings'?'设置文字 AI 服务':aiStatus(settings).action==='usage'?'查看额度与用量':'录入单词'}</Button>
    <View className='ai-start-hint'>{aiStatus(settings).ready?'提交学习材料后，按实际使用结算。':'已有单词、汉字、诗词和学习记录仍可继续使用。'}</View>
    <View className='card ai-features'>
     {(['text','vision'] as const).map(capability=>{const status=aiStatus(data[capability]);return <View className='ai-feature' key={capability}><View className='ai-feature-copy'><View className='ai-section-title'>{capabilityNames[capability]}</View><View className='muted small'>{capability==='text'?'整理单词和诗词，并为单词、诗词和汉字提供 AI 学童讲解':'拍照或选图，提取学习内容'}</View></View>{status.ready?<View className='ai-ready'>{status.detail}</View>:<Button className='ai-status-action' disabled={busy} onClick={()=>status.action==='usage'?go('ai-usage'):void advanced(capability)}>{status.label}<Chevron/></Button>}</View>;})}
    </View>
    <View className='card ai-more'>
-    <Button className='ai-menu-row' onClick={()=>setHelp(value=>!value)}><Text>第一次使用？</Text><Text className='ai-menu-hint'>{help?'收起':'查看说明'}<Chevron direction={help?'up':'down'}/></Text></Button>
-    {help&&<View className='ai-help'><View>1. 添加单词，或前往汉字、古诗词录入和导入材料。</View><View>2. AI 整理内容，核对后保存；也可通过 AI 学童了解单词、诗词和汉字。</View><View>3. 默认服务使用家庭额度，未完成的生成不扣额度。</View><View>每个家庭一次性赠送 {aiMoney(settings.welcome_credit_micros,true)}。使用默认服务时，无需选择模型或填写密钥。</View><Button className='text-action' onClick={()=>go('privacy-policy')}>查看服务与隐私说明</Button></View>}
-    <Button className='ai-menu-row' onClick={()=>void advanced()}><Text>高级设置</Text><Text className='ai-menu-hint'>使用自己的 AI 账号<Chevron/></Text></Button>
+    <Button className='ai-menu-row' onClick={()=>setHelp(value=>!value)}><Text>第一次使用？</Text><View className='ai-menu-hint'><Text>{help?'收起':'查看说明'}</Text><Chevron direction={help?'up':'down'}/></View></Button>
+    {help&&<View className='ai-help'><View>1. 从统一录入页选择单词、古诗或汉字，输入文字或导入材料。</View><View>2. AI 整理内容，核对后保存；也可通过 AI 学童了解单词、诗词和汉字。</View><View>3. 默认服务使用家庭额度，未完成的生成不扣额度。</View><View>每个家庭一次性赠送 {aiMoney(settings.welcome_credit_micros,true)}。使用默认服务时，无需选择模型或填写密钥。</View><Button className='text-action' onClick={()=>go('privacy-policy')}>查看服务与隐私说明</Button></View>}
+    <Button className='ai-menu-row' onClick={()=>void advanced()}><Text>高级设置</Text><View className='ai-menu-hint'><Text>使用自己的 AI 账号</Text><Chevron/></View></Button>
    </View>
   </>}
  </View>;

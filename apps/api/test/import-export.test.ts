@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 import {deflateRawSync} from 'node:zlib';
 import {randomUUID} from 'node:crypto';
 import {parseFile,imageReader} from '../src/import-files.ts';
-import {csvCell} from '../src/word-export.ts';
+
 import {Core} from '../src/core.ts';
 import {DevIdentity,FixtureDictionary} from '../src/providers.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
@@ -28,12 +28,8 @@ test('bounded text, spreadsheet and document extraction; rejects unsafe containe
   ['bad.txt',Buffer.from([255,255]),'INVALID_IMPORT_ENCODING'],['bad.png',Buffer.from('not image'),'INVALID_IMPORT_FILE'],['bad.pdf',Buffer.from('%PDF'),'IMPORT_FORMAT_UNSUPPORTED'],['bad.csv',Buffer.from('a'.repeat(1000001)),'IMPORT_TEXT_TOO_LONG'],['empty.txt',Buffer.from(' '),'IMPORT_EMPTY'],['secret.txt',Buffer.from('sk-'+'x'.repeat(30)),'SENSITIVE_INPUT'],['bad.xlsx',office('xl/worksheets/sheet1.xml','<row><c><f>1+1</f><v>2</v></c></row>'),'IMPORT_FORMULA_UNSUPPORTED'],['bad.docx',office('word/document.xml','<!DOCTYPE a [<!ENTITY x SYSTEM "file:///etc/passwd">]><w:p><w:t>&x;</w:t></w:p>'),'INVALID_IMPORT_FILE'],['bad.docx',zip({'[Content_Types].xml':'<Types/>','../outside':'x','word/document.xml':'<w:p><w:t>x</w:t></w:p>'}),'INVALID_IMPORT_FILE'],['bomb.docx',office('word/document.xml','x'.repeat(3*1024*1024)),'INVALID_IMPORT_FILE']
  ] as const)assert.throws(()=>parseFile(name,data),{code});
 });
-test('CSV preserves quotes, newlines, Chinese and neutralizes spreadsheet formulas',()=>{
- assert.equal(csvCell('机场,"test"\n下一行'),'"机场,""test""\n下一行"');
- for(const value of ['=cmd()',' +SUM(1)','@SUM(A1)','-1','\t=1'])assert(csvCell(value).startsWith('"\''));
-});
 test('scope, >200 word paging, arbitrary selection/all exclusions, OCR caching and budgets',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/007_import_attempts.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/007_import_attempts.sql','utf8'));
  const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))};
  let calls=0,revoke='',fail=false;const reader={profile:'test',read:async()=>{calls++;if(revoke)await pg.query("UPDATE wordmate.family_members SET status='removed' WHERE user_id=$1",[revoke]);if(fail)throw Error('provider failure');return 'airport\nluggage';}};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),{} as any,'test',()=>new Date(),undefined,undefined,undefined,reader);
@@ -41,7 +37,7 @@ test('scope, >200 word paging, arbitrary selection/all exclusions, OCR caching a
   const dad=(await core.login('dev-dad')).user.id,outsider=(await core.login('dev-outsider')).user.id,f=await core.createFamily(dad,'f',{name:'family'}),c=await core.createChild(dad,'c',f.id,{nickname:'child'});
   const ids:string[]=[];for(let i=0;i<205;i++){const id=randomUUID();ids.push(id);await pg.query("INSERT INTO wordmate.child_words(id,child_id,lemma,normalized_lemma,part_of_speech,sense_key,meaning_zh,dictionary_source,created_by) VALUES($1,$2,$3,$3,'noun','default','中文','test',$4)",[id,c.id,'word'+i,dad]);}
   let cursor:string|null=null,seen=new Set<string>();do{const page=await core.words(dad,c.id,{limit:100,...(cursor?{cursor}:{})});assert.equal(page.total,205);page.items.forEach((w:any)=>{assert(!seen.has(w.id));seen.add(w.id);});cursor=page.next_cursor;}while(cursor);assert.equal(seen.size,205);
-  const selected=await core.exportWords(dad,c.id,{word_ids:[ids[0],ids[204]]});assert.equal(selected.count,2);assert(selected.content.startsWith('\uFEFF'));assert(selected.content.includes('"word0"'));assert(!selected.content.includes('"word1"'));
+  const selected=await core.exportWords(dad,c.id,{word_ids:[ids[0],ids[204]]});assert.equal(selected.count,2);assert.equal(selected.filename,'单词本.pdf');assert.equal(selected.mime_type,'application/pdf');assert(Buffer.from(selected.base64,'base64').toString('ascii').startsWith('%PDF-1.4'));
   assert.equal((await core.exportWords(dad,c.id,{all:true,excluded_ids:[ids[0]]})).count,204);
   const scoped=await core.createWordbook(dad,'scoped-book',c.id,{name:'仅两词'});await pg.query('INSERT INTO wordmate.wordbook_words(child_id,wordbook_id,child_word_id) VALUES($1,$2,$3),($1,$2,$4)',[c.id,scoped.id,ids[0],ids[1]]);assert.equal((await core.words(dad,c.id,{wordbook_id:scoped.id})).total,2);assert.equal((await core.exportWords(dad,c.id,{all:true,wordbook_id:scoped.id})).count,2);assert.equal((await core.exportWords(dad,c.id,{word_ids:[ids[0]],wordbook_id:scoped.id})).count,1);await assert.rejects(core.exportWords(dad,c.id,{word_ids:[ids[2]],wordbook_id:scoped.id}),{code:'EXPORT_SELECTION_CHANGED'});
   await assert.rejects(core.exportWords(outsider,c.id,{all:true}),{code:'FAMILY_NOT_FOUND'});

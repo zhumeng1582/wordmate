@@ -1,0 +1,8 @@
+.sentence-import-raw{min-height:230px}.sentence-import-row .field{min-height:120px}.sentence-import .import-material-actions{display:flex;gap:12px;margin:20px 0}.sentence-import .import-material-actions .btn{flex:1;padding-left:8px;padding-right:8px;margin:0}.sentence-import .add-destination{display:flex;justify-content:space-between;align-items:center}.sentence-import .notice{margin-top:20px}
+
+.sentence-review-pages{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0}.sentence-review-pages .text-action{margin:0}
+
+.sentence-original-translation{margin:16px 0;color:var(--muted);font-size:25px;line-height:1.6;white-space:pre-wrap}.sentence-translation-check{font-size:25px;line-height:1.65}.sentence-suggested-translation{margin-top:16px;white-space:pre-wrap}.sentence-translation-check checkbox-group{display:block;margin-top:16px}
+.sentence-translation-check label{display:flex;align-items:center;gap:10px;min-height:64px}
+
+.sentence-page .library-item-top{align-items:flex-start}.sentence-page .library-item-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;font-size:32px;line-height:1.55;overflow-wrap:anywhere}.sentence-page .library-item-meta-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;line-height:1.65}.sentence-page .library-item-meta{margin-top:10px}

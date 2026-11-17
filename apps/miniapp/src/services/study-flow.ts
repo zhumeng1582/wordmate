@@ -5,11 +5,18 @@ export type StudyResult={correct:boolean;selectedMeaning:string;meaning:string;s
 export type StudyFlow={format:1;mode?:'review'|'dictation';source:StudySource;session:any;sessionClosed:boolean;loaded:boolean;cards:StudyCard[];pool:{id:string;meaning_zh:string}[];phase:'learn'|'test'|'practice'|'summary';learnIndex:number;testIndex:number;results:Record<string,StudyResult>;baseDone:number;total:number;practiceQueue:string[];practiced:Record<string,boolean>;practiceTurn:number;practiceFeedback?:{correct:boolean;selectedMeaning:string};today?:any;startedAt:number;updatedAt:number};
 export type StudyPending={body:any;card?:StudyCard;result?:StudyResult;legacyKey?:string};
 export const studyKeys=(token:string,child:string)=>({resume:`study_resume:${token}:${child}`,pending:`study_pending:${token}:${child}`});
-export function nextNewGroupSize(today:any){return Math.max(0,Math.min(Number(today?.new_count)||0,Number(today?.new_group_size??today?.goal)||10,100));}
+export function nextNewGroupSize(today:any,roundLimit=5){return Math.max(0,Math.min(Number(today?.new_count)||0,Number(today?.new_group_size??today?.goal)||10,roundLimit));}
 export function sourceIdentity(source:StudySource){const record:Record<string,unknown>=source;return JSON.stringify(Object.fromEntries(Object.keys(record).sort().map(key=>[key,key==='word_ids'&&Array.isArray(record[key])?[...record[key]].sort():record[key]])));}
 export function emptyStudy(source:StudySource,now=Date.now()):StudyFlow{return {format:1,source,session:null,sessionClosed:false,loaded:false,cards:[],pool:[],phase:source.source==='new_words'?'learn':'test',learnIndex:0,testIndex:0,results:{},baseDone:0,total:0,practiceQueue:[],practiced:{},practiceTurn:0,startedAt:now,updatedAt:now};}
 export function studyCounts(flow:StudyFlow){const answers=Object.values(flow.results).filter(result=>result.saved),correct=answers.filter(result=>result.correct).length;return {done:Math.min(flow.total,flow.baseDone+answers.length),correct,wrong:answers.length-correct,total:flow.total};}
 export const studyComplete=(flow:StudyFlow)=>flow.loaded&&studyCounts(flow).done>=flow.total;
+export function studyResumeDetail(flow:StudyFlow){
+ if(!flow.loaded||!flow.cards.length&&flow.total>0)return '继续准备本轮单词';
+ if(flow.phase==='learn')return `认识单词 ${Math.min(flow.cards.length,flow.learnIndex+1)} / ${flow.cards.length}`;
+ if(flow.phase==='practice')return `还有 ${flow.practiceQueue.length} 词待巩固`;
+ const counts=studyCounts(flow);return counts.done>=counts.total?'本轮已完成，查看小结':`本轮练习 ${counts.done} / ${counts.total}`;
+}
+export const nextReviewGroupSize=(today:any)=>Math.max(0,Math.min(Number(today?.due_count)||0,Number(today?.review_group_size)||10,10));
 export const studyCard=(flow:StudyFlow)=>flow.phase==='learn'?flow.cards[flow.learnIndex]:flow.phase==='test'?flow.cards[flow.testIndex]:flow.phase==='practice'?flow.cards.find(card=>card.id===flow.practiceQueue[0]):undefined;
 export function upcomingStudyCards(flow:StudyFlow):StudyCard[]{
  if(flow.phase==='learn')return flow.cards.slice(flow.learnIndex+1,flow.learnIndex+4);

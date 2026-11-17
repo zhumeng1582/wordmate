@@ -10,7 +10,7 @@ const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pgl
 const scheduler:Scheduler={version:'test',parameterVersion:'test',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{rating,due:new Date(now.getTime()+86400000)},label:'review',due:new Date(now.getTime()+86400000)})};
 
 test('15-day actual streak earns one credit and makeup restores continuity without inventing study',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  await pg.exec("ALTER TABLE wordmate.idempotency_keys ALTER COLUMN created_at SET DEFAULT '2026-10-15T12:00:00Z'::timestamptz");
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
  let now=new Date('2026-10-15T12:00:00Z');const core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'makeup-test',()=>now);
@@ -38,6 +38,7 @@ test('15-day actual streak earns one credit and makeup restores continuity witho
   assert.equal(day.checked_in,true);assert.equal(day.makeup,true);assert.equal(day.studied_words,0);assert.equal(calendar.makeup_credits,0);
   const use=(await pg.query('SELECT used_by,used_for_date FROM wordmate.checkin_makeup_credits WHERE child_id=$1',[child.id])).rows[0];assert.equal(use.used_by,actor);assert.equal(new Date(use.used_for_date).toISOString().slice(0,10),'2026-10-16');
   await assert.rejects(core.useCheckinMakeup(actor,'duplicate-use',child.id,{date:'2026-10-16'}),{code:'CHECKIN_ALREADY_COMPLETE'});
+  await assert.rejects(core.useCheckinMakeup(actor,'today-use',child.id,{date:'2026-10-17'}),{code:'MAKEUP_DATE_NOT_PAST'});
   await assert.rejects(core.useCheckinMakeup(actor,'future-use',child.id,{date:'2026-10-18'}),{code:'MAKEUP_DATE_NOT_PAST'});
  }finally{await pg.close();}
 });

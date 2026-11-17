@@ -44,3 +44,9 @@ test('login consent acknowledgment is single-use and bound to its flow and accou
 test('waiting application is retained for the signed-in account before leaving',async()=>{
  const page=pageHarness('pages/invite/index',async()=>waiting,undefined,{query:{token}});await page.show();const saved=page.cache.get('pending_family_invite');assert.equal(saved.familyId,'family-b');assert.equal(saved.account,'account-a');page.button('先去首页').onClick();assert.equal(page.routes.at(-1),'/pages/home/index');page.dispose();
 });
+test('a waiting applicant can cancel its application without entering the family',async()=>{
+ const page=pageHarness('pages/invite/index',async(path)=>path.endsWith('/cancel')?{status:'revoked'}:{...waiting,application_id:'application-a'},undefined,{query:{token}});
+ await page.show();await page.button('取消申请').onClick();await tick();
+ assert.equal(page.calls.filter(c=>c.path==='/family-invites/application-a/cancel').length,1);assert.match(page.text(page.render()),/申请已取消/);
+ assert.equal(page.cache.has('pending_family_invite'),false);assert.equal(page.cache.get('family_id'),'family-a');assert.equal(page.routes.length,0);page.dispose();
+});

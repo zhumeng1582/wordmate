@@ -10,7 +10,7 @@ import type {Database} from '../src/ports.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 const image='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5xkAAAAASUVORK5CYII=';
 async function fixture(){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/019_parent_profiles.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/019_parent_profiles.sql','utf8'));
  const db:Database={query:(sql,params)=>pg.query(sql,params),transaction:fn=>pg.transaction((tx:any)=>fn({query:(sql,params)=>tx.query(sql,params)}))};
  const core=new Core(db,new DevIdentity(),new FixtureDictionary(),await createScheduler(),'profiles'),dad=await core.login('dev-dad'),mom=await core.login('dev-mom'),other=await core.login('dev-outsider'),family=await core.createFamily(dad.user.id,randomUUID(),{name:'共学家庭'});
  return {pg,core,dad,mom,other,family};

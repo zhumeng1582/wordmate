@@ -10,7 +10,7 @@ import type {Database,Scheduler} from '../src/ports.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 const scheduler:Scheduler={version:'test',parameterVersion:'test',empty:now=>({due:now}),next:(_state,rating,now)=>({state:{rating,due:new Date(now.getTime()+86400000)},label:'review',due:new Date(now.getTime()+86400000)})};
 test('calendar, mixed-source mistakes, practice scheduling, extra rounds, timezone and family isolation',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));
  // Keep database-created timestamps aligned with this fixture's fixed clock.
  await pg.exec("ALTER TABLE wordmate.idempotency_keys ALTER COLUMN created_at SET DEFAULT '2026-10-19T15:59:00Z'::timestamptz");
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s,p)=>tx.query(s,p)}))};
@@ -28,8 +28,8 @@ test('calendar, mixed-source mistakes, practice scheduling, extra rounds, timezo
  await core.confirmBatch(dad,'confirm',batch.id,{expected_version:1,selections:batch.items.map((i:any)=>({item_id:i.id,action:'select',candidate_id:i.candidates[0].candidate_id}))});
  const wordPage=await core.words(dad,c.id,{limit:2});assert.equal(wordPage.total,3);assert.equal(wordPage.items.length,2);assert(wordPage.next_cursor);
  const cat=(await core.words(dad,c.id,{q:'cat'})).items[0];assert.equal(cat.lemma,'cat');assert.equal(cat.annotations.favorite,false);
- const easy=await core.patchWordAnnotations(dad,'mark-easy',cat.id,{expected_version:0,easy:true});assert.equal(easy.easy,true);assert.equal(easy.error_prone,false);assert.equal(easy.version,1);
- const difficult=await core.patchWordAnnotations(dad,'mark-difficult',cat.id,{expected_version:1,error_prone:true});assert.equal(difficult.easy,false);assert.equal(difficult.error_prone,true);
+ const easy=await core.patchWordAnnotations(dad,'mark-easy',cat.id,{expected_version:0,easy:true});assert.equal(easy.easy,true);assert.equal(easy.error_prone,false);assert.equal(easy.version,1);assert.equal((await core.wordAnnotations(dad,cat.id)).easy,true);
+ const difficult=await core.patchWordAnnotations(dad,'mark-difficult',cat.id,{expected_version:1,error_prone:true});assert.equal(difficult.easy,false);assert.equal(difficult.error_prone,true);const readBack=await core.wordAnnotations(dad,cat.id);assert.equal(readBack.easy,false);assert.equal(readBack.error_prone,true);assert.equal(readBack.manual_needs_correction,false);assert.equal(readBack.needs_correction,false);
  const favorite=await core.patchWordAnnotations(dad,'mark-favorite',cat.id,{expected_version:2,favorite:true});assert.equal(favorite.favorite,true);
  assert.equal((await core.words(dad,c.id,{mark:'favorite'})).total,1);assert.equal((await core.words(dad,c.id,{mark:'error_prone',q:'cat'})).total,1);
  await assert.rejects(core.patchWordAnnotations(dad,'stale-mark',cat.id,{expected_version:1,favorite:false}),{code:'ANNOTATIONS_CHANGED'});

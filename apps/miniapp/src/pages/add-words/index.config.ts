@@ -1,1 +1,1 @@
-export default definePageConfig({navigationBarTitleText:'添加单词'});
+export default definePageConfig({navigationBarTitleText:'录入单词'});

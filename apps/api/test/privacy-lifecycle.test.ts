@@ -13,7 +13,7 @@ import type {Database} from '../src/ports.ts';
 import type {AudioRuntime} from '../src/audio-runtime.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 async function fixture(){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));
  for(const file of readdirSync('apps/api/migrations').sort())await pg.exec(readFileSync(`apps/api/migrations/${file}`,'utf8'));
  const db:Database={query:(s,p)=>pg.query(s,p),transaction:fn=>pg.transaction((tx:any)=>fn({query:(s:string,p?:any[])=>tx.query(s,p)}))};
  const privacy=new Privacy(db,{NODE_ENV:'development'}),objects=new Map<string,Uint8Array>(),spool=mkdtempSync(join(tmpdir(),'wordmate-privacy-'));

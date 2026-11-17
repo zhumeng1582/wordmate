@@ -22,3 +22,7 @@
 .calendar-result{padding:4px 6px 30px;text-align:center}
 .calendar-result-count{font-size:56px;font-weight:600;color:var(--primary);margin-bottom:18px}
 .calendar-result-count text{font-size:27px;font-weight:400;color:var(--muted)}
+.makeup-kinds{display:flex;gap:12px;margin:20px 0;background:var(--field);padding:8px;border-radius:24px}
+.makeup-kind{flex:1;margin:0;padding:14px 0;background:transparent;color:var(--muted);font-size:28px;line-height:1.5;border-radius:18px}.makeup-kind::after{border:0}
+.makeup-kind.selected{background:var(--surface);color:var(--primary);font-weight:650}
+.makeup-balance{margin:20px 0 12px;font-size:28px;color:var(--primary)}

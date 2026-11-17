@@ -6,7 +6,7 @@ import {Core} from '../src/core.ts';
 import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 test('public wordbooks publish, search, copy examples, preserve independent progress and stop safely',async()=>{
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/022_shared_wordbook_author.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/016_security_integrity.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/022_shared_wordbook_author.sql','utf8'));
  const db={query:(s:string,p?:any[])=>pg.query(s,p),transaction:(fn:any)=>pg.transaction((q:any)=>fn({query:(s:string,p?:any[])=>q.query(s,p)}))},scheduler=await createScheduler(),core=new Core(db,new DevIdentity(),new FixtureDictionary(),scheduler,'sharing');
  try{
   const dad=(await core.login('dev-dad')).user.id,mom=(await core.login('dev-mom')).user.id;

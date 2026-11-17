@@ -1,3 +1,5 @@
+import {checkinBackgrounds,CheckinBackgrounds} from './checkin-backgrounds';
+import {LearningAssistantSpeech} from './learning-assistant-speech';
 import {AiAccounts} from './ai-accounts';
 import {TutorAsr} from './tutor-asr';
 import {TutorSpeech} from './tutor-speech';
@@ -28,7 +30,7 @@ import {validateBody} from './validation';
 const env=process.env,development=env.AUTH_MODE==='development',release=readReleaseInfo();
 if(development&&env.NODE_ENV!=='development')throw Error('Development identities require NODE_ENV=development');
 if(env.DICTIONARY_PROVIDER==='fixture'&&!development)throw Error('Fixture dictionary requires development auth');
-let tutorImage:TutorImage;let tutorSearch:TutorSearch;let tutorAsr:TutorAsr;let tutorSpeech:TutorSpeech;let referralCodes:ReferralCodeImage;let core:Core;let privacy:Privacy;let lifecycle:Lifecycle;let accounts:AiAccounts;let payments:AiPayments;
+let backgrounds:CheckinBackgrounds;let assistantSpeech:LearningAssistantSpeech;let tutorImage:TutorImage;let tutorSearch:TutorSearch;let tutorAsr:TutorAsr;let tutorSpeech:TutorSpeech;let referralCodes:ReferralCodeImage;let core:Core;let privacy:Privacy;let lifecycle:Lifecycle;let accounts:AiAccounts;let payments:AiPayments;
 @Controller('api')
 class ApiController {
   @Get('health') health(){return {status:'ok',api_revision:'0.1-audio',mode:development?'development':'production',release};}
@@ -40,15 +42,22 @@ class ApiController {
       const aiRead=method==='GET'&&['me/ai-settings','me/ai-usage','me/ai-recharges'].includes(p.join('/'));
       if(aiRead&&req.query.capability!==undefined)ensure(typeof req.query.capability==='string'&&['text','vision'].includes(req.query.capability),422,'INVALID_REQUEST_BODY');
       const historyRead=method==='GET'&&p[0]==='children'&&['calendar','wrong-words','history-range'].includes(p[2]);
+      const hanziHistoryRead=method==='GET'&&p[0]==='children'&&['hanzi-calendar','hanzi-history-range'].includes(p[2]);
       const hanziRead=method==='GET'&&p[0]==='children'&&p[2]==='hanzi'&&p.length===3;
+      const sentenceRead=method==='GET'&&p[0]==='children'&&['sentences','sentence-progress','sentence-calendar','sentence-history-range'].includes(p[2]);
+      const sharedSentenceRead=method==='GET'&&p[0]==='shared-sentence-books';
       const poemsRead=method==='GET'&&p[0]==='children'&&p[2]==='poems'&&p.length===3;
+      const unifiedRead=method==='GET'&&p[0]==='children'&&p[2]==='search'&&p.length===3;
       const wordsRead=method==='GET'&&p[0]==='children'&&p[2]==='words'&&p.length===3;
       const sharedBooksRead=method==='GET'&&p[0]==='shared-wordbooks';
+      const sharedHanziRead=method==='GET'&&p[0]==='shared-hanzi-books';
+      const sharedPoemRead=method==='GET'&&p[0]==='shared-poem-books';
       const avatarRead=method==='GET'&&p[0]==='parents'&&p[2]==='avatar'&&p.length===3;
       if(avatarRead&&req.query.v!==undefined)ensure(typeof req.query.v==='string'&&/^[1-9][0-9]{0,9}$/.test(req.query.v),422,'INVALID_REQUEST_BODY');
       const cardsRead=method==='GET'&&p[0]==='study-sessions'&&p[2]==='cards';
       const quizRead=method==='GET'&&(p[0]==='monthly-quizzes'||p[0]==='children'&&p[2]==='monthly-quizzes');
-      ensure(Object.keys(req.query).every(k=>hanziRead&&['status','q','archive'].includes(k)||poemsRead&&['offset','status','q','archive'].includes(k)||avatarRead&&k==='v'||aiRead&&['family_id','capability'].includes(k)||method==='GET'&&p.join('/')==='voices'&&k==='accent'||method==='GET'&&p.join('/')==='textbook-volumes'&&k==='child_id'||quizRead&&['month','cursor','limit','scope'].includes(k)||historyRead&&(p[2]==='calendar'?['month','source']:p[2]==='history-range'?['date','date_from','date_to','scope','source']:['date','date_from','date_to','source','quiz_id','cursor','limit']).includes(k)||cardsRead&&['cursor','limit'].includes(k)||wordsRead&&['cursor','limit','q','mark','wordbook_id','archive'].includes(k)||method==='GET'&&p[0]==='children'&&p[2]==='today'&&p.length===3&&k==='wordbook_id'||sharedBooksRead&&['q','limit','offset','grade','textbook','category','child_id'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
+      const hanziQuizRead=method==='GET'&&p[0]==='children'&&p[2]==='hanzi-monthly-quizzes'&&(p[3]==='preview'||p.length===3||p.length===5&&p[4]==='items');
+      ensure(Object.keys(req.query).every(k=>sentenceRead&&['sentence_id','book_id','status','q','offset','limit','month','date','date_from','date_to'].includes(k)||sharedSentenceRead&&['q','child_id','offset','limit','grade','textbook','category'].includes(k)||method==='GET'&&p[0]==='children'&&p[2]==='import-records'&&['kind','offset'].includes(k)||unifiedRead&&['q','type','archive','book_scope','limit','cursor'].includes(k)||hanziHistoryRead&&(p[2]==='hanzi-calendar'?k==='month':['date','date_from','date_to','cursor','limit'].includes(k))||hanziQuizRead&&(p[3]==='preview'?['month','book_id'].includes(k):['cursor','limit'].includes(k))||hanziRead&&['status','q','archive','book_id','cursor','limit'].includes(k)||method==='GET'&&p[0]==='children'&&['hanzi-due','hanzi-progress'].includes(p[2])&&p.length===3&&k==='book_id'||method==='GET'&&p[0]==='children'&&p[2]==='hanzi-mistakes'&&p.length===3&&['book_id','q','limit','cursor'].includes(k)||poemsRead&&['offset','limit','status','q','archive','book_id'].includes(k)||avatarRead&&k==='v'||aiRead&&['family_id','capability'].includes(k)||method==='GET'&&p.join('/')==='voices'&&k==='accent'||method==='GET'&&p.join('/')==='textbook-volumes'&&k==='child_id'||quizRead&&['month','cursor','limit','scope'].includes(k)||historyRead&&(p[2]==='calendar'?['month','source']:p[2]==='history-range'?['date','date_from','date_to','scope','source']:['date','date_from','date_to','source','quiz_id','cursor','limit']).includes(k)||cardsRead&&['cursor','limit'].includes(k)||wordsRead&&['cursor','limit','q','mark','wordbook_id','archive','status'].includes(k)||method==='GET'&&p[0]==='children'&&p[2]==='today'&&p.length===3&&k==='wordbook_id'||(sharedHanziRead||sharedPoemRead)&&['q','limit','offset','child_id','grade','textbook','category'].includes(k)||sharedBooksRead&&['q','limit','offset','grade','textbook','category','child_id'].includes(k)),422,'QUERY_NOT_IMPLEMENTED');
       validateBody(p,method,b);
       if(method==='GET'&&p.join('/')==='privacy/policy')return res.json({request_id,data:privacy.policy});
       if(method==='POST'&&p.join('/')===(development?'auth/dev':'auth/wechat'))return res.json({request_id,data:await core.login(b.code,b.invite_code,b.management_only===true)});
@@ -61,6 +70,7 @@ class ApiController {
        if(method==='PUT'){data=await privacy.accept(actor,b);await core.upgradeSession(actor,auth.slice(7));}
        if(method==='DELETE')data=await privacy.withdraw(actor);
       }
+      else if(method==='GET'&&p[0]==='checkin-backgrounds'&&p.length===3){const image=await backgrounds.content(p[1],p[2]);res.setHeader('Content-Type',image.mime);res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','private, max-age=86400');return res.send(Buffer.from(image.bytes));}
       else if(route==='me/referral-code-image'&&method==='GET'){const me=await core.me(actor);data=await referralCodes.create(me.referral_code,request_id);}
       else if(route==='me/profile'&&method==='PUT')data=await core.saveProfile(actor,key,b);
       else if(avatarRead){const avatar=await core.parentAvatar(actor,p[1],req.query.v as string|undefined);res.setHeader('Content-Type',avatar.mime);res.setHeader('X-Content-Type-Options','nosniff');return res.send(avatar.bytes);}
@@ -86,13 +96,47 @@ class ApiController {
       else if(method==='POST'&&p[0]==='families'&&p[2]==='transfer-owner'&&p.length===3)data=await lifecycle.transfer(actor,p[1],b);
       else if(method==='DELETE'&&p[0]==='families'&&p[2]==='members'&&p.length===4)data=await lifecycle.leave(actor,p[1],p[3]);
 
+      else if(p[0]==='learning-assistant-messages'&&p.length===3&&p[2]==='audio'&&method==='POST')data=await assistantSpeech.create(actor,p[1],b.accent,b.voice_id);
+      else if(p[0]==='learning-assistant-audio'&&p.length===3&&p[2]==='content'&&method==='GET'){const bytes=await assistantSpeech.content(actor,p[1]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(bytes);}
       else if(p[0]==='word-tutor-messages'&&p.length===3&&p[2]==='audio'&&method==='POST')data=await tutorSpeech.create(actor,p[1],b.accent,b.voice_id,b.part);
       else if(p[0]==='word-tutor-audio'&&p.length===3&&p[2]==='content'&&method==='GET'){const bytes=await tutorSpeech.content(actor,p[1]);res.setHeader('Content-Type','audio/mpeg');res.setHeader('X-Content-Type-Options','nosniff');return res.send(bytes);}
+      else if(p[0]==='shared-sentence-books'&&method==='GET')data=p.length===1?await core.sentences.discover(actor,req.query):p.length===2?await core.sentences.shared(actor,p[1]):undefined;
+      else if(p[0]==='children'&&p[2]==='sentence-books'){
+       if(p.length===3)data=method==='GET'?await core.sentences.books(actor,p[1]):method==='POST'?await core.sentences.saveBook(actor,key,p[1],b):undefined;
+       else if(p.length===4)data=method==='PATCH'?await core.sentences.saveBook(actor,key,p[1],b,p[3]):method==='DELETE'?await core.sentences.removeBook(actor,key,p[1],p[3]):undefined;
+       else if(p.length===5&&p[4]==='share'&&['POST','PUT'].includes(method))data=await core.sentences.share(actor,key,p[1],p[3],b);
+      }
+      else if(p[0]==='children'&&p[2]==='shared-sentence-books'&&p.length===5&&p[4]==='join'&&method==='POST')data=await core.sentences.join(actor,key,p[1],p[3]);
+      else if(p[0]==='children'&&p[2]==='shared-sentence-books'&&p.length===5&&p[4]==='leave'&&method==='POST')data=await core.sentences.removeBook(actor,key,p[1],p[3]);
+      else if(p[0]==='children'&&p[2]==='sentence-progress'&&p.length===3)data=method==='GET'?await core.sentences.progress(actor,p[1],req.query.book_id as string|undefined):method==='PUT'?await core.sentences.goal(actor,key,p[1],b):undefined;
+      else if(p[0]==='children'&&p[2]==='sentence-calendar'&&p.length===3&&method==='GET')data=await core.sentences.calendar(actor,p[1],req.query.month);
+      else if(p[0]==='children'&&p[2]==='sentence-history-range'&&p.length===3&&method==='GET')data=await core.sentences.history(actor,p[1],req.query);
+      else if(p[0]==='children'&&p[2]==='sentence-checkin-makeup'&&p.length===3&&method==='POST')data=await core.sentences.makeup(actor,key,p[1],b);
+      else if(p[0]==='children'&&p[2]==='sentences'){
+       if(p.length===3&&method==='GET')data=await core.sentences.list(actor,p[1],req.query);
+       else if(p.length===4&&p[3]==='save'&&method==='POST')data=await core.sentences.save(actor,key,p[1],b);
+       else if(p.length===4&&p[3]==='imports'&&method==='POST')data=await core.sentences.importCreate(actor,p[1],b);
+       else if(p.length===5&&p[3]==='imports'&&method==='GET')data=await core.sentences.importGet(actor,p[1],p[4]);
+       else if(p.length===6&&p[3]==='imports'&&method==='POST')data=p[5]==='save'?await core.sentences.importSave(actor,key,p[1],p[4],b):['retry','cancel'].includes(p[5])?await core.sentences.importAction(actor,p[1],p[4],p[5] as 'retry'|'cancel'):undefined;
+       else if(p.length===4&&method==='PATCH')data=await core.sentences.update(actor,p[1],p[3],b);
+      }
+      else if(p[0]==='children'&&p[2]==='sentence-study-rounds'){
+       if(p.length===3&&method==='POST')data=await core.sentences.start(actor,key,p[1],b);
+       else if(p.length===4&&method==='GET')data=await core.sentences.getRound(actor,p[1],p[3]);
+       else if(p.length===5&&method==='POST')data=p[4]==='reveal'?await core.sentences.reveal(actor,p[1],p[3],b):p[4]==='answer'?await core.sentences.answer(actor,p[1],p[3],b):p[4]==='end'?await core.sentences.endRound(actor,p[1],p[3],b):['heartbeat','release'].includes(p[4])?await core.sentences.lease(actor,p[1],p[3],b,p[4]==='release'):undefined;
+      }
+      else if(p[0]==='children'&&p[2]==='learning-assistant-sessions'&&p.length===3&&method==='GET')data=await core.assistant.list(actor,p[1]);
+      else if(p[0]==='children'&&p[2]==='learning-assistant-sessions'&&p.length===3&&method==='POST')data=await core.assistant.open(actor,p[1]);
+      else if(p[0]==='learning-assistant-sessions'&&p.length===2&&method==='GET')data=await core.assistant.get(actor,p[1]);
+      else if(p[0]==='learning-assistant-sessions'&&p.length===2&&method==='DELETE')data=await core.assistant.delete(actor,p[1]);
+      else if(p[0]==='learning-assistant-sessions'&&p.length===3&&p[2]==='messages'&&method==='POST')data=await core.assistant.answer(actor,p[1],b);
       else if(p[0]==='word-tutor-sessions'&&p.length===3&&p[2]==='images'&&method==='POST')data=await tutorImage.start(actor,p[1],b.request_id);
       else if(p[0]==='word-tutor-images'&&p.length===2&&method==='GET')data=await tutorImage.get(actor,p[1]);
       else if(p[0]==='word-tutor-images'&&p.length===3&&p[2]==='content'&&method==='GET'){const bytes=await tutorImage.content(actor,p[1]);res.setHeader('Content-Type','image/png');res.setHeader('X-Content-Type-Options','nosniff');return res.send(bytes);}
       else if(p[0]==='word-tutor-sessions'&&p.length===3&&p[2]==='search'&&method==='POST')data=await tutorSearch.search(actor,p[1],b.request_id,b.question);
       else if(p[0]==='word-tutor-sessions'&&p.length===3&&p[2]==='transcriptions'&&method==='POST')data=await tutorAsr.transcribe(actor,p[1],b.request_id,b.audio_base64);
+      else if(p[0]==='word-tutor-sessions'&&p.length===3&&p[2]==='adopt'&&method==='POST')data=await core.tutor.adoptConversation(actor,p[1]);
+      else if(p[0]==='word-tutor-sessions'&&p.length===3&&p[2]==='agent'&&method==='POST')data=await core.tutor.agentAnswer(actor,p[1],b);
       else if(p[0]==='word-tutor-sessions'&&p.length===3&&p[2]==='messages'&&method==='POST')data=await core.tutor.answer(actor,p[1],b.request_id,b.question,b.use_school_grade===true,b.exercise_answer===true);
       else if(p[0]==='word-tutor-sessions'&&p.length===3&&p[2]==='learning-events'&&method==='POST')data=await core.tutor.learningEvent(actor,p[1],b.event_id,b.kind,b.message_id);
       else if(p[0]==='word-tutor-sessions'&&p.length===2&&method==='GET')data=await core.tutor.get(actor,p[1]);
@@ -122,6 +166,8 @@ class ApiController {
       else if(p[0]==='ai-batches'&&p.length===3&&p[2]==='retry'&&method==='POST')data=await core.vocabulary.retry(actor,key,p[1]);
       else if(method==='GET'&&p.join('/')==='me')data=await core.me(actor);
       else if(method==='GET'&&p.join('/')==='textbook-volumes')data=await core.textbookVolumes(actor,req.query.child_id);
+      else if(sharedHanziRead&&p.length===1)data=await core.hanzi.searchShared(actor,req.query);
+      else if(sharedHanziRead&&p.length===2)data=await core.hanzi.shared(actor,p[1]);
       else if(sharedBooksRead&&p.length===1)data=await core.searchSharedWordbooks(actor,req.query);
       else if(sharedBooksRead&&p.length===2)data=await core.sharedWordbook(actor,p[1]);
       else if(method==='POST'&&p.join('/')==='families')data=await core.createFamily(actor,key,b);
@@ -129,9 +175,22 @@ class ApiController {
       else if(p[0]==='families'&&p[2]==='invites'&&p.length===3)data=method==='GET'?await core.invites(actor,p[1]):method==='POST'?await core.createInvite(actor,key,p[1]):undefined;
       else if(method==='POST'&&p.join('/')==='family-invites/claim')data=await core.claimInvite(actor,key,b);
       else if(method==='POST'&&p.join('/')==='family-invites/resolve')data=await core.resolveInvite(actor,b);
+      else if(method==='POST'&&p[0]==='family-invites'&&p.length===3&&['reject','revoke','cancel'].includes(p[2]))data=await core.changeInvite(actor,key,p[1],p[2] as 'reject'|'revoke'|'cancel');
+      else if(method==='PATCH'&&p[0]==='children'&&p.length===2)data=await core.updateChild(actor,key,p[1],b);
       else if(method==='POST'&&p[0]==='family-invites'&&p[2]==='approve'&&p.length===3)data=await core.approveInvite(actor,key,p[1]);
       else if(p[0]==='families'&&p[2]==='children'&&p.length===3){data=method==='GET'?await core.children(actor,p[1]):method==='POST'?await core.createChild(actor,key,p[1],b):undefined;}
       else if(method==='GET'&&p[0]==='children'&&p[2]==='words'&&p.length===4)data=await core.word(actor,p[1],p[3]);
+      else if(p[0]==='children'&&p[2]==='import-records'&&p.length===3&&method==='GET')data=await core.importRecords(actor,p[1],req.query);
+      else if(p[0]==='shared-poem-books'&&method==='GET')data=p.length===1?await core.poems.books.search(actor,req.query):await core.poems.books.shared(actor,p[1]);
+      else if(p[0]==='children'&&p[2]==='poem-books'&&p.length===3)data=method==='GET'?await core.poems.books.list(actor,p[1]):await core.poems.books.create(actor,key,p[1],b);
+      else if(p[0]==='children'&&p[2]==='poem-books'&&p.length===5&&p[4]==='share'&&method==='PUT')data=await core.poems.books.share(actor,key,p[1],p[3],b);
+      else if(p[0]==='children'&&p[2]==='poem-books'&&p.length===4){if(method==='PATCH')data=await core.poems.books.rename(actor,key,p[1],p[3],b);else if(method==='DELETE')data=await core.poems.books.remove(actor,key,p[1],p[3]);}
+      else if(p[0]==='children'&&p[2]==='shared-poem-books'&&p.length===5&&p[4]==='join'&&method==='POST')data=await core.poems.books.join(actor,key,p[1],p[3]);
+      else if(p[0]==='children'&&p[2]==='shared-poem-books'&&p.length===5&&p[4]==='leave'&&method==='POST')data=await core.poems.books.remove(actor,key,p[1],p[3],true);
+      else if(p[0]==='children'&&p[2]==='hanzi-books'&&p.length===5&&p[4]==='share'&&method==='PUT')data=await core.hanzi.shareBook(actor,key,p[1],p[3],b);
+      else if(p[0]==='children'&&p[2]==='shared-hanzi-books'&&p.length===5&&p[4]==='join'&&method==='POST')data=await core.hanzi.joinShared(actor,key,p[1],p[3]);
+      else if(p[0]==='children'&&p[2]==='hanzi-books'&&p.length===4){if(method==='PATCH')data=await core.hanzi.renameBook(actor,key,p[1],p[3],b);else if(method==='DELETE')data=await core.hanzi.removeBook(actor,key,p[1],p[3]);}
+      else if(p[0]==='children'&&p[2]==='shared-hanzi-books'&&p.length===5&&p[4]==='leave'&&method==='POST')data=await core.hanzi.removeBook(actor,key,p[1],p[3],true);
       else if(p[0]==='children'&&p[2]==='wordbooks'&&p.length===4){if(method==='PATCH')data=await core.renameWordbook(actor,key,p[1],p[3],b);else if(method==='DELETE')data=await core.archiveWordbook(actor,key,p[1],p[3]);}
       else if(p[0]==='children'&&p[2]==='wordbooks'&&p.length===5&&p[4]==='share'&&method==='PUT')data=await core.shareWordbook(actor,key,p[1],p[3],b);
       else if(p[0]==='children'&&p[2]==='shared-wordbooks'&&p.length===5&&p[4]==='join'&&method==='POST')data=await core.joinSharedWordbook(actor,key,p[1],p[3]);
@@ -141,6 +200,29 @@ class ApiController {
       else if(method==='GET'&&p[0]==='words'&&p[2]==='annotations'&&p.length===3)data=await core.wordAnnotations(actor,p[1]);
       else if(method==='PATCH'&&p[0]==='words'&&p[2]==='annotations'&&p.length===3)data=await core.patchWordAnnotations(actor,key,p[1],b);
       else if(p[0]==='children'&&p[2]==='monthly-quizzes'&&p[3]==='preview'&&p.length===4&&method==='GET')data=await core.quizzes.preview(actor,p[1],req.query.month,req.query.scope);
+      else if(p[0]==='children'&&p[2]==='hanzi-study-rounds'){
+       const child=p[1],id=p[3];
+       if(p.length===3&&method==='GET')data=await core.hanziStudy.active(actor,child);
+       else if(p.length===3&&method==='POST')data=await core.hanziStudy.create(actor,key,child,b);
+       else if(p.length===4&&method==='GET')data=await core.hanziStudy.get(actor,child,id);
+       else if(p.length===5&&['resume','takeover'].includes(p[4])&&method==='POST')data=await core.hanziStudy.resume(actor,key,child,id,b,p[4]==='takeover');
+       else if(p.length===5&&['heartbeat','end'].includes(p[4])&&method==='POST')data=await core.hanziStudy.heartbeat(actor,child,id,b,p[4]==='end');
+       else if(p.length===5&&p[4]==='answer'&&method==='POST')data=await core.hanziStudy.answer(actor,key,child,id,b);
+       else if(p.length===5&&p[4]==='abandon'&&method==='POST')data=await core.hanziStudy.abandon(actor,key,child,id,b);
+      }
+      else if(p[0]==='children'&&p[2]==='hanzi-monthly-quizzes'){
+       const child=p[1],id=p[3];
+       if(p.length===4&&id==='preview'&&method==='GET')data=await core.hanziQuizzes.preview(actor,child,req.query.month,req.query.book_id);
+       else if(p.length===3&&method==='GET')data=await core.hanziQuizzes.list(actor,child,req.query);
+       else if(p.length===3&&method==='POST')data=await core.hanziQuizzes.create(actor,key,child,b);
+       else if(p.length===4&&method==='GET')data=await core.hanziQuizzes.get(actor,child,id);
+       else if(p.length===5&&p[4]==='items'&&method==='GET')data=await core.hanziQuizzes.items(actor,child,id,req.query);
+       else if(p.length===5&&['resume','takeover'].includes(p[4])&&method==='POST')data=await core.hanziQuizzes.resume(actor,key,child,id,b,p[4]==='takeover');
+       else if(p.length===5&&['heartbeat','end'].includes(p[4])&&method==='POST')data=await core.hanziQuizzes.heartbeat(actor,child,id,b,p[4]==='end');
+       else if(p.length===7&&p[4]==='items'&&p[6]==='answer'&&method==='PUT')data=await core.hanziQuizzes.answer(actor,key,child,id,p[5],b);
+       else if(p.length===5&&p[4]==='submit'&&method==='POST')data=await core.hanziQuizzes.submit(actor,key,child,id,b);
+       else if(p.length===5&&p[4]==='abandon'&&method==='POST')data=await core.hanziQuizzes.abandon(actor,key,child,id,b);
+      }
       else if(p[0]==='children'&&p[2]==='poem-tutor-sessions'&&p.length===3&&method==='GET')data=await core.poems.listSessions(actor,p[1]);
       else if(p[0]==='children'&&p[2]==='hanzi-tutor-sessions'&&p.length===3&&method==='GET')data=await core.hanzi.listSessions(actor,p[1]);
       else if(p[0]==='children'&&p[2]==='hanzi'){
@@ -152,8 +234,8 @@ class ApiController {
        else if(p.length===6&&p[3]==='imports'&&p[5]==='retry'&&method==='POST')data=await core.hanziImports.retry(actor,child,p[4]);
        else if(p.length===4&&p[3]==='analyze'&&method==='POST')data=await core.hanzi.analyzeImport(actor,child,b.request_id,b.text);
        else if(p.length===4&&p[3]==='copybook'&&method==='POST')data=await core.hanzi.copybook(actor,child,b.ids);
-       else if(p.length===4&&p[3]==='batch'&&method==='POST')data=await core.hanzi.importCharacters(actor,key,child,b.characters,b.job_id);
-       else if(p.length===3&&method==='GET')data=await core.hanzi.list(actor,child,req.query.status,req.query.q,req.query.archive);
+       else if(p.length===4&&p[3]==='batch'&&method==='POST')data=await core.hanzi.importCharacters(actor,key,child,b.characters,b.job_id,b.book_id);
+       else if(p.length===3&&method==='GET')data=await core.hanzi.list(actor,child,req.query.status,req.query.q,req.query.archive,req.query.book_id,req.query);
        else if(p.length===3&&method==='POST')data=await core.hanzi.create(actor,key,child,b);
        else if(p.length===4&&method==='GET')data=await core.hanzi.get(actor,child,id);
        else if(p.length===4&&method==='PATCH')data=await core.hanzi.update(actor,child,id,b);
@@ -161,6 +243,7 @@ class ApiController {
        else if(p.length===5&&p[4]==='strokes'&&method==='GET')data=await core.hanzi.strokes(actor,child,id);
        else if(p.length===5&&p[4]==='pinyin'&&method==='POST')data=await core.hanzi.suggestPinyin(actor,child,id,b.request_id);
        else if(p.length===5&&p[4]==='words'&&method==='POST')data=await core.hanzi.suggestWords(actor,child,id,b.request_id);
+       else if(p.length===5&&p[4]==='favorite'&&method==='PUT')data=await core.hanzi.favorite(actor,key,child,id,b);
        else if(p.length===5&&p[4]==='mark'&&method==='PUT')data=await core.hanzi.mark(actor,child,id,b);
        else if(p.length===5&&p[4]==='archive'&&method==='PUT')data=await core.hanzi.archive(actor,child,id,b);
        else if(p.length===5&&p[4]==='sessions'&&method==='POST')data=await core.hanzi.open(actor,child,id);
@@ -182,12 +265,13 @@ class ApiController {
        else if(p.length===6&&p[3]==='imports'&&p[5]==='draft'&&method==='PUT')data=await core.poemImports.saveDraft(actor,child,p[4],b);
        else if(p.length===6&&p[3]==='imports'&&p[5]==='cancel'&&method==='POST')data=await core.poemImports.cancel(actor,child,p[4]);
        else if(p.length===6&&p[3]==='imports'&&p[5]==='retry'&&method==='POST')data=await core.poemImports.retry(actor,child,p[4]);
-       else if(p.length===3&&method==='GET')data=await core.poems.list(actor,child,req.query.offset,req.query.status,req.query.q,req.query.archive);
+       else if(p.length===3&&method==='GET')data=await core.poems.list(actor,child,req.query.offset,req.query.status,req.query.q,req.query.archive,req.query.book_id,req.query.limit);
        else if(p.length===3&&method==='POST')data=await core.poems.create(actor,key,child,b);
        else if(p.length===4&&p[3]==='analyze'&&method==='POST')data=await core.poems.analyzeImport(actor,child,b.request_id,b.text);
        else if(p.length===4&&method==='GET')data=await core.poems.get(actor,child,id);
        else if(p.length===4&&method==='PATCH')data=await core.poems.update(actor,child,id,b);
        else if(p.length===4&&method==='DELETE')data=await core.poems.delete(actor,child,id);
+       else if(p.length===5&&p[4]==='favorite'&&method==='PUT')data=await core.poems.favorite(actor,key,child,id,b);
        else if(p.length===5&&p[4]==='memorization'&&method==='PUT')data=await core.poems.mark(actor,child,id,b);
        else if(p.length===5&&p[4]==='archive'&&method==='PUT')data=await core.poems.archive(actor,child,id,b);
        else if(p.length===6&&p[4]==='sessions'&&method==='GET')data=await core.poems.getSession(actor,child,id,p[5]);
@@ -220,6 +304,13 @@ class ApiController {
         if(method==='POST'&&p[2]==='word-exports')data=await core.exportWords(actor,id,b);
         if(method==='POST'&&p[2]==='checkin-share')data=await core.checkinShare.create(actor,id,b);
         if(p[2]==='learning-goal')data=method==='GET'?await core.learningGoal(actor,id):method==='PUT'?await core.setLearningGoal(actor,key,id,b):undefined;
+        if(p[2]==='hanzi-progress')data=method==='GET'?await core.hanziProgress(actor,id,req.query.book_id):method==='PUT'?await core.setHanziGoal(actor,key,id,b):undefined;
+        if(method==='POST'&&p[2]==='hanzi-checkin-makeup')data=await core.useHanziMakeup(actor,key,id,b);
+        if(method==='GET'&&p[2]==='hanzi-calendar')data=await core.hanziCalendar(actor,id,req.query.month);
+        if(method==='GET'&&p[2]==='hanzi-history-range')data=await core.hanziHistoryRange(actor,id,req.query);
+        if(p[2]==='hanzi-due'&&method==='GET')data=await core.hanziDue(actor,id,req.query.book_id);
+        if(p[2]==='hanzi-mistakes'&&method==='GET')data=await core.hanziMistakes(actor,id,req.query.book_id,req.query);
+        if(p[2]==='hanzi-learning-events'&&method==='POST')data=await core.recordHanziLearning(actor,id,b);
         if(p[2]==='ai-batches')data=method==='GET'?await core.vocabulary.list(actor,id):method==='POST'?await core.vocabulary.create(actor,key,id,b):undefined;
         if(p[2]==='monthly-quizzes')data=method==='GET'?await core.quizzes.list(actor,id,req.query):method==='POST'?await core.quizzes.create(actor,key,id,b):undefined;
         if(method==='POST'&&p[2]==='checkin-makeup')data=await core.useCheckinMakeup(actor,key,id,b);
@@ -230,6 +321,8 @@ class ApiController {
         if(method==='POST'&&p[2]==='library-checkins')data=await core.recordLibraryCheckin(actor,id,b);
         if(method==='GET'&&p[2]==='today')data=await core.today(actor,id,req.query.wordbook_id);
         if(p[2]==='wordbooks')data=method==='GET'?await core.wordbooks(actor,id):method==='POST'?await core.createWordbook(actor,key,id,b):undefined;
+        if(p[2]==='hanzi-books')data=method==='GET'?await core.hanzi.books(actor,id):method==='POST'?await core.hanzi.createBook(actor,key,id,b):undefined;
+        if(method==='GET'&&p[2]==='search')data=await core.search.search(actor,id,req.query);
         if(method==='GET'&&p[2]==='words')data=await core.words(actor,id,req.query);
         if(method==='POST'&&p[2]==='batches')data=await core.createBatch(actor,key,id,b);
         if(method==='POST'&&p[2]==='study-sessions')data=await core.startSession(actor,key,id,b);
@@ -245,14 +338,16 @@ class ApiController {
   }
 }
 @Module({controllers:[ApiController]}) class AppModule{}
-export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime,encouragement?:EncouragementProvider,reader?:ImageReader,shareImages?:CheckinShareImageCache,aiFetch?:typeof fetch,paymentFetch?:typeof fetch}={}){
+export async function createApplication(options:{vocabulary?:VocabularyProvider,audio?:AudioRuntime,encouragement?:EncouragementProvider,reader?:ImageReader,shareImages?:CheckinShareImageCache,backgrounds?:CheckinBackgrounds,aiFetch?:typeof fetch,paymentFetch?:typeof fetch}={}){
   const {db,source}=await connect(env.DATABASE_URL??'');
   const shareImages=options.shareImages??await checkinShareImageCache(env,db),runtime=options.audio??await audioRuntime(env);
+  backgrounds=options.backgrounds??await checkinBackgrounds(env);
   referralCodes=new ReferralCodeImage(env);accounts=new AiAccounts(db,env,options.aiFetch);payments=new AiPayments(db,accounts,env,options.paymentFetch);
   privacy=new Privacy(db,env);lifecycle=new Lifecycle(db,runtime,shareImages);shareImages?.setAuthorization((q,actor,scope)=>privacy.authorizePoster(q,actor,scope));
   core=new Core(db,development?new DevIdentity():new WechatIdentity(env.WECHAT_APP_ID??'',env.WECHAT_APP_SECRET??''),env.DICTIONARY_PROVIDER==='fixture'?new FixtureDictionary():new UnconfiguredDictionary(),await createScheduler(),env.WECHAT_APP_ID??'wxcf7d28bc513949d4',()=>new Date(),options.vocabulary,runtime,options.encouragement,options.reader,shareImages,(q,actor)=>privacy.assertConsent(q,actor),options.vocabulary?undefined:accounts);
   tutorImage=new TutorImage({tx:fn=>core.tutorTransaction(fn),child:(...args)=>core.tutorChild(...args)},env,options.aiFetch);
   tutorSearch=new TutorSearch({tx:fn=>core.tutorTransaction(fn),child:(...args)=>core.tutorChild(...args)},env,options.aiFetch);
+  assistantSpeech=new LearningAssistantSpeech({tx:fn=>core.tutorTransaction(fn),child:(...args)=>core.tutorChild(...args)},runtime);
   tutorSpeech=new TutorSpeech({tx:fn=>core.tutorTransaction(fn),child:(...args)=>core.tutorChild(...args)},runtime);
   tutorAsr=new TutorAsr({tx:fn=>core.tutorTransaction(fn),child:(...args)=>core.tutorChild(...args)},env,options.aiFetch);
   const app=await NestFactory.create<NestExpressApplication>(AppModule,{bodyParser:false,logger:['error','warn']});
@@ -262,7 +357,7 @@ export async function createApplication(options:{vocabulary?:VocabularyProvider,
   app.use('/api/children/:child/import-file',async(req:Request,res:Response,next:any)=>{
     try{const auth=req.headers.authorization;ensure(auth?.startsWith('Bearer '),401,'UNAUTHENTICATED');await core.authenticate(auth!.slice(7));next();}catch{res.status(401).json({error:{code:'UNAUTHENTICATED'}});}
   });
-  const importPath=(req:any)=>/^\/api\/children\/[^/]+\/(?:import-file|ai-batches|hanzi\/imports|poems\/imports(?:\/[^/]+\/(?:save|draft))?)\/?$/.test(req.path)||req.method==='PUT'&&/^\/api\/ai-batches\/[^/]+\/?$/.test(req.path);
+  const importPath=(req:any)=>/^\/api\/children\/[^/]+\/(?:sentences\/(?:save|imports(?:\/[^/]+\/save)?)|import-file|ai-batches|hanzi\/imports|poems\/imports(?:\/[^/]+\/(?:save|draft))?)\/?$/.test(req.path)||req.method==='PUT'&&/^\/api\/ai-batches\/[^/]+\/?$/.test(req.path);
   const largeImportPath=(req:any)=>/^\/api\/children\/[^/]+\/(?:import-file|hanzi\/imports|poems\/imports(?:\/[^/]+\/(?:save|draft))?)\/?$/.test(req.path);
   app.use((req:Request,res:Response,next:any)=>{if(!largeImportPath(req))return next();const auth=req.headers.authorization;if(!auth?.startsWith('Bearer '))return res.status(401).json({error:{code:'UNAUTHENTICATED'}});core.authenticate(auth.slice(7)).then(()=>next(),()=>res.status(401).json({error:{code:'UNAUTHENTICATED'}}));});
   app.useBodyParser('json',{limit:'15mb',inflate:false,type:largeImportPath});

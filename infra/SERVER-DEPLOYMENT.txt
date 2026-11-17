@@ -58,6 +58,8 @@
 systemd 使用 wordmate 用户、Node 22、production.env，启动前检查生产配置。
 配置文件含密钥，0600 权限；原部署 /var/www/wordmate 与部署备份保留。
 OSS 使用 WordmateEcsOssProduction 实例角色和 IMDSv2 临时凭证。
+
+2026-11-13 DNS恢复：resolvconf的head前置100.100.2.136和100.100.2.138，恢复阿里云数据库新连接及公网域名解析。原仅8.8.8.8的配置备份在/var/backups/wordmate/dns-poem-save-1794539789537；后续网络配置变更不要丢失云内网DNS。此次没有修改数据库地址、凭据或数据库内容。
 POSTER_POOL_PREWARM=false，海报按需生成。
 当时已完成 002–018 正式迁移和生产配置检查，数据库当时有 52 张 wordmate 表；后续版本和迁移以实际账本为准。
 备份脚本 scripts/server-backup.cjs：每日上海时间 04:15；删除清单每小时第 7 分钟；

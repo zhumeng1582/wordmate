@@ -16,7 +16,7 @@ import type {AudioRuntime} from '../src/audio-runtime.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 const result=(word:string,i:number)=>({input_index:i,input:word,status:'ok',lemma:word,part_of_speech:'noun',meaning_zh:'释义'+word,ipa_gb:'/test/',ipa_us:'/test/',sentence_en:`I see the ${word}.`,sentence_zh:'这是学习用的例句。',reason:null});
 async function fixture(provider?:VocabularyProvider){
- const pg=new PGlite();await pg.exec(readFileSync('deliverables/0.1/database/001_schema.sql','utf8'));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));
+ const pg=new PGlite();await pg.exec((readFileSync('deliverables/0.1/database/001_schema.sql','utf8')+readFileSync('apps/api/migrations/056_import_order.sql','utf8')));await pg.exec(readFileSync('apps/api/migrations/043_library_archive.sql','utf8'));
  for(const f of readdirSync('apps/api/migrations').sort())await pg.exec(readFileSync(`apps/api/migrations/${f}`,'utf8'));
  const sql:string[]=[];const wrap=(q:any):Sql=>({query:(s,p)=>{sql.push(s);return q.query(s,p);}});
  const db:Database={...wrap(pg),transaction:fn=>pg.transaction((q:any)=>fn(wrap(q)))};

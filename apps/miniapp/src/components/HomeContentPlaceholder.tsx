@@ -1,0 +1,14 @@
+import {View,Text,Button,Picker} from '@tarojs/components';
+import Taro from '@tarojs/taro';
+import {storage} from '../services/api';
+import {homeContentCopy,type HomeBook} from '../services/home-content';
+import type {LibraryKind} from '../services/library-navigation';
+import './HomeContentPlaceholder.css';
+export function HomeContentPlaceholder({kind,state,bookName='',books=[],bookId='',onSwitch,onRetry,error}:{kind:LibraryKind;state:'loading'|'error'|'empty'|'empty-book';bookName?:string;books?:HomeBook[];bookId?:string;onSwitch?:(id:string)=>void;onRetry?:()=>void;error?:string}){
+ const copy=homeContentCopy[kind],owner=`${storage.get('access_token')}:${storage.get('child_id')}:${storage.get('family_id')}`,current=()=>owner===`${storage.get('access_token')}:${storage.get('child_id')}:${storage.get('family_id')}`;
+ const open=(page:'import'|'discover')=>{if(current())void Taro.navigateTo({url:`/pages/${page}/index?kind=${kind}`});};
+ return <View className={`card home-progress-card home-content-placeholder home-content-${state}`} data-kind={kind} data-state={state}>
+ <View className='home-empty-heading'><Text className='home-word-heading'>{copy.title}</Text>{bookName&&state!=='empty'&&<Text className='home-book-name'>{bookName}</Text>}</View>
+ {state==='loading'?<View className='home-content-skeleton' role='status' aria-label={`正在加载${copy.name}`}><View className='home-skeleton-line'/><View className='home-skeleton-actions'><View/><View/></View><Text className='muted small'>正在加载…</Text></View>:state==='error'?<View role='alert'><View className='muted home-empty-description'>统计暂不可用，请重试。</View>{error&&<View className='muted small'>{error}</View>}<Button className='text-action home-empty-retry' onClick={()=>current()&&onRetry?.()}>重新加载</Button></View>:<><View className='muted home-empty-description'>{state==='empty-book'?`这本${copy.book}还没有内容，可以录入或切换到其他${copy.book}。`:copy.description}</View><View className='home-learning-actions home-empty-actions'><Button className='home-study-button home-learn-button' onClick={()=>open('import')}><Text className='home-action-title'>录入{copy.name}</Text></Button>{state==='empty-book'&&onSwitch&&books.length>1?<Picker className='home-empty-picker' mode='selector' range={books.map(book=>`${book.name}${book.read_only?' · 共享':''}`)} value={Math.max(0,books.findIndex(book=>book.id===bookId))} onChange={event=>{const id=books[Number(event.detail.value)]?.id;if(id&&current())onSwitch(id);}}><View className='home-study-button home-review-button' role='button' aria-label={`切换${copy.book}`}><Text className='home-action-title'>切换{copy.book}</Text></View></Picker>:<Button className='home-study-button home-review-button' onClick={()=>open('discover')}><Text className='home-action-title'>发现{copy.book}</Text></Button>}</View></>}
+ </View>;
+}

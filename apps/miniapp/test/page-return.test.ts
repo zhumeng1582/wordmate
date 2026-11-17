@@ -10,7 +10,7 @@ test('settings reuses its child components on return and replaces only the chang
  page.cache.set('access_token','account-b');await page.show();assert.notEqual(keys().AudioPreferences,initial.AudioPreferences);
 });
 
-test('wordbook return preserves loaded pages, expansion and usable controls until replacement is ready',async()=>{
+test('wordbook return preserves loaded pages and usable controls until replacement is ready',async()=>{
  let hold=false;const waiting=deferred();
  const page=pageHarness('pages/words/index',async path=>{
   if(hold)await waiting.promise;
@@ -19,31 +19,31 @@ test('wordbook return preserves loaded pages, expansion and usable controls unti
   const after=new URL(path,'https://test.invalid').searchParams.get('cursor'),offset=after==='word-100'?100:0;
   return {items:Array.from({length:100},(_,i)=>({id:`word-${offset+i+1}`,lemma:`word${offset+i+1}`,version:1})),next_cursor:offset?null:'word-100',total:200,book_total:200,learned_count:5,first_unlearned_id:null};
  });
- await page.show();await page.button('加载更多').onClick();page.render();
+ await page.show();await page.reachBottom();page.render();
  const row=page.all(page.render()).find(node=>node.props?.id==='word-word-150');assert(row);row.props.onClick();
  const count=()=>page.all(page.render()).filter(node=>node.props?.className==='wordbook-item').length;
- assert.equal(count(),200);page.hide();hold=true;await page.show();assert.equal(count(),200);assert.doesNotMatch(page.text(page.render()),/正在加载/);assert(page.all(page.render()).some(node=>node.props?.className==='wordbook-detail'));
- waiting.resolve();await tick();assert.equal(count(),200);assert(page.all(page.render()).some(node=>node.props?.className==='wordbook-detail'));
+ assert.equal(count(),200);page.hide();hold=true;await page.show();assert.equal(count(),200);assert.doesNotMatch(page.text(page.render()),/正在加载/);assert.equal(page.routes.at(-1),'/pages/word-detail/index?id=word-150');assert(!page.all(page.render()).some(node=>node.props?.className==='wordbook-detail'));
+ waiting.resolve();await tick();assert.equal(count(),200);assert.equal(page.routes.at(-1),'/pages/word-detail/index?id=word-150');assert(!page.all(page.render()).some(node=>node.props?.className==='wordbook-detail'));
 });
 
 test('wrong-word return keeps multiple pages and selection without disabling the study action',async()=>{
  let hold=false;const waiting=deferred();
  const page=pageHarness('pages/wrong/index',async path=>{if(hold)await waiting.promise;const offset=path.includes('cursor=after-50')?50:0;return {items:Array.from({length:50},(_,i)=>({word:{id:`word-${offset+i}`,lemma:`wrong${offset+i}`,meaning_zh:'测试',part_of_speech:'noun'},wrong_count:1,sources:['review'],last_wrong_at:'2026-10-30T12:00:00Z'})),next_cursor:offset?null:'after-50'};});
- await page.show();await page.button('加载更多').onClick();page.render();page.button('选择已加载的词').onClick();assert.match(page.text(page.render()),/复习选中错词（100）/);
+ await page.show();await page.reachBottom();page.render();page.actionChoices.push('选择错词复习');await page.button('更多错题操作').onClick();await tick();await page.button('全选当前范围').onClick();await tick();assert.match(page.text(page.render()),/已选 100 词/);
  page.hide();hold=true;await page.show();assert.match(page.text(page.render()),/wrong99/);assert.equal(page.button('复习选中错词').disabled,false);
- waiting.resolve();await tick();assert.match(page.text(page.render()),/复习选中错词（100）/);
+ waiting.resolve();await tick();assert.match(page.text(page.render()),/已选 100 词/);
 });
 
 test('a child change clears old list content immediately and late responses cannot restore it',async()=>{
  let hold=false;const waiting=deferred();
- const page=pageHarness('pages/wordbooks/index',async path=>{if(hold)await waiting.promise;return {items:[{id:path.includes('child-b')?'book-b':'book-a',name:path.includes('child-b')?'孩子 B 的词本':'孩子 A 的词本',word_count:1}]};});
+ const page=pageHarness('components/BookManagement',async path=>{if(hold)await waiting.promise;return {items:[{id:path.includes('child-b')?'book-b':'book-a',name:path.includes('child-b')?'孩子 B 的词本':'孩子 A 的词本',word_count:1}]};},'BookManagement',{props:{kind:'words'}});
  await page.show();hold=true;page.hide();await page.show();page.hide();page.cache.set('child_id','child-b');await page.show();assert.doesNotMatch(page.text(page.render()),/孩子 A/);
  waiting.resolve();await tick();assert.match(page.text(page.render()),/孩子 B/);assert.doesNotMatch(page.text(page.render()),/孩子 A/);
 });
 
 test('home return retains today progress and does not grey out its main action',async()=>{
  let hold=false;const waiting=deferred();
- const page=pageHarness('pages/home/index',async path=>{if(hold)await waiting.promise;return path==='/me'?{referral_code:''}:{child:{nickname:'小明'},completed_words:7,goal:20,due_count:15,new_count:16,remaining_new_limit:16,streak_days:3};});
+ const page=pageHarness('pages/home/index',async path=>{if(hold)await waiting.promise;return path==='/me'?{referral_code:''}:path.includes('/words?')?{book_total:30,learned_count:7}:{child:{nickname:'小明'},completed_words:7,goal:20,due_count:15,new_count:16,remaining_new_limit:16,streak_days:3};});
  await page.show();page.hide();hold=true;await page.show();assert.match(page.text(page.render()),/小明/);assert.equal(page.button('复习单词').disabled,false);assert.doesNotMatch(page.text(page.render()),/正在加载/);waiting.resolve();await tick();
 });
 
@@ -63,7 +63,7 @@ test('audio preferences preserve unsaved values through return without another l
 });
 
 test('failed return refresh retains the last loaded wordbooks and provides retry',async()=>{
- let fail=false;const page=pageHarness('pages/wordbooks/index',async()=>{if(fail)throw Error('NETWORK_TIMEOUT');return {items:[{id:'book-a',name:'保留的词本',word_count:5}]};});
+ let fail=false;const page=pageHarness('components/BookManagement',async()=>{if(fail)throw Error('NETWORK_TIMEOUT');return {items:[{id:'book-a',name:'保留的词本',word_count:5}]};},'BookManagement',{props:{kind:'words'}});
  await page.show();page.hide();fail=true;await page.show();assert.match(page.text(page.render()),/保留的词本/);assert.match(page.text(page.render()),/NETWORK_TIMEOUT/);assert.equal(page.button('创建词本').disabled,false);
 });
 

@@ -116,6 +116,6 @@ test('discarding all recognized entries cannot silently submit the original mate
 
 test('an expired login during submission returns to a clear login action',async()=>{
  let page!:ReturnType<typeof fixture>;page=fixture({write:async()=>{page.cache.clear();throw Object.assign(Error('UNAUTHENTICATED'),{status:401});}});await page.show();input(page,'apple');await page.button('整理并选择词义').onClick();
- assert.match(page.text(page.render()),/微信登录/);assert.doesNotMatch(page.text(page.render()),/正在提交|正在准备添加单词|apple/);
+ assert.match(page.text(page.render()),/微信登录/);assert.doesNotMatch(page.text(page.render()),/正在提交|正在准备录入单词|apple/);
 });
 test('photo preview marks phrases invalid and preserves contractions as words',()=>{const input=[{...entries[0],input:'have a nice day',lemma:'have a nice day',part_of_speech:'phrase'},{...entries[1],input:"can't",lemma:"can't",input_index:1}];const draft=applyMaterial(emptyVocabularyDraft(),{text:"have a nice day\ncan't",source:'image',prepared_items:input});assert.equal(draft.prepared?.[0].status,'invalid');assert.match(draft.prepared?.[0].reason??'',/短语/);assert.equal(draft.prepared?.[0].lemma,null);assert.equal(draft.prepared?.[1].status,'ok');});

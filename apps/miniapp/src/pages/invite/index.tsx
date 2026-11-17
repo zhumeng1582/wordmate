@@ -5,10 +5,12 @@ import {api,storage,openLogin,eventId,message} from '../../services/api';
 import {selectFamilyContext,reconcileFamilyChild} from '../../services/family-context';
 import {beginInviteLogin,consumeInviteLogin,cancelInviteLogin} from '../../services/invite-login';
 import './index.css';
-type Destination={state:'ready'|'waiting'|'member'|'unavailable';family?:{id:string;name:string};children?:{id:string}[];expires_at?:string};
-type Screen='checking'|'login'|'ready'|'waiting'|'unavailable'|'error';
+type Destination={state:'ready'|'waiting'|'member'|'unavailable';family?:{id:string;name:string};children?:{id:string}[];application_id?:string;expires_at?:string};
+type Screen='checking'|'login'|'ready'|'waiting'|'unavailable'|'cancelled'|'error';
 export default function Invite(){
+ const [applicationId,setApplicationId]=useState('');
  const [screen,setScreen]=useState<Screen>('checking'),[familyName,setFamilyName]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const applicationFamily=useRef('');
  const token=useRef(''),shown=useRef(true),serial=useRef(0),locked=useRef(false),loginOpening=useRef(false),loginOpened=useRef(false),loginFlow=useRef(''),claimKey=useRef(eventId()),lastScreen=useRef<Screen>('checking');
  const show=(next:Screen)=>{lastScreen.current=next;setScreen(next);};
  const home=()=>Taro.reLaunch({url:'/pages/home/index'});
@@ -22,9 +24,9 @@ export default function Invite(){
   const ticket=++serial.current;locked.current=true;setBusy(true);setError('');const current=()=>shown.current&&ticket===serial.current&&account===storage.get('access_token');
   const display=async(result:Destination)=>{
    if(!current())return;
-   if(result.state==='waiting'&&result.family)storage.set('pending_family_invite',{familyId:result.family.id,name:result.family.name,account});
+   if(result.state==='waiting'&&result.family){applicationFamily.current=result.family.id;storage.set('pending_family_invite',{familyId:result.family.id,name:result.family.name,account});}
    if(result.state==='member'&&result.family){Taro.removeStorageSync('pending_family_invite');selectFamilyContext(storage,result.family.id);reconcileFamilyChild(storage,result.children??[]);await home();return;}
-   setFamilyName(result.family?.name??'');show(result.state==='member'?'error':result.state);
+   setApplicationId(result.application_id??'');setFamilyName(result.family?.name??'');show(result.state==='member'?'error':result.state);
   };
   try{
    let result=await api<Destination>('/family-invites/resolve','POST',{invite_token:token.current});if(!current())return;
@@ -38,6 +40,19 @@ export default function Invite(){
   }catch(e){if(!shown.current||ticket!==serial.current)return;if(account!==storage.get('access_token')){show('login');if(!storage.get('access_token')&&!loginOpened.current)await startLogin();return;}setError(message(e));if(!['ready','waiting'].includes(lastScreen.current))show('error');}
   finally{if(ticket===serial.current){locked.current=false;setBusy(false);}}
  };
+ const cancelApplication=async()=>{
+  if(locked.current||!applicationId)return;
+  const account=storage.get('access_token'),id=applicationId,family=applicationFamily.current,ticket=++serial.current,current=()=>shown.current&&ticket===serial.current&&account===storage.get('access_token');
+  locked.current=true;setBusy(true);setError('');
+  try{
+   const yes=await Taro.showModal({title:'取消这次加入申请？',content:'取消后，家庭管理员将无法批准这次申请。'});
+   if(!yes.confirm||!current())return;
+   await api(`/family-invites/${id}/cancel`,'POST',{},eventId());
+   if(!current())return;
+   const tracked=storage.get('pending_family_invite');if(tracked?.account===account&&tracked.familyId===family)Taro.removeStorageSync('pending_family_invite');setApplicationId('');show('cancelled');
+  }catch(e){if(current())setError(message(e));}
+  finally{if(ticket===serial.current){locked.current=false;if(shown.current)setBusy(false);}}
+ };
  useLoad(query=>{const incoming=query.token??'';if(/^[A-Za-z0-9_-]{43}$/.test(incoming))token.current=incoming;else show('unavailable');});
  useDidShow(()=>{shown.current=true;const join=consumeInviteLogin(loginFlow.current,storage.get('access_token'));loginFlow.current='';if(token.current)void check(join);});
  useDidHide(()=>{shown.current=false;serial.current++;locked.current=false;setBusy(false);});
@@ -47,9 +62,10 @@ export default function Invite(){
  if(screen==='checking')return <View className='invite-page invite-checking'><View className='invite-brand'>单词共学</View><View className='muted'>正在进入…</View></View>;
  return <View className='invite-page'><View className='invite-brand'>单词共学</View><View className='invite-content'>
   <View className={`invite-mark ${screen==='waiting'?'invite-mark-waiting':''}`}>{screen==='waiting'?'✓':screen==='unavailable'?'…':'＋'}</View>
-  <View className='invite-title'>{screen==='waiting'?'申请已发送':screen==='unavailable'?'邀请暂时不可用':screen==='error'?'暂时无法打开':'和家人一起陪学'}</View>
-  <View className='invite-description'>{screen==='waiting'?`等待“${familyName}”的管理员确认。通过后会自动进入首页。`:screen==='unavailable'?'请家人重新分享邀请卡片。已加入的家长可以直接返回首页。':screen==='error'?'检查网络后重试，已提交的申请会保留。':familyName?`加入“${familyName}”，一起查看孩子的学习进度。`:'微信登录并申请加入，家人确认后即可一起陪学。'}</View>
+  <View className='invite-title'>{screen==='waiting'?'申请已发送':screen==='cancelled'?'申请已取消':screen==='unavailable'?'邀请暂时不可用':screen==='error'?'暂时无法打开':'和家人一起陪学'}</View>
+  <View className='invite-description'>{screen==='waiting'?`等待“${familyName}”的管理员确认。通过后会自动进入首页。`:screen==='cancelled'?'你还没有加入这个家庭。如需加入，请家人重新邀请。':screen==='unavailable'?'请家人重新分享邀请卡片。已加入的家长可以直接返回首页。':screen==='error'?'检查网络后重试，已提交的申请会保留。':familyName?`加入“${familyName}”，可查看本家庭所有孩子的学习进度。`:'微信登录并申请加入，家人确认后即可一起陪学。'}</View>
   {error&&<View className='error'>{error}</View>}
+  {screen==='waiting'&&applicationId&&<Button className='invite-later' disabled={busy} onClick={()=>void cancelApplication()}>取消申请</Button>}
   {screen==='login'?<Button className='btn primary' onClick={()=>void startLogin()}>微信登录并申请加入</Button>:screen==='ready'?<><Button className='btn primary' loading={busy} disabled={busy} onClick={()=>void check(true)}>加入家庭</Button><View className='invite-note'>提交后由家人确认</View></>:screen==='waiting'?<Button className='btn secondary' disabled={busy} onClick={()=>void home()}>先去首页</Button>:screen==='error'?<Button className='btn primary' disabled={busy} onClick={()=>void check()}>重新连接</Button>:<Button className='btn primary' onClick={()=>void home()}>返回首页</Button>}
  </View>{['login','ready','error'].includes(screen)&&<Button className='invite-later' disabled={busy} onClick={()=>void home()}>稍后再说</Button>}</View>;
 }

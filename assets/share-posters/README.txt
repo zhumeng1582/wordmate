@@ -15,7 +15,24 @@ poster copy and progress figures.
 09-river-canyon.png      River canyon
 10-island-bay.png        Turquoise island bay
 
-These source images are kept outside the miniapp package because together they
-are about 24 MB. In local development the API randomly selects a background
-matched to the encouragement theme and serves it through the authenticated
-check-in-share image endpoint; the miniapp does not bundle these files.
+These original PNGs are kept outside the miniapp package because together they
+are about 24 MB. Compressed derivatives live under compressed/ and are uploaded
+to private OSS, not bundled in the miniapp. Ten WebP files at quality 65 total
+1,166,570 bytes; ten JPEG compatibility files total 3,338,341 bytes. Original
+pixel dimensions are preserved. No image subpackages remain in the miniapp.
+Rebuild with `node scripts/build-share-posters.cjs` on macOS (cwebp and sips).
+Upload with the target environment loaded using scripts/upload-share-posters.cjs;
+it verifies checksums and does not overwrite differing existing objects.
+The source PNGs remain unchanged. The API also uses them for local generation.
+
+The poster canvas now draws at 1800 x 2400 and exports PNG at that same size.
+Text and the invitation code are drawn at three times the 600 x 800 layout
+coordinates, rather than enlarging an already rasterized small canvas.
+The authenticated /api/checkin-backgrounds/:id/:format route reads only the ten
+allowlisted private OSS objects under OSS_POSTER_PREFIX/compressed-v1/. It uses
+the existing API download domain and keeps credentials out of the miniapp.
+The miniapp downloads a temporary local image before drawing. iOS uses JPEG;
+other platforms prefer WebP and fall back to JPEG on decoding failures. Each
+page retains at most three temporary backgrounds and clears them when its owner
+changes or the page is destroyed. Failed downloads can be retried; account/child
+changes invalidate pending preparation. No paid image generation is involved.

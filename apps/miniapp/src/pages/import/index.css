@@ -1,0 +1,12 @@
+@import '../wordbooks/index.css';
+.unified-import-body>.page{padding:0;min-height:0;background:transparent}
+.unified-import-body>.page>.title,.unified-import-body>.page>.add-topline,.unified-import-body>.page>.add-intro{display:none}
+.import-kind-tabs{display:flex;gap:12px;margin:16px 0 24px;background:var(--field);padding:8px;border-radius:24px}
+.import-kind-tab{flex:1;margin:0;padding:14px 0;background:transparent;color:var(--muted);font-size:28px;line-height:1.5;border-radius:18px}
+.import-kind-tab::after{border:0}
+.import-kind-tab.selected{background:var(--surface);color:var(--primary);font-weight:650}
+.import-record-header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.import-record-summary{margin-top:14px;font-size:28px;overflow-wrap:anywhere}
+.import-record-meta{margin:8px 0;color:var(--muted);font-size:23px}
+.import-record-status{color:var(--primary);font-size:24px}
+.import-record-actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px}

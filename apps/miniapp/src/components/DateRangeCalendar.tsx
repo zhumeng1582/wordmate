@@ -4,18 +4,18 @@ import {View,Text,Button,Picker} from '@tarojs/components';
 import {selectRange,monthDays,recentRange,rangeLabel,type DateRange} from '../services/date-range';
 import {api,storage} from '../services/api';
 import './DateRangeCalendar.css';
-type Mode='review'|'wrong';
-export function DateRangeGrid({value,onChange,month,onMonthChange,today,days=[],mode='review'}:{value:DateRange;onChange:(range:DateRange)=>void;month:string;onMonthChange:(month:string)=>void;today:string;days?:any[];mode?:Mode}){
+type Mode='review'|'wrong'|'makeup';
+export function DateRangeGrid({value,onChange,month,onMonthChange,today,days=[],mode='review',unit='词',disabled=false}:{value:DateRange;onChange:(range:DateRange)=>void;month:string;onMonthChange:(month:string)=>void;today:string;days?:any[];mode?:Mode;unit?:'词'|'字'|'句';disabled?:boolean}){
  const {offset,count}=monthDays(month),records=new Map(days.map(day=>[day.date,day]));
  const move=(step:number)=>{const d=new Date(`${month}-01T00:00:00Z`);d.setUTCMonth(d.getUTCMonth()+step);onMonthChange(d.toISOString().slice(0,7));};
  const preset=(range:DateRange)=>{onChange(range);};
  return <View className='date-range-grid'>
-  <View className='range-presets'>{(['今天','近7天','本月'] as const).map((label,index)=><Button key={label} className='range-preset' onClick={()=>preset(index===0?{start:today,end:today}:index===1?recentRange(today):{start:`${today.slice(0,7)}-01`,end:today})}>{label}</Button>)}</View>
-  <View className='range-selection'>{rangeLabel(value)}</View>
-  <View className='range-heading range-month'><Button className='text-action chevron-button' aria-label='上个月' disabled={month<='2000-01'} onClick={()=>move(-1)}><Chevron direction='left'/></Button><Picker mode='date' fields='month' start='2000-01' end={today.slice(0,7)} value={month} onChange={event=>onMonthChange(event.detail.value)}><Text className='range-month-label'>{month.replace('-',' 年 ')} 月<Chevron direction='down'/></Text></Picker><Button className='text-action chevron-button' aria-label='下个月' disabled={month>=today.slice(0,7)} onClick={()=>move(1)}><Chevron/></Button></View>
+  {mode!=='makeup'&&<View className='range-presets'>{(['今天','近7天','本月'] as const).map((label,index)=><Button key={label} className='range-preset' onClick={()=>preset(index===0?{start:today,end:today}:index===1?recentRange(today):{start:`${today.slice(0,7)}-01`,end:today})}>{label}</Button>)}</View>}
+  <View className='range-selection'>{mode==='makeup'?(value.start||'选择要补卡的日期'):rangeLabel(value)}</View>
+  <View className='range-heading range-month'><Button className='text-action chevron-button' aria-label='上个月' disabled={disabled||month<='2000-01'} onClick={()=>move(-1)}><Chevron direction='left'/></Button><Picker disabled={disabled} mode='date' fields='month' start='2000-01' end={today.slice(0,7)} value={month} onChange={event=>onMonthChange(event.detail.value)}><View className='range-month-label'><Text>{month.replace('-',' 年 ')} 月</Text><Chevron direction='down'/></View></Picker><Button className='text-action chevron-button' aria-label='下个月' disabled={disabled||month>=today.slice(0,7)} onClick={()=>move(1)}><Chevron/></Button></View>
   <View className='range-grid'>{['一','二','三','四','五','六','日'].map(day=><Text className='range-week' key={day}>{day}</Text>)}{Array.from({length:offset},(_,index)=><View key={`blank-${index}`}/>)}{Array.from({length:count},(_,index)=>{
    const date=`${month}-${String(index+1).padStart(2,'0')}`,edge=date===value.start||date===value.end,inside=!!value.end&&date>value.start&&date<value.end,record=records.get(date),words=mode==='wrong'?record?.wrong_words:record?.reviewable_words??record?.studied_words;
-   return <Button key={date} data-date={date} aria-pressed={edge||inside} className={`range-day ${edge?'range-edge':''} ${inside?'range-inside':''}`} disabled={date>today} onClick={()=>onChange(selectRange(value,date))}><Text>{index+1}</Text><Text className='range-activity'>{words?`${words}词`:''}</Text></Button>;
+   return <Button key={date} data-date={date} aria-pressed={edge||inside} className={`range-day ${edge?'range-edge':''} ${inside?'range-inside':''}`} disabled={disabled||(mode==='makeup'?date>=today||!!record?.checked_in:date>today)} onClick={()=>{if(disabled||date>today||mode==='makeup'&&(date>=today||record?.checked_in))return;onChange(mode==='makeup'?{start:date,end:date}:selectRange(value,date));}}><Text>{index+1}</Text><Text className='range-activity'>{mode==='makeup'?(record?.makeup?'已补卡':record?.checked_in?'已打卡':date===today?'今天':date<today?'可补卡':''):(words?`${words}${unit}`:'')}</Text></Button>;
   })}</View>
  </View>;
 }

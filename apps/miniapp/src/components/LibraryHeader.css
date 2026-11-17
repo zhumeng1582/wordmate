@@ -1,0 +1,16 @@
+.library-header{display:flex;align-items:center;gap:12px;min-height:88px;margin:0 0 10px}
+.library-header-picker,.library-header-static{flex:1;min-width:0}
+.library-header-choice{display:flex;align-items:center;gap:10px;min-width:0;min-height:88px}
+.library-header-title{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:32px;font-weight:650;line-height:1.35;color:var(--text)}
+.library-header-choice .ui-chevron{flex:none;margin:0;color:var(--muted)}
+.library-header-shared{flex:none;padding:3px 7px;border-radius:8px;background:var(--field);color:var(--muted);font-size:19px;white-space:nowrap}
+.library-header-actions{display:flex;align-items:center;gap:0;flex:none}
+.library-header-button{position:relative;display:flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;width:88px;height:88px;min-width:88px;min-height:88px;margin:0;padding:0;border-radius:24px;background:transparent;line-height:1;color:var(--text)}
+.library-header-button::after{border:0}.library-header-button:active{background:var(--field)}.library-header-button[disabled]{background:transparent;color:var(--disabled-text)}
+.library-overview{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;margin:0 2px 12px}
+.library-overview-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;flex:1;min-width:0;font-size:25px;font-weight:650;line-height:1.5}
+.library-overview-count{color:var(--muted);font-size:22px;font-weight:400;white-space:nowrap}
+.library-overview-scope{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:none;max-width:52%;min-height:60px;margin:0;padding:6px 0;background:transparent;color:var(--muted);font-size:22px;line-height:1.5}
+.library-overview-scope text{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.library-overview-scope .ui-chevron{flex:none;width:24px;height:24px;margin:0}.library-overview-scope::after{border:0}.library-overview-scope[disabled]{background:transparent;color:var(--disabled-text)}
+.library-header-switch{display:block;margin:0;padding:0;background:transparent;text-align:left;line-height:1.35;border-radius:0}
+.library-header-switch::after{border:0}

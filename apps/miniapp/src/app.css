@@ -43,11 +43,7 @@ button,input,textarea{font-family:inherit}
 
 /* Fixed-size indicators remain legible beside secondary text at every page's font size. */
 .ui-chevron{position:relative;display:inline-block;flex-shrink:0;align-self:center;vertical-align:middle;width:40px;height:40px;margin-left:8px;color:inherit;line-height:1}
-.ui-chevron::before{content:'';position:absolute;left:11px;top:11px;box-sizing:border-box;width:18px;height:18px;border-top:3px solid currentColor;border-right:3px solid currentColor;transform:rotate(45deg)}
 .ui-chevron-left{margin-left:0;margin-right:8px}
-.ui-chevron-left::before{transform:rotate(-135deg)}
-.ui-chevron-up::before{transform:rotate(-45deg)}
-.ui-chevron-down::before{transform:rotate(135deg)}
 .chevron-button .ui-chevron{margin:0}
 .indicator-label{display:inline-flex;align-items:center;vertical-align:middle}
 
@@ -72,17 +68,8 @@ input,textarea{caret-color:var(--primary)}
 /* Fixed-size speaker: activity never changes the text row height. */
 /* Leave room for the loading ring inside WeChat buttons, which clip overflow. */
 .audio-icon{position:relative;display:inline-block;flex-shrink:0;width:32px;height:32px;color:var(--muted);align-self:center;margin:0 4px 0 8px}
-.audio-icon-box{position:absolute;left:3px;top:12px;width:7px;height:10px;border-radius:2px;background:currentColor}
-.audio-icon-cone{position:absolute;left:6px;top:7px;width:0;height:0;border-top:10px solid transparent;border-bottom:10px solid transparent;border-right:11px solid currentColor}
-.audio-wave{position:absolute;border:2px solid currentColor;border-top-color:transparent;border-bottom-color:transparent;border-left-color:transparent;border-radius:50%}
-.audio-wave-near{left:13px;top:9px;width:9px;height:16px}
-.audio-wave-far{left:12px;top:4px;width:17px;height:26px}
 .audio-icon-playing,.audio-icon-loading{color:var(--primary)}
-.audio-icon-playing .audio-wave{animation:audio-wave-pulse 1s ease-in-out infinite}
-.audio-icon-playing .audio-wave-far{animation-delay:.22s}
-.audio-icon-loading .audio-wave{opacity:0}
 .audio-icon-ring{position:absolute;inset:-5px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:audio-ring-turn .8s linear infinite}
-@keyframes audio-wave-pulse{0%,100%{opacity:.2}50%{opacity:1}}
 @keyframes audio-ring-turn{to{transform:rotate(360deg)}}
 .text-action .audio-icon{margin-right:12px}
 
@@ -143,3 +130,16 @@ input,textarea{caret-color:var(--primary)}
 
 /* Shared inset hairline between entries in the learning libraries. */
 .library-divider{position:absolute;top:0;left:0;right:0;height:1PX;background:var(--border);transform:scaleY(.5);transform-origin:top;pointer-events:none}
+
+/* Shared line icons: the same geometry in lists, menus and audio controls. */
+.ui-chevron.app-icon::before{display:none}.ui-chevron-left.app-icon{transform:rotate(180deg)}.ui-chevron-up.app-icon{transform:rotate(-90deg)}.ui-chevron-down.app-icon{transform:rotate(90deg)}
+.audio-icon .app-icon{display:block;width:100%;height:100%}.audio-icon-playing .app-icon{animation:audio-glyph-pulse 1.2s ease-in-out infinite}.audio-icon-loading .app-icon{opacity:.6}
+@keyframes audio-glyph-pulse{0%,100%{opacity:.6}50%{opacity:1}}
+.example-copy{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:100px;min-height:88px;padding:12px 8px}
+@media(prefers-reduced-motion:reduce){.audio-icon-playing .app-icon,.audio-icon-ring{animation:none}}
+button[disabled] .app-icon{opacity:.45}.chevron-button{display:inline-flex;align-items:center;justify-content:center;min-width:88px;min-height:88px}
+.ai-menu-hint{display:inline-flex;align-items:center;justify-content:flex-end}
+
+.audio-selectable-text .audio-text-play{display:flex;align-items:center;justify-content:center;flex:none;width:56px;min-width:56px;min-height:64px;margin:-10px 0;padding:0;background:transparent;border:0;border-radius:12px;line-height:1}
+.audio-selectable-text .audio-text-play::after{border:0}
+.audio-selectable-text .audio-text-label{flex:1;min-width:0;overflow-wrap:anywhere}

@@ -6,7 +6,7 @@ import {fixture} from './ai-fixture.ts';
 
 test('poem and character views count independently once a day and respect ownership',async()=>{
  const f=await fixture();try{
-  for(const name of ['034_poems.sql','035_poem_fields.sql','040_hanzi.sql','041_hanzi_order.sql','043_library_archive.sql','044_library_checkins.sql'])await f.pg.exec(readFileSync(`apps/api/migrations/${name}`,'utf8'));
+  for(const name of ['034_poems.sql','056_import_order.sql','035_poem_fields.sql','040_hanzi.sql','041_hanzi_order.sql','043_library_archive.sql','044_library_checkins.sql'])await f.pg.exec(readFileSync(`apps/api/migrations/${name}`,'utf8'));
   const p=await f.core.poems.create(f.dad,randomUUID(),f.child.id,{title:'春晓',body:'春眠不觉晓。'}),h=await f.core.hanzi.create(f.dad,randomUUID(),f.child.id,{character:'春'});
   await f.core.recordLibraryCheckin(f.dad,f.child.id,{kind:'poems',item_id:p.id});await f.core.recordLibraryCheckin(f.dad,f.child.id,{kind:'poems',item_id:p.id});
   let state=await f.core.libraryCheckins(f.dad,f.child.id);assert.deepEqual(state.poems,{total_days:1,checked_in:true});assert.deepEqual(state.hanzi,{total_days:0,checked_in:false});
