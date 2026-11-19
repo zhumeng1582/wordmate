@@ -1,3 +1,4 @@
+import type {RepairRequest,RepairVerificationRequest,RepairResult,RepairVerification} from './content-repairs.ts';
 import {yuanMicros,settleAiCall,releaseAiCall} from './ai-wallet.ts';
 import {configuredAudioPrice} from './audio-tariff.ts';
 export {yuanMicros} from './ai-wallet.ts';
@@ -9,6 +10,10 @@ import {ensure,DomainError,uuid} from './errors.ts';
 import {vocabularyProvider,type VocabularyProvider} from './vocabulary.ts';
 import {imageReader,type ImageReader} from './import-files.ts';
 
+type RepairCall<T> = {
+  id: string;
+  data: {data:T;usage:unknown};
+};
 type Env=Record<string,string|undefined>;
 export type AiPriceTier={up_to_input_tokens:number;input_yuan_per_million:string;output_yuan_per_million:string;cached_yuan_per_million?:string};
 export type AiModel={id:string;provider:'qwen'|'deepseek'|'openai';model:string;label:string;vision?:boolean;base_url?:string;input_yuan_per_million?:string;output_yuan_per_million?:string;cached_yuan_per_million?:string;max_input_tokens?:number;pricing_tiers?:AiPriceTier[]|null};
@@ -158,6 +163,30 @@ export class AiAccounts{
   const tutor=await import(pathToFileURL(resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist/poem-tutor.js')).href);
   return async(poem:any,history:any[],question?:string)=>this.run(actor,'word_tutor',reference,selected,observed,()=>tutor.generatePoemAnswer(adapter.createTextGenerator(selected.env,observed.fetcher),poem,history,question));
  }
+  async contentRepair(q: Sql, actor: string, reference: string, familyId: string, verify: true): Promise<(input: RepairVerificationRequest) => Promise<RepairCall<RepairVerification>>>;
+  async contentRepair(q: Sql, actor: string, reference: string, familyId: string, verify?: false): Promise<(input: RepairRequest) => Promise<RepairCall<RepairResult>>>;
+  async contentRepair(q: Sql, actor: string, reference: string, familyId: string, verify = false) {
+    const selected = await this.select(q, actor, undefined, 'text', familyId);
+    const observed = this.observer();
+    const base = resolve(
+      typeof __dirname === 'string' ? __dirname : resolve(process.cwd(), 'apps/api/src'),
+      '../../../packages/ai/dist',
+    );
+    const adapter = await import(pathToFileURL(resolve(base, 'index.js')).href);
+    const repair = await import(pathToFileURL(resolve(base, 'content-repair.js')).href);
+    const generator = adapter.createTextGenerator(selected.env, observed.fetcher);
+
+    if (verify) {
+      return async (input: RepairVerificationRequest) => this.run<RepairCall<RepairVerification>['data']>(
+        actor, 'word_tutor', reference, selected, observed,
+        () => generator.generate(repair.contentRepairVerificationRequest(input)),
+      );
+    }
+    return async (input: RepairRequest) => this.run<RepairCall<RepairResult>['data']>(
+      actor, 'word_tutor', reference, selected, observed,
+      () => generator.generate(repair.contentRepairRequest(input)),
+    );
+  }
  async sentenceImport(q:Sql,actor:string,reference:string,familyId:string){
   const selected=await this.select(q,actor,undefined,'text',familyId),observed=this.observer();
   const base=resolve(typeof __dirname==='string'?__dirname:resolve(process.cwd(),'apps/api/src'),'../../../packages/ai/dist');

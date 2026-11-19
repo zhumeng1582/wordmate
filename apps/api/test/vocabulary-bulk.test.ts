@@ -27,6 +27,24 @@ test('bulk text keeps phrases, respects model chunk size, and rejects 8001 rows 
 });
 const markdownWord=(i:number)=>'sample'+String.fromCharCode(97+Math.floor(i/26))+String.fromCharCode(97+i%26);
 const markdownDocument=(count:number)=>'# 儿童课堂单词记录\n\n共 '+count+' 个单词；音标、释义和例句。\n\n'+Array.from({length:count},(_,i)=>`${i+1}. **${markdownWord(i)}** /test/ — 名词 — 测试\n\n   I can see a ${markdownWord(i)}.\n   我能看见它。`).join('\n\n');
+test('copied Markdown excerpts keep unnumbered first entries and offset numbering with their examples',()=>{
+ const words=['music','gym','library','pat','kiss','wink','lick','supermarket','cart','fruit','vegetable','bread','cereal','meat','checkout','trash','throw'];
+ const entries=words.map((word,i)=>`${i?`${235+i}. `:''}**${word}** /test/ — 名词（n.） — 测试；释义\n\n   I see ${word}.\n   我看见了它。`);
+ assert.deepEqual(vocabularyImportChunks(entries.join('\n\n')),[entries.join('\n\n')]);
+ for(const omitFirstNumber of [true,false]){
+  const source=Array.from({length:61},(_,i)=>`${i===0&&omitFirstNumber?'':`${235+i}. `}**${markdownWord(i)}** /test/ — 名词 — 测试；释义\nI see ${markdownWord(i)}.\n我看见了它。`);
+  const chunks=vocabularyImportChunks(source.join('\n\n'));assert.equal(chunks.length,3);
+  assert.deepEqual(chunks,[source.slice(0,30).join('\n\n'),source.slice(30,60).join('\n\n'),source[60]]);
+ }
+});
+test('bulk status reports the most recent real failure instead of an older provider denial',async()=>{
+ const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>({items:words.map(result)})});
+ try{
+  const job=await f.core.vocabulary.create(f.actor,'latest-error',f.child.id,{wordbook_id:f.book.id,words:Array.from({length:61},(_,i)=>testWord(i))});
+  await f.pg.query(`UPDATE wordmate.generation_jobs SET status='failed',error_code=CASE payload->>'bulk_index' WHEN '0' THEN 'AI_SERVICE_NOT_ACTIVATED' WHEN '1' THEN 'GENERATED_CONTENT_REJECTED' ELSE 'BULK_PAUSED' END,updated_at=CASE payload->>'bulk_index' WHEN '0' THEN '2026-11-18T00:49:00Z'::timestamptz ELSE '2026-11-18T03:17:00Z'::timestamptz END,result=CASE payload->>'bulk_index' WHEN '1' THEN '{"validation_error":{"field":"sentence_en","index":0}}'::jsonb ELSE '{"provider_error":{"code":"AccessDenied.Unpurchased"}}'::jsonb END WHERE payload->>'bulk_parent_id'=$1`,[job.id]);
+  const data=await f.core.vocabulary.get(f.actor,job.id);assert.equal(data.error_code,'GENERATED_CONTENT_REJECTED');assert.equal(data.validation_error.field,'sentence_en');assert.equal(data.provider_error,null);
+ }finally{await f.pg.close();}
+});
 test('a structured 156-word Markdown document produces six complete batches without importing headers or splitting examples',()=>{
  const chunks=vocabularyImportChunks(markdownDocument(156));assert.equal(chunks.length,6);assert(chunks.every(chunk=>[...chunk.matchAll(/^\d+\. \*\*/gm)].length<=30));
  assert.doesNotMatch(chunks.join('\n'),/儿童课堂单词记录|共 156 个单词/);
@@ -108,4 +126,11 @@ test('cancelling a running bulk import keeps saved words and prevents late resul
 });
 test('cancelling a pending review discards candidates and prevents confirmation',async()=>{
  const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>({items:words.map(result)})});try{const job=await f.core.vocabulary.create(f.actor,'cancel-review',f.child.id,{wordbook_id:f.book.id,words:['apple'],review_before_save:true});await f.core.vocabulary.processOne();const review=await f.core.vocabulary.candidates(f.actor,job.id);assert.equal(review.pending_count,1);assert.equal((await f.core.vocabulary.cancel(f.actor,job.id)).status,'cancelled');await assert.rejects(f.core.vocabulary.confirmCandidates(f.actor,'confirm-cancelled',job.id,{decisions:[{item_id:review.items[0].id,selected:true}]}),{code:'GENERATION_NOT_REVIEWABLE'});assert.equal((await f.pg.query('SELECT count(*)::int n FROM wordmate.child_words')).rows[0].n,0);}finally{await f.pg.close();}
+});
+
+test('funding and service recovery allow one explicit retry after the old attempt limit without a new task',async()=>{
+ const f=await fixture({provider:'qwen',model:'test',promptVersion:'test',generate:async words=>({items:words.map(result)})});
+ try{const job=await f.core.vocabulary.create(f.actor,'create-recovery',f.child.id,{wordbook_id:f.book.id,words:['cat']});await f.pg.query("UPDATE wordmate.generation_jobs SET status='failed',attempts=3,error_code='AI_SERVICE_NOT_ACTIVATED' WHERE id=$1",[job.id]);assert.equal((await f.core.vocabulary.get(f.actor,job.id)).retryable,true);
+ const retried=await f.core.vocabulary.retry(f.actor,'retry-service',job.id);assert.equal(retried.id,job.id);assert.equal(retried.attempts,3);assert.equal(retried.max_attempts,4);assert.deepEqual(await f.core.vocabulary.retry(f.actor,'retry-service',job.id),retried);await f.core.vocabulary.processOne();const saved=await f.core.vocabulary.get(f.actor,job.id);assert.equal(saved.status,'succeeded');assert.equal(saved.items.filter((i:any)=>i.word_id).length,1);assert.equal((await f.core.vocabulary.list(f.actor,f.child.id)).items.length,1);
+ }finally{await f.pg.close();}
 });

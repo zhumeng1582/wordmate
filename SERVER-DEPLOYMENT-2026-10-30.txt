@@ -1,4 +1,65 @@
+2026-11-18 18:12 代码规范优化及纠错失败恢复服务端已部署
+release: 2026-11-18T10-11-01.250Z-standards
+previous: /var/www/wordmate-releases/2026-11-18T06-03-12.423Z-repair-audit
+fingerprint: 2fa8a706909cf24d640cd8dd4f4227dd6cc599d8b06bce1be338c766c91aee8a
+备份: /var/backups/wordmate/daily/2026-11-18T10-12-16-167Z，38089508 bytes
+仅更新 apps/api/dist/content-repairs.js、ai-accounts.js、database.js 以及 packages/ai/dist/content-repair.js，附对应源码快照；保留现有依赖和 production.env，无数据库迁移。
+纠错失败时三类额度释放与任务失败状态事务化，补齐超时恢复；集成具体类型及代码可读性整理。数据库适配改动仅用于开发 PGlite 重启，不改变生产 PostgreSQL 连接路径。
+发布前完整 verify：696 小程序 +313 API +81 AI +21 脚本/本地数据库，共1111测试通过，HTTP集成与正式小程序构建通过。
+发布前15张业务表摘要无变化；24条既有录入记录已保存数量不变。健康ok/production/integrity verified，鉴权401，systemd active/running，NRestarts=0，启动错误日志为空。旧版本保留可回退。
+部署证据 .local/standards-release/result.json。
+小程序候选已本地构建（版本号0.1.1118.1811），未上传成功：微信开发者工具CLI因服务端口关闭退出；没有成功开启端口。用户随后明确小程序上传由本人完成，代理已停止客户端上传尝试，并将该边界写入根目录 AGENTS.md。用户“部署”默认仅指服务端。
+
+2026-11-18 14:06 AI 纠错全面回归及服务端补丁已部署
+release: 2026-11-18T06-03-12.423Z-repair-audit
+previous: /var/www/wordmate-releases/2026-11-18T05-31-37-750Z-poem-audio
+fingerprint: 1299aa38028cb6d21989ca1f8b3970fa6a3d0eb4c2013acde1b74da228d3dfd1
+备份: /var/backups/wordmate/daily/2026-11-18T06-06-03-466Z，38072976 bytes
+仅发布 apps/api/dist/content-repairs.js 与 packages/ai/dist/content-repair.js（含精确源码快照）；保留上一版本 pinyin-pro 及依赖、production.env。无数据库迁移，无新增实体。
+修复例句单字段 diff 写入/译文保留/目标定位、单词拼写 SQL 参数类型冲突、无效音标和拼音校验、未知作者朝代保留、音频修复安全撤销。103 项 AI/服务/组件测试 +1 项 HTTP 路由测试通过，编译通过。
+切换前检查 15 张表无变化；24 条既有录入记录已保存数量不变；健康 production/ok/integrity verified，鉴权401，systemd active/running，NRestarts=0，启动无错误。
+本轮无小程序变更或上传。说明 apps/AI-CONTENT-REPAIR.txt；部署证据 .local/repair-audit-release/result.json。
+
 单词共学服务器域名与部署记录 · 2026-10-30
+
+2026-11-18 13:39 · 古诗朗读词典校验与修复
+- 当前版本：/var/www/wordmate-releases/2026-11-18T05-31-37-750Z-poem-audio；更新content-repairs.js、content-repair.js，新增chinese-pronunciation.js，固定AI包pinyin-pro 3.29.5及锁文件。72个校验文件包含隔离于新版本目录的MIT依赖及许可证，未修改共享旧依赖，无数据库迁移。
+- 默认古诗朗读使用词典方案、独立AI核验及真实TTS；中文模型音节经过字音约束。通用词语“杂兴”采用已核实的xing4读音；保留明确补充说明的修复流程，已有result JSON记录核验拒绝原因。
+- 18项相关测试及完整HTTP失败/重试/播放/撤销测试通过；真实整首核验及合成通过。已完成用户这首《四时田园杂兴（其三十一）》的音频修复，普通播放资源复用正确；原文、注释、译文、学习记录保持，成功收费按既有账本结算。
+- 备份/var/backups/wordmate/daily/2026-11-18T05-38-54-675Z，37,779,320字节。原数据核对及24条录入记录保存数量一致；源码/依赖哈希、部署结果和实际修复回执在.local/poem-audio-release/。
+- 公网health=ok、integrity=verified，指纹533c466e649b754234fb66c3c06fcce62cb30fbd21d623efd8ab6fb5d3acf490；服务active/running、NRestarts=0，错误日志为空。旧版本保留可回退。
+
+2026-11-18 13:10 · 发音纠错格式与音标一致性修复
+- 当前版本：/var/www/wordmate-releases/2026-11-18T05-07-16-809Z-repair-pronunciation；仅更新apps/api/dist/content-repairs.js及packages/ai/dist/content-repair.js，无数据库迁移或依赖变化。
+- 修复真实模型用拼音近似英文导致pupil纠错被拒的问题；纯英文CMU/纯中文拼音限制写入Schema，支持的已有IPA约束单词音素序列，并传递现有口音设置。纠错校验失败复用REPAIR_NOT_VERIFIED提示；失败阶段/字段使用既有result JSON记录。
+- 14项纠错/音素回归及完整HTTP失败重试/播放/撤销测试通过；pupil真实生成、独立核验和语音合成通过，未创建用户纠错任务或扣用户钱包。
+- 备份/var/backups/wordmate/daily/2026-11-18T05-10-08-668Z，37,757,065字节；15张关键业务表发布前核对，24条存量录入记录保存数量一致。
+- 公网health=ok、integrity=verified，指纹ff80a776a0190135beb067f783def3e44b71fd8865fa5caa08b59e03775fa01e；服务active/running、NRestarts=0，错误日志为空。补丁和结果.local/repair-pronunciation-release/。
+
+2026-11-18 12:47 · AI纠错服务端上线
+- 当前版本：/var/www/wordmate-releases/2026-11-18T04-44-04-299Z-content-repair；以12:37录入流程版本为基线，发布16个相关文件，包含已有061_content_repairs.sql；没有混入新的客户端流程优化。
+- 修复客户端AI纠错入口调用尚未部署接口时被旧查询白名单以QUERY_NOT_IMPLEMENTED拦截的问题。接口、后台任务、两步生成核验、发音SSML/播放替换、撤销及现有账务接入上线。
+- 061迁移完成，账本60项、无待执行项；备份/var/backups/wordmate/daily/2026-11-18T04-47-47-080Z，37,754,918字节。迁移演练回滚及存量诗词只读验证通过，13张业务表摘要一致。
+- 公网health=ok、integrity=verified，指纹8baf0bb190a4d17dc2735273eabd50c1b503dcb36afc24c519f3882c170c72b0；服务active/running、NRestarts=0，错误日志为空。纠错GET/POST未登录边界401。
+- 33项纠错相关测试及新增完整HTTP音频修复失败/重试/播放/撤销测试通过，in-process全流程检查通过。真实SSML合成返回MP3；未改动用户诗词或自动创建用户纠错任务。
+- 发布结果见.local/content-repair-release/result.json。首次校验请求缺少必填参数触发应用回滚；修正测试请求后重新激活成功，已应用的兼容性迁移保留。
+
+2026-11-18 12:37 · 录入失败与重试流程优化（服务端）
+- 当前版本：/var/www/wordmate-releases/2026-11-18T04-35-46-568Z-import-flow；以03:47切段修复版本为基线，仅更新apps/api/dist/vocabulary.js与import-records.js，未混入其他工作区功能。
+- 欠费/服务未开通/额度不足等故障在达到旧次数上限后，允许用户明确重试获得一次新尝试，保留原任务及账务历史；录入记录按当前状态提供失败原因、可核对和可重试标志。
+- 无依赖或数据库迁移；迁移账本59项，无待执行项。备份：/var/backups/wordmate/daily/2026-11-18T04-36-58-165Z，37,749,301字节。13张关键业务表数据摘要一致；24条存量录入记录只读验证通过，保存数量一致。
+- 公网health=ok、integrity=verified，指纹a2805ced58bbc6d25207866100be07e817324f76de61a91361ae4376c511dfab；服务active/running、NRestarts=0，启动错误日志为空，未登录接口401。
+- 本轮部署前32项相关回归通过。补丁及部署记录见.local/import-flow-release/；旧版本保留。未自动重试用户录入任务，未发起付费AI。
+- 句子/汉字/古诗的客户端交互及草稿优化尚未上传微信；服务端部署不等于小程序客户端发布。
+
+2026-11-18 11:50 · 单词与古诗录入切段修复
+- 后端版本：/var/www/wordmate-releases/2026-11-18T03-47-30-107Z-import-boundaries；以原线上版本2026-11-17-content-marks-e350bf为基线，仅替换vocabulary.js、vocabulary-import.js、poem-import-jobs.js并新增poem-import-chunks.js，未混入工作区其他功能。
+- 修复复制词表无首条编号、非1起始编号导致的词条拆散；批任务展示最近实际错误。古诗按明确标题或分隔线切段，超限按完整条目重拆；无法安全识别边界或单首资料过长时提示整理后重试。
+- 无数据库迁移或依赖变更；迁移账本59项，无待执行项。备份：/var/backups/wordmate/daily/2026-11-18T03-50-23-901Z，37,507,875字节；10张关键业务表切换前后行数及数据摘要一致。
+- 公网health状态ok、release integrity=verified，指纹8442b2706b0a1de7b3efedb0c94644f5d46b23845f8aad7e2e8194197631cfca；未登录接口401、启动错误日志为空。旧录入记录只读验证保留5词并显示GENERATED_CONTENT_REJECTED，未重建或重试旧任务。
+- 初次切换后日志命令不接受ISO时间格式，脚本自动恢复旧版本；更正查询格式后二次发布完成。
+- 补丁计划、源码哈希及部署结果见.local/import-boundaries-release/。服务器保留旧版本可回滚。
+- 小程序基于Git bce773eb30941d9634f8c7ea23cff309b23764da，仅合入services/api.ts及services/poem-import.ts的本次改动；正式API构建与发布包检查通过，产物output/miniapp-import-boundaries-20261118.zip。尚未上传微信，不代表客户端已发布。
 
 2026-11-13 · 英语常用句后端上线
 - 当前版本：/var/www/wordmate-releases/2026-11-13-sentence-learning-49f431；release 2026-11-13T09-47-28-345Z-49f431。
@@ -574,3 +635,12 @@ AI 学童 Agent 能力合并发布（2026-11-11）
 - 128张业务表迁移前后原有字段完整行摘要一致（对poems/hanzi比较时排除本次新增favorite字段），新收藏字段全部false；3用户、2家庭、3成员、2孩子、289单词、123古诗、285汉字、100句子未改动。没有写入测试业务数据。
 - 公网HTTPS及本机health正常，release id与本次清单一致、integrity verified；systemd active/running、NRestarts=0，启动后错误日志为空。两个新增收藏路由未登录均返回401。新功能授权行为、版本冲突和共享复制隔离由本地288项API及补充专项、真实HTTP冒烟验证；前端660项测试、类型检查和正式构建通过。
 - 部署记录 .local/content-marks-release/result.json。后端已上线，小程序未代上传，统一标记界面需上传已生成的apps/miniapp/dist后生效。
+
+2026-11-19 12:00（北京时间）管理后台运营查询及成本备份上线
+- 生产版本 2026-11-19T03-53-22-021Z-85492f-admin，原版本 2026-11-18T10-11-01.250Z-standards 保留，可切回旧目录并重启服务。未执行数据库迁移。
+- 基于 bce773e 工作区的未提交改动构建，按当前生产清单提取 21 项差异并附上 3 个 API 模块的源码。补丁 SHA-256 为 9c8cb1ccc3e7703c9a1ffb54b808d0aa8a833d679e0f271bcbe45b4ffc840526，生产清单源码指纹为 2506f102533fd109326f476a5f12c194ccd4337b6a01d62ae0ec0d4f7d1c9d33。生产依赖及运行配置沿用旧版。
+- 发布四类学习内容、导入任务、AI 纠错的管理查询，当前版本音频的查询与试听、手工数据库成本统计及日备份支持。管理后台沿用 SSH 隧道按需启动方式。
+- 六类导入、生成、纠错及 AI 任务预检通过，停服备份数据库和删除清单至 /var/backups/wordmate/daily/2026-11-19T04-00-14-445Z。数据库 dump 共 39,013,789 字节，目录及摘要校验通过。切换前 15 张业务表两次只读摘要一致。
+- 本次重新编译 API/AI，管理及备份 23 项测试通过。切换前后用临时回环管理后台读取四类内容列表、详情及音频列表、导入任务、纠错与成本，均通过，未写入账单或生成音频。首次验收脚本查询成本时遗漏月份，按页面参数补齐后通过。临时管理进程已退出。
+- 本机与公网 HTTPS 健康均返回目标版本、ok 和 verified。systemd active/running，NRestarts=0，启动期间无 err 级日志。管理接口及两个受保护 API 缺少身份时均返回 401。复核迁移账本 60 项，待执行 0 项。
+- 仅部署服务端，小程序未上传。文件清单及切换结果见 .local/admin-server-release/plan.json 和 result.json。

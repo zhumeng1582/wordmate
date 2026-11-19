@@ -22,6 +22,8 @@ test('embedded development DB initializes once, persists after reopen and reject
   await connection.source.destroy();connection=undefined;
   connection=await connect(url);
   const rows=await connection.db.query('SELECT display_name FROM wordmate.users');assert.equal(rows.rows[0].display_name,'持久化测试');
+  const pos=await connection.db.query("SELECT wordmate.short_word_pos('noun') label");assert.equal(pos.rows[0].label,'n.');
+  const trigger=await connection.db.query("SELECT 1 FROM information_schema.triggers WHERE trigger_schema='wordmate' AND trigger_name='normalize_word_pos' AND event_object_table='child_words'");assert(trigger.rows.length>0);
   await connection.source.destroy();connection=undefined;
   await assert.rejects(connect('pglite:../outside'),/inside .local/);
   process.env.NODE_ENV='production';await assert.rejects(connect(url),/only enabled for local development/);

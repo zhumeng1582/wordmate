@@ -120,6 +120,7 @@ const {CheckinBackgrounds}=require('../apps/api/dist/checkin-backgrounds.js');
     assert.equal((await request(route,{favorite:false,expected_version:item.version},undefined,'PUT')).status,409);
     assert.equal((await request(route,{favorite:'yes',expected_version:marked.version},undefined,'PUT')).status,422);
     assert.equal((await ok(`${base}/${item.id}`)).favorite,true);
+    const repairBase=`/children/${child.id}/content-repairs`,latest=await ok(`${repairBase}?kind=${kind}&target_id=${item.id}`);assert.equal(latest.latest,null);assert.equal((await request(repairBase,{kind,target_id:item.id,issue:kind==='poems'?'explanation':'pinyin',expected_version:999})).status,409);assert.equal((await request(repairBase,{kind,target_id:item.id,issue:'invalid',expected_version:latest.version})).status,422);assert.equal((await request(`${repairBase}?kind=${kind}&target_id=${item.id}&invalid=1`)).status,422);
    }
   }
   {const base=`/children/${c.id}/learning-assistant-sessions`,session=await ok(base,{}),route=`/learning-assistant-sessions/${session.id}`;

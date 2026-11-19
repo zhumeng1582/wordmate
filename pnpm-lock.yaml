@@ -128,7 +128,11 @@ importers:
         specifier: 4.5.14
         version: 4.5.14(@types/node@22.15.30)(sass@1.105.2)(terser@5.51.2)
 
-  packages/ai: {}
+  packages/ai:
+    dependencies:
+      pinyin-pro:
+        specifier: 3.29.5
+        version: 3.29.5
 
 packages:
 
@@ -3543,6 +3547,9 @@ packages:
   pinkie@2.0.4:
     resolution: {integrity: sha512-MnUuEycAemtSaeFSjXKW/aroV7akBbY+Sv+RkyqFjgAe73F+MR0TBWKBRDkmfWq/HiFmdavfZ1G7h4SPZXaCSg==}
     engines: {node: '>=0.10.0'}
+
+  pinyin-pro@3.29.5:
+    resolution: {integrity: sha512-Fk5YoRmtdHqJWqAuzYVG/NzvzeCbaG+ZEwbY6Nbps3QAIrvQQEtcm49frcyCM8i2b5najnzPDtYqrHRYTTiuwQ==}
 
   pirates@4.0.7:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
@@ -7999,6 +8006,8 @@ snapshots:
       pinkie: 2.0.4
 
   pinkie@2.0.4: {}
+
+  pinyin-pro@3.29.5: {}
 
   pirates@4.0.7: {}
 

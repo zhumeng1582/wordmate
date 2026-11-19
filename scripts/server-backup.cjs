@@ -24,6 +24,21 @@ function prune(days){
   }
  }
 }
+function backupDatabaseCosts(current, env, directory) {
+  const source = env.ADMIN_DATABASE_COSTS_FILE || path.resolve(
+    path.resolve(current, env.AUDIO_SPOOL_DIR || '.local/audio-spool'),
+    '../admin-database-costs.json',
+  );
+  if (!path.isAbsolute(source)) throw Error('ADMIN_DATABASE_COSTS_FILE must be an absolute path');
+  if (!fs.existsSync(source)) return null;
+  if (fs.statSync(source).size > 2 * 1024 * 1024) throw Error('Cost file exceeds backup limit');
+  const bytes = fs.readFileSync(source);
+  const file = 'admin-database-costs.json';
+  fs.writeFileSync(path.join(directory, file), bytes, {mode: 0o600});
+  return {file, bytes: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex')};
+}
+module.exports={backupDatabaseCosts};
+if(require.main===module){
 try{
  const envPath=path.join(current,'production.env'),env=parseEnv(fs.readFileSync(envPath,'utf8'));
  const days=Number(env.PRIVACY_BACKUP_RETENTION_DAYS);
@@ -42,8 +57,11 @@ try{
   fs.copyFileSync(envPath,path.join(directory,'runtime.env'));fs.chmodSync(path.join(directory,'runtime.env'),0o600);
   fs.copyFileSync(ledger(),path.join(directory,'deletion-ledger.json'));
   const report={created_at:new Date().toISOString(),release:fs.realpathSync(current),retention_days:days,bytes:fs.statSync(dump).size,sha256:crypto.createHash('sha256').update(fs.readFileSync(dump)).digest('hex')};
+  report.database_costs=backupDatabaseCosts(current,env,directory);
   fs.writeFileSync(path.join(directory,'manifest.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({operation,passed:true,directory,bytes:report.bytes,retention_days:days}));
  }else console.log(JSON.stringify({operation,passed:true}));
  prune(days);
 }catch(e){console.error('WORDMATE_BACKUP_FAILED',e.code||e.message);process.exitCode=1;}
+
+}

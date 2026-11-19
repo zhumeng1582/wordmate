@@ -13,7 +13,9 @@ const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value))
 export const VOCABULARY_VALIDATION_REVISION='2026-10-31-noun-plurals';
 const terminalInputErrors=['NO_WORDS_FOUND','TOO_MANY_WORDS','UNSAFE_INPUT'];
 const validationRecovery=(job:Row)=>job.status==='failed'&&job.error_code==='GENERATED_CONTENT_REJECTED'&&job.attempts>=job.max_attempts&&job.max_attempts<5&&job.payload.validation_revision!==VOCABULARY_VALIDATION_REVISION;
-const retryable=(job:Row)=>!terminalInputErrors.includes(job.error_code)&&(job.attempts<job.max_attempts||validationRecovery(job));
+const configurationRecovery=(job:Row)=>job.status==='failed'&&['AI_SERVICE_NOT_ACTIVATED','AI_PROVIDER_BILLING_UNAVAILABLE','AI_INSUFFICIENT_BALANCE','AI_KEY_REQUIRED','AI_DAILY_LIMIT','AI_SYSTEM_BUDGET_EXHAUSTED'].includes(job.error_code)&&job.attempts>=job.max_attempts;
+export const vocabularyJobRetryable=(job:Row)=>!terminalInputErrors.includes(job.error_code)&&(job.attempts<job.max_attempts||validationRecovery(job)||configurationRecovery(job));
+const retryable=vocabularyJobRetryable;
 export interface VocabularyProvider {
  provider:string;model:string;promptVersion:string;rawPromptVersion?:string;selection?:AiSelection;
  generateRaw?(raw:string,theme:string,level:string,version?:string):Promise<{items:Row[];error:string|null;billing_id?:string}>;
@@ -40,7 +42,7 @@ export class Vocabulary {
   const jobs=(await q.query("SELECT * FROM generation_jobs WHERE payload->>'bulk_parent_id'=$1 ORDER BY (payload->>'bulk_index')::int",[j.id])).rows;
   const counts=await one(q,"SELECT count(*)::int total,count(*) FILTER(WHERE i.child_word_id IS NOT NULL)::int saved,count(*) FILTER(WHERE i.status='invalid')::int invalid,count(*) FILTER(WHERE i.status='needs_confirmation')::int pending FROM batch_items i JOIN generation_jobs g ON i.batch_id=(g.payload->>'batch_id')::uuid WHERE g.payload->>'bulk_parent_id'=$1",[j.id]);
   const items=(await q.query("SELECT i.*,((g.payload->>'bulk_index')::int*30+i.ordinal) global_ordinal FROM batch_items i JOIN generation_jobs g ON i.batch_id=(g.payload->>'batch_id')::uuid WHERE g.payload->>'bulk_parent_id'=$1 ORDER BY (i.child_word_id IS NULL) DESC,(g.payload->>'bulk_index')::int,i.ordinal LIMIT 60",[j.id])).rows;
-  const active=jobs.some(job=>['queued','running'].includes(job.status)),failures=jobs.filter(job=>['failed','partial'].includes(job.status)),error=failures.find(job=>job.error_code&&job.error_code!=='BULK_PAUSED');
+  const active=jobs.some(job=>['queued','running'].includes(job.status)),failures=jobs.filter(job=>['failed','partial'].includes(job.status)),error=failures.filter(job=>job.error_code&&job.error_code!=='BULK_PAUSED').sort((a,b)=>new Date(b.updated_at).getTime()-new Date(a.updated_at).getTime())[0];
   const status=j.error_code==='USER_CANCELLED'?'cancelled':active?'running':jobs.every(job=>job.status==='succeeded')?'succeeded':(counts.saved||counts.pending)?'partial':jobs.every(job=>job.status==='cancelled')?'cancelled':'failed';
   return {id:j.id,child_id:j.child_id,is_bulk:true,review_before_save:!!j.payload.review_before_save,pending_count:counts.pending,input_type:j.payload.input_type,raw_text:j.payload.raw_text?.slice(0,1000)??null,wordbook_id:j.payload.wordbook_id,theme:j.payload.theme,batch_id:j.payload.batch_id,status,attempts:Math.max(0,...jobs.map(job=>job.attempts)),max_attempts:Math.max(3,...jobs.map(job=>job.max_attempts)),error_code:j.error_code==='USER_CANCELLED'?null:error?.error_code??null,provider_error:error?.result?.provider_error??null,validation_error:error?.result?.validation_error??null,provider:j.payload.provider,model:j.payload.model,retryable:j.error_code!=='USER_CANCELLED'&&!active&&failures.some(retryable),total_count:counts.total,saved_count:counts.saved,invalid_count:counts.invalid,bulk:{total_parts:jobs.length,completed_parts:jobs.filter(job=>job.status==='succeeded').length,failed_parts:failures.length},items:items.map(item=>({ordinal:item.global_ordinal,input:item.raw_text,status:item.status,word_id:item.child_word_id,reason:item.candidates[0]?.reason??null}))};
  }
@@ -102,12 +104,15 @@ export class Vocabulary {
  async list(actor:string,child:string){return this.a.tx(async q=>{await this.a.child(q,actor,child);return {items:await Promise.all((await q.query("SELECT * FROM generation_jobs WHERE child_id=$1 AND payload->>'flow' IN ('vocabulary_v1','vocabulary_bulk_v1') AND payload->>'bulk_parent_id' IS NULL ORDER BY created_at DESC,id DESC LIMIT 20",[child])).rows.map(j=>this.dto(q,j)))};});}
  async cancel(actor:string,id:string){return this.a.tx(async q=>{const {job}=await this.scope(q,actor,id);if(job.status==='cancelled'&&job.error_code==='USER_CANCELLED')return this.dto(q,job);const bulk=job.payload.flow==='vocabulary_bulk_v1',where=bulk?"g.payload->>'bulk_parent_id'=$1":"g.id=$1";const pending=await one(q,`SELECT count(*)::int n FROM batch_items i JOIN generation_jobs g ON i.batch_id=(g.payload->>'batch_id')::uuid WHERE ${where} AND i.status='needs_confirmation'`,[id]);ensure(['queued','running','failed','partial'].includes(job.status)||pending.n>0,409,'GENERATION_NOT_CANCELLABLE');if(bulk)await q.query("UPDATE generation_jobs SET status='cancelled',error_code='USER_CANCELLED',lease_until=NULL,updated_at=$2 WHERE payload->>'bulk_parent_id'=$1 AND status IN ('queued','running','failed','partial')",[id,this.a.now()]);await q.query(`UPDATE batch_items SET status='confirmed',candidates='[]'::jsonb WHERE id IN (SELECT i.id FROM batch_items i JOIN generation_jobs g ON i.batch_id=(g.payload->>'batch_id')::uuid WHERE ${where} AND i.status='needs_confirmation')`,[id]);const row=await one(q,"UPDATE generation_jobs SET status='cancelled',error_code='USER_CANCELLED',lease_until=NULL,updated_at=$2 WHERE id=$1 RETURNING *",[id,this.a.now()]);return this.dto(q,row);});}
  private async prepareRetry(q:Sql,job:Row,provider:VocabularyProvider){
-  const recover=validationRecovery(job),previous=job.payload.validation_revision??'legacy';
+  const recover=validationRecovery(job),configuration=configurationRecovery(job),previous=job.payload.validation_revision??'legacy';
   job.payload.validation_revision=VOCABULARY_VALIDATION_REVISION;
   if(this.accounts)job.payload.ai_selection=provider.selection;
   // A validation fix grants one attempt on user retry; prior attempts and
   // billing references remain intact. The revision prevents repeated grants.
   if(recover){job.max_attempts++;job.payload.validation_recovery_from=previous;}
+  // Configuration and funding can change after failure; only an explicit user
+  // retry grants one more attempt, preserving prior billing references.
+  if(configuration)job.max_attempts++;
   await q.query('UPDATE generation_jobs SET payload=$2,max_attempts=$3 WHERE id=$1',[job.id,JSON.stringify(job.payload),job.max_attempts]);
  }
  async retry(actor:string,key:string,id:string){return this.a.write(actor,key,`vocabulary:retry:${id}`,{},q=>this.scope(q,actor,id),async(q,{job:j,c})=>{

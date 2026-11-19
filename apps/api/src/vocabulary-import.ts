@@ -1,7 +1,7 @@
 export const MAX_IMPORT_WORDS=8000;
 export const MAX_IMPORT_TEXT=1000000;
 export const GENERATION_CHUNK_SIZE=30;
-export const VOCABULARY_IMPORT_PLAN_VERSION=3;
+export const VOCABULARY_IMPORT_PLAN_VERSION=4;
 
 // A numbered/bulleted Markdown vocabulary document is a sequence of complete
 // entries. Keep each headword, definition and examples together in one chunk.
@@ -12,10 +12,14 @@ function markdownEntries(raw:string):string[]|null{
   if(marker){if(!fence)fence=marker[1][0];else if(marker[1][0]===fence)fence='';continue;}
   if(fence)continue;
   if(/^ {0,3}(?:#{1,6}\s+|(?:注|备注|补充说明)[：:]|\d{4}-\d{2}-\d{2}\b.*说明[：:])/.test(lines[i]))headings.push(i);
-  const list=lines[i].match(/^ {0,3}(?:(\d+)[.)、]|([-+*]))\s+(.+)$/);if(!list)continue;
-  const word=list[3].match(/^(?:\*\*([A-Za-z][A-Za-z .’'-]{0,119})\*\*|__([A-Za-z][A-Za-z .’'-]{0,119})__)(?:\s|[|：:—–-]|$)/);
+  const list=lines[i].match(/^ {0,3}(?:(\d+)[.)、]|([-+*]))\s+(.+)$/);
+  const bare=lines[i].match(/^ {0,3}((?:\*\*|__)[A-Za-z].*)$/);
+  if(!list&&!bare)continue;
+  const word=(list?.[3]??bare![1]).match(/^(?:\*\*([A-Za-z][A-Za-z .’'-]{0,119})\*\*|__([A-Za-z][A-Za-z .’'-]{0,119})__)(?:\s|[|：:—–-]|$)/);
   if(!word){if(starts.length)otherLists.push(i);continue;}
-  const nextStyle=list[1]?'numbered':'bulleted';if(style&&style!==nextStyle)return null;style=nextStyle;starts.push(i);if(list[1])numbers.push(Number(list[1]));
+  // A copied excerpt may omit the first number or start at any source number.
+  if(list){const nextStyle=list[1]?'numbered':'bulleted';if(style&&style!==nextStyle)return null;style=nextStyle;if(list[1])numbers.push(Number(list[1]));}
+  starts.push(i);
  }
  if(!starts.length||starts.length===1&&!lines.slice(starts[0]+1).some(line=>/(?:例句|example|e\.g\.)\s*[:：]|^\s*[A-Za-z][A-Za-z0-9 ,;:’'"()\-–—]*[.!?]\s*$/i.test(line)))return null;
  const last=starts[starts.length-1];
@@ -23,7 +27,7 @@ function markdownEntries(raw:string):string[]|null{
  // entries. A mixed/unformatted list inside the entries still uses the full
  // text parser so that a target word is never silently dropped.
  if(otherLists.some(index=>index<last||!headings.some(heading=>heading>last&&heading<index)))return null;
- if(numbers.length&&!numbers.every(n=>n===1)&&!numbers.every((n,i)=>n===i+1))return null;
+ if(numbers.length&&!numbers.every(n=>n===1)&&!numbers.every((n,i)=>n===numbers[0]+i))return null;
  if(starts.length>MAX_IMPORT_WORDS)throw Error('TOO_MANY_WORDS');
  return starts.map((start,i)=>lines.slice(start,starts[i+1]??lines.length).join('\n').trim());
 }

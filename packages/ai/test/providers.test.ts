@@ -137,3 +137,8 @@ test('DeepSeek remains an explicit optional provider with isolated credentials a
 test('poem narration uses the dedicated Mandarin voice with Chinese language hints',async()=>{
  let input:any;const tts=createTtsProvider(speechEnv,async(url,init)=>{if(String(url).includes('/SpeechSynthesizer')){input=JSON.parse(init!.body as string).input;return ok(synthesis);}return new Response(new Uint8Array([73,68,51]));});await tts.synthesize({text:'床前明月光',accent:'zh-CN',voiceId:'longxiaochun_v3',rate:0.9,languageHints:['zh']});assert.equal(input.voice,'longxiaochun_v3');assert.deepEqual(input.language_hints,['zh']);await assert.rejects(tts.synthesize({text:'春晓',accent:'zh-CN',voiceId:'loongemily_v3',rate:1,languageHints:['zh']}),{code:'VOICE_ACCENT_UNAVAILABLE'});await assert.rejects(tts.synthesize({text:'春晓',accent:'zh-CN',voiceId:'longxiaochun_v3',rate:1,languageHints:['en']}),{code:'VOICE_ACCENT_UNAVAILABLE'});
 });
+test('pronunciation repairs enable SSML explicitly while retaining the requested voice and rate',async()=>{
+ const ssml='<speak><phoneme alphabet="cmu" ph="AE1 P AH0 L">apple</phoneme></speak>';
+ const tts=createTtsProvider(speechEnv,async(url,init)=>{if(String(url).includes('/SpeechSynthesizer')){const body=JSON.parse(String(init?.body));assert.equal(body.input.enable_ssml,true);assert.equal(body.input.text,ssml);assert.equal(body.input.voice,speech.voiceId);assert.equal(body.input.rate,speech.rate);return ok(synthesis);}return new Response(new Uint8Array([73,68,51]));});
+ await tts.synthesize({...speech,text:'apple',ssml});
+});

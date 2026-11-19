@@ -3,3 +3,156 @@
 #repair{border-top:1px solid #e4eaf0;padding:8px 0}#repair label{margin:10px 0}#repair audio{width:100%;margin:8px 0}#repair .actions{justify-content:flex-start;flex-wrap:wrap;margin:10px 0}#repair-notice{color:#b03f3f}dialog{max-height:90vh;overflow:auto}
 
 .book-context{align-self:center;color:#516779;padding:0 6px}.library-audios{display:flex;flex-direction:column;gap:10px;min-width:210px}.library-audio{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.library-audio select{max-width:210px;font-size:12px;padding:7px}.library-audio button{font-size:13px;padding:8px}.library-audio audio{width:240px;height:36px;max-width:100%}.library-audio audio[hidden]{display:none}
+
+.database-cost-toolbar label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.database-cost-toolbar input {
+  min-width: 0;
+}
+
+.database-cost-status {
+  color: #516779;
+}
+
+.database-cost-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.database-cost-metric {
+  padding: 18px;
+  border: 1px solid #e4eaf0;
+  border-radius: 12px;
+  background: #f5f9fc;
+}
+
+.database-cost-metric span,
+.database-cost-metric strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.database-cost-metric span {
+  color: #516779;
+  font-size: 13px;
+}
+
+.database-cost-metric strong {
+  margin-top: 8px;
+  font-size: 26px;
+  color: #236ba0;
+  font-variant-numeric: tabular-nums;
+}
+
+.database-cost-section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #e4eaf0;
+}
+
+.database-cost-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.database-cost-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: #516779;
+}
+
+.database-cost-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.database-cost-check {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #516779;
+  font-size: 13px;
+}
+
+.database-cost-check input {
+  flex: none;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.database-cost-form > button {
+  justify-self: start;
+}
+
+.database-cost-notice {
+  color: #b03f3f;
+}
+
+.database-cost-plan {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #e4eaf0;
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.database-cost-plan p {
+  margin: 6px 0;
+}
+
+.database-cost-plan .actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .database-cost-summary,
+  .database-cost-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.operations .operation-detail:not(:empty) {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #dce4e9;
+  border-radius: 12px;
+  background: #f8fafb;
+}
+.operations td {
+  overflow-wrap: anywhere;
+  max-width: 420px;
+}
+.operations p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.operations .library-audio {
+  margin-top: 16px;
+}
+#filters {
+  flex-wrap: wrap;
+}
+
+.pagination[hidden] {
+  display: none;
+}
+.library-audio > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}

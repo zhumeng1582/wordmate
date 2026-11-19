@@ -162,3 +162,23 @@ test('short dense poem lists split on overflow and retain generated learning sec
  }finally{await f.close();}
 });
 test('poem lists support bounded page size while preserving legacy default and next offsets',async()=>{const f=await fixture();try{for(const file of ['034_poems.sql','056_import_order.sql','043_library_archive.sql','035_poem_fields.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+file,'utf8'));for(let i=0;i<3;i++)await f.core.poems.create(f.dad,`limit-poem-${i}`,f.child.id,{title:`诗${i}`,author:'作者',body:`正文${i}`});const first=await f.core.poems.list(f.dad,f.child.id,0,'all','','active',undefined,1);assert.equal(first.items.length,1);assert.equal(first.next_offset,1);assert.equal(first.total,3);const second=await f.core.poems.list(f.dad,f.child.id,1,'all','','active',undefined,2);assert.equal(second.items.length,2);assert.equal(second.next_offset,null);assert(!second.items.some((p:any)=>p.id===first.items[0].id));assert.equal((await f.core.poems.list(f.dad,f.child.id,0)).items.length,3);for(const limit of [0,301,'abc',1.5])await assert.rejects(f.core.poems.list(f.dad,f.child.id,0,'all','','active',undefined,limit),{code:'INVALID_PAGE'});}finally{await f.close();}});
+
+test('long poem jobs send each complete poem with its source learning sections',async()=>{
+ const poems=Array.from({length:5},(_,i)=>({title:`边界诗${i}`,author:'作者',dynasty:'唐',body:('春风明月。\n').repeat(100).trim(),annotations:'注'.repeat(900),translation:'译'.repeat(900)}));
+ const entries=poems.map(p=>`标题：${p.title}\n作者：${p.author}\n正文：${p.body}\n注释：${p.annotations}\n译文：${p.translation}\n`),requests:string[]=[];
+ const f=await fixture(async(_url,options)=>{const request=JSON.parse(String(options!.body)),text=JSON.parse(request.messages.at(-1).content).text;requests.push(text);const found=poems.filter((p,i)=>text.includes(entries[i]));assert(found.length);return response({items:found,incomplete:false,overflow:false});});
+ try{
+  for(const n of ['028_word_tutor.sql','034_poems.sql','056_import_order.sql','035_poem_fields.sql','043_library_archive.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));
+  const id=randomUUID();await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:entries.join('')});
+  let job:any;for(let i=0;i<10;i++){await f.core.poemImports.processOne();job=await f.core.poemImports.get(f.dad,f.child.id,id);if(['ready','failed'].includes(job.status))break;}
+  assert.equal(job.status,'ready',JSON.stringify(job));assert(requests.length>1);assert.equal(requests.join(''),entries.join(''));assert.equal(job.results.flatMap((r:any)=>r.items).length,5);
+ }finally{await f.close();}
+});
+test('overflow without a safe poem boundary fails instead of generating fragments',async()=>{
+ let calls=0;const f=await fixture(async()=>{calls++;return response({items:[],incomplete:true,overflow:true});});
+ try{
+  for(const n of ['028_word_tutor.sql','034_poems.sql','056_import_order.sql','035_poem_fields.sql','043_library_archive.sql','036_poem_import_ai.sql','037_poem_import_jobs.sql','038_poem_import_page_progress.sql'])await f.pg.exec(readFileSync('apps/api/migrations/'+n,'utf8'));
+  const id=randomUUID();await f.core.poemImports.create(f.dad,f.child.id,{id,raw_text:'标题：长诗\n正文：'+('春风明月。').repeat(150)});await f.core.poemImports.processOne();
+  const job=await f.core.poemImports.get(f.dad,f.child.id,id);assert.equal(job.status,'failed');assert.equal(job.error_code,'POEM_BOUNDARY_REQUIRED');assert.equal(calls,1);assert.equal(job.total_parts,1);assert.equal(job.completed_parts,0);
+ }finally{await f.close();}
+});

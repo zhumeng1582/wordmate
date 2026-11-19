@@ -3,10 +3,16 @@
 const http=require('node:http');
 const {randomBytes,timingSafeEqual}=require('node:crypto');
 const {readFileSync}=require('node:fs');
-const {join}=require('node:path');
+const {join,resolve,isAbsolute}=require('node:path');
+const {createStore}=require('./database-costs.cjs');
 const repair=require('./repair.cjs');
 const library=require('./library.cjs');
-function createServer(pool,port,token,runtime){
+const operations = require('./operations.cjs');
+const contentAudio = require('./content-audio.cjs');
+function createServer(pool,port,token,runtime,options={}){
+const costsFile=options.databaseCostsFile||process.env.ADMIN_DATABASE_COSTS_FILE||resolve(runtime?.spoolDir||resolve(__dirname,'../../.local/audio-spool'),'../admin-database-costs.json');
+if(!isAbsolute(costsFile))throw Error('ADMIN_DATABASE_COSTS_FILE must be an absolute path');
+const databaseCosts=createStore(costsFile,options.clock);
 const statuses=['pending','in_progress','resolved','dismissed'];
 const union=`SELECT 'word' AS source,f.id,f.kind,f.created_at,w.lemma,w.meaning_zh,s.text_en,s.translation_zh,NULL::text AS message,f.audio_id::text AS audio_id,f.word_version::text AS reported_version,w.version::text AS current_version FROM wordmate.word_feedback f JOIN wordmate.child_words w ON w.id=f.child_word_id LEFT JOIN wordmate.sentences s ON s.id=f.sentence_id
  UNION ALL SELECT 'audio',f.id,'pronunciation',f.created_at,COALESCE(w.lemma,''),COALESCE(w.meaning_zh,''),s.text_en,s.translation_zh,NULL::text,f.audio_id::text,a.content_version::text,NULL::text FROM wordmate.audio_feedback f JOIN wordmate.audio_assets a ON a.id=f.audio_id LEFT JOIN wordmate.child_words w ON w.id=a.child_word_id LEFT JOIN wordmate.sentences s ON s.id=a.sentence_id
@@ -20,9 +26,42 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'");
   res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');
   const u=new URL(req.url,`http://${expected}`);
-  if(req.method==='GET'&&['/','/app.js','/style.css'].includes(u.pathname)){const file=u.pathname==='/'?'index.html':u.pathname.slice(1);res.writeHead(200,{'Content-Type':file.endsWith('.js')?'text/javascript; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-store'});return res.end(readFileSync(join(__dirname,file)))}
+  if(req.method==='GET'&&['/','/app.js','/style.css','/database-costs.js','/operations.js'].includes(u.pathname)){const file=u.pathname==='/'?'index.html':u.pathname.slice(1);res.writeHead(200,{'Content-Type':file.endsWith('.js')?'text/javascript; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-store'});return res.end(readFileSync(join(__dirname,file)))}
   if(!secretEqual(req.headers['x-admin-token']))return send(res,401,{error:'管理凭证无效'});
   if(req.headers.origin&&req.headers.origin!==`http://${expected}`)return send(res,403,{error:'来源无效'});
+  if (req.method === 'GET' && u.pathname === '/api/database-costs') {
+    return send(res, 200, databaseCosts.get(u.searchParams.get('month')));
+  }
+  if (req.method === 'PUT' && ['/api/database-costs/bill', '/api/database-costs/plan'].includes(u.pathname)) {
+    if (req.headers.origin !== `http://${expected}` || !String(req.headers['content-type'] || '').startsWith('application/json')) {
+      return send(res, 403, {error: '来源无效'});
+    }
+    let input;
+    try {
+      input = await body(req);
+    } catch {
+      return send(res, 400, {error: '成本记录 JSON 无效或过长'});
+    }
+    const saved = u.pathname.endsWith('/bill')
+      ? databaseCosts.saveBill(input)
+      : databaseCosts.savePlan(input);
+    return send(res, 200, saved);
+  }
+  if (req.method === 'GET') {
+    const params = u.searchParams;
+    const lists = {'/api/contents':operations.contents, '/api/repair-records':operations.repairs, '/api/import-tasks':operations.imports};
+    if (Object.hasOwn(lists,u.pathname)) return send(res,200,await lists[u.pathname](pool,params));
+    if (u.pathname === '/api/content-detail') return send(res,200,await operations.contentDetail(pool,params.get('kind'),params.get('id')));
+    if (u.pathname === '/api/repair-detail') return send(res,200,await operations.repairDetail(pool,params.get('id')));
+    if (u.pathname === '/api/content-clips') return send(res,200,await contentAudio.clips(pool,runtime,params.get('kind'),params.get('id'),params.get('part')));
+    if (['/api/library-repair-audio','/api/cached-content-audio'].includes(u.pathname)) {
+      const bytes = u.pathname === '/api/library-repair-audio'
+        ? await contentAudio.repairBytes(pool,params.get('id'))
+        : await contentAudio.cachedBytes(pool,runtime,params.get('kind'),params.get('target'),params.get('part'),params.get('id'));
+      res.writeHead(200,{'Content-Type':'audio/mpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+      return res.end(bytes);
+    }
+  }
   if(req.method==='GET'&&u.pathname==='/api/feedback'){
    const status=u.searchParams.get('status')||'all',source=u.searchParams.get('source')||'all',offset=Math.min(Math.max(Number(u.searchParams.get('offset'))||0,0),100000);
    if(!['all',...statuses].includes(status)||!['all','word','audio','tutor'].includes(source))return send(res,400,{error:'筛选条件无效'});

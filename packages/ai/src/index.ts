@@ -118,7 +118,7 @@ export function createTextGenerator(env: Record<string, string | undefined> = pr
 
 export type Accent = 'en-GB' | 'en-US';
 export type Voice = { id: string; accent: Accent; gender: string };
-export type SpeechRequest = { text: string; accent: Accent | 'zh-CN'; voiceId: string; rate: number; languageHints?: ('zh'|'en')[] };
+export type SpeechRequest = { text: string; accent: Accent | 'zh-CN'; voiceId: string; rate: number; languageHints?: ('zh'|'en')[];ssml?:string };
 export type SpeechProfile = Readonly<{
   provider: string; region: string; model: string; revision: string;
   format: 'mp3'; sampleRate: number;
@@ -170,8 +170,8 @@ export function createCosyVoiceProvider(env: Record<string, string | undefined>,
       if (r.accent==='zh-CN' ? r.voiceId!=='longxiaochun_v3'||r.languageHints?.length!==1||r.languageHints[0]!=='zh' : !voices.some(v => v.id === r.voiceId && v.accent === r.accent)) throw new ProviderError('VOICE_ACCENT_UNAVAILABLE');
       const result = await json(await request(fetcher, `${base}/api/v1/services/audio/tts/SpeechSynthesizer`, {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, input: { text: r.text, voice: r.voiceId, format: 'mp3', sample_rate: 24000,
-          rate: r.rate, language_hints: r.languageHints??['en'], enable_ssml: false, enable_aigc_tag: true } }),
+        body: JSON.stringify({ model, input: { text: r.ssml??r.text, voice: r.voiceId, format: 'mp3', sample_rate: 24000,
+          rate: r.rate, language_hints: r.languageHints??['en'], enable_ssml: !!r.ssml, enable_aigc_tag: true } }),
       }, 60000));
       if (result?.code) throw new ProviderError('TTS_SYNTHESIS_FAILED');
       if (result?.output?.finish_reason !== 'stop') throw new ProviderError('INCOMPLETE_SYNTHESIS', true);

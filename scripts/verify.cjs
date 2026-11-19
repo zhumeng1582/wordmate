@@ -9,6 +9,7 @@ run('API build','corepack',['pnpm','build:api']);
 run('miniapp typecheck','corepack',['pnpm','--filter','@wordmate/miniapp','typecheck']);
 run('miniapp tests',process.execPath,['--experimental-strip-types','--test','--test-concurrency=2',...files('apps/miniapp/test','.test.ts')]);
 run('API tests',process.execPath,['--experimental-strip-types','--test','--test-concurrency=2',...files('apps/api/test','.test.ts')]);
+run('admin tests',process.execPath,['--test','--test-concurrency=2',...files('apps/admin','.test.cjs')]);
 run('AI tests',process.execPath,['--experimental-strip-types','--test','--test-concurrency=2',...files('packages/ai/test','.test.ts')]);
 run('script and local database tests',process.execPath,['--test','--test-concurrency=2',...files('scripts/test','.test.cjs'),'apps/api/test/local-database.test.cjs']);
 run('HTTP integration',process.execPath,['scripts/smoke-inprocess.cjs']);

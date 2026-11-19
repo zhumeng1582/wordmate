@@ -1,5 +1,6 @@
 'use strict';
 const {createHash}=require('node:crypto');
+const currentAudio=require('./content-audio.cjs');
 const uuid=s=>typeof s==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 function error(message,status=400){const e=Error(message);e.httpStatus=status;throw e}
 function offset(value){if(value===null||value==='')return 0;if(!/^\d+$/.test(value))error('页码无效');return Math.min(Number(value),100000)}
@@ -17,10 +18,10 @@ async function words(pool,params){
 }
 async function audio(pool,runtime,id){
  if(!uuid(id))error('音频无效');
- const sql=`SELECT a.storage_profile_id,a.storage_key,a.sha256 FROM wordmate.audio_assets a JOIN wordmate.children c ON c.id=a.child_id AND c.archived_at IS NULL JOIN wordmate.families f ON f.id=c.family_id AND f.status='active' LEFT JOIN wordmate.child_words w ON w.id=a.child_word_id AND w.child_id=a.child_id AND w.archived_at IS NULL LEFT JOIN wordmate.sentences s ON s.id=a.sentence_id AND s.child_id=a.child_id AND s.status='validated' WHERE a.id=$1 AND a.status='succeeded' AND ((w.id IS NOT NULL AND w.version=a.content_version) OR (s.id IS NOT NULL AND s.content_version=a.content_version))`;
- const row=(await pool.query(sql,[id])).rows[0];if(!row)error('音频不存在或已更新',404);const store=runtime?.stores[row.storage_profile_id];if(!store)error('音频存储不可用',503);
+ const sql=`SELECT a.child_id,a.child_word_id,a.sentence_id,a.accent,a.voice_id,a.speech_rate,a.storage_profile_id,a.storage_key,a.sha256 FROM wordmate.audio_assets a JOIN wordmate.children c ON c.id=a.child_id AND c.archived_at IS NULL JOIN wordmate.families f ON f.id=c.family_id AND f.status='active' LEFT JOIN wordmate.child_words w ON w.id=a.child_word_id AND w.child_id=a.child_id AND w.archived_at IS NULL LEFT JOIN wordmate.sentences s ON s.id=a.sentence_id AND s.child_id=a.child_id AND s.status='validated' WHERE a.id=$1 AND a.status='succeeded' AND ((w.id IS NOT NULL AND w.version=a.content_version) OR (s.id IS NOT NULL AND s.content_version=a.content_version))`;
+ const row=(await pool.query(sql,[id])).rows[0];if(!row)error('音频不存在或已更新',404);const replacement=await currentAudio.assetOverride(pool,row);if(replacement)return replacement;const store=runtime?.stores[row.storage_profile_id];if(!store)error('音频存储不可用',503);
  let bytes;try{bytes=await store.get(row.storage_key)}catch{error('音频暂时无法读取',503)}
  if(!bytes||bytes.length<3||bytes.length>10485760||createHash('sha256').update(bytes).digest('hex')!==row.sha256)error('音频校验失败',503);
- const current=(await pool.query(sql,[id])).rows[0];if(!current||current.sha256!==row.sha256||current.storage_key!==row.storage_key||current.storage_profile_id!==row.storage_profile_id)error('音频已更新，请刷新后重试',409);return bytes;
+ const current=(await pool.query(sql,[id])).rows[0];if(!current||current.sha256!==row.sha256||current.storage_key!==row.storage_key||current.storage_profile_id!==row.storage_profile_id)error('音频已更新，请刷新后重试',409);const freshRepair=await currentAudio.assetOverride(pool,current);return freshRepair||bytes;
 }
 module.exports={words,audio};

@@ -1,3 +1,4 @@
+import {repairedAudio} from './content-repairs.ts';
 import {reserveAudio} from './audio-billing.ts';
 import {audioTariff,audioCharacters} from './audio-tariff.ts';
 import {settleAiCall,releaseAiCall} from './ai-wallet.ts';
@@ -29,7 +30,7 @@ export class AudioService {
   const row=await one(q,query,[id]);ensure(row,404,'AUDIO_RESOURCE_NOT_FOUND');
   ensure((word?row.version:row.content_version)===b.content_version,409,'AUDIO_CONTENT_CHANGED');
   const text=word?row.lemma:row.text_en;ensure(text.length>0&&text.length<=1000,422,'INVALID_SPEECH_REQUEST');
-  return {child:row.child_id,text:text.normalize('NFC').trim(),pronunciation:word?JSON.stringify([row.part_of_speech,row.sense_key,row.ipa_gb,row.ipa_us]):''};
+  return {row,child:row.child_id,text:text.normalize('NFC').trim(),pronunciation:word?JSON.stringify([row.part_of_speech,row.sense_key,row.ipa_gb,row.ipa_us]):''};
  }
  private async scope(q:Sql,actor:string,id:string){
   const job=await one(q,"SELECT * FROM generation_jobs WHERE id=$1 AND kind='audio' AND payload->>'flow'='audio_0.1'",[uuid(id)]);ensure(job,404,'AUDIO_JOB_NOT_FOUND');
@@ -40,6 +41,7 @@ export class AudioService {
  async create(actor:string,key:string,b:any){return this.a.write(actor,key,'audio:create',b,q=>this.source(q,actor,b),async(q,s)=>{
   const runtime=this.runtime;ensure(runtime,503,'AUDIO_NOT_CONFIGURED');
   ensure(['en-GB','en-US'].includes(b.accent)&&typeof b.voice_id==='string'&&Number.isFinite(b.speech_rate)&&b.speech_rate>=0.5&&b.speech_rate<=1.5,422,'INVALID_SPEECH_REQUEST');
+  const repair=await repairedAudio(q,s.child,b.word_id?'words':'sentences',b.word_id||b.sentence_id,b.word_id?'word':'body',b.accent,b.voice_id,s.row,b.speech_rate);if(repair)return repair;
   const profile=runtime.profile,profileKey=hash(canonical(profile));
   const cache=hash(JSON.stringify([s.child,b.word_id||b.sentence_id,b.content_version,s.text,s.pronunciation,profileKey,b.accent,b.voice_id,b.speech_rate]));
   const existing=await one(q,"SELECT * FROM generation_jobs WHERE child_id=$1 AND kind='audio' AND dedupe_key=$2",[s.child,cache]);if(existing)return this.dto(q,existing);

@@ -19,6 +19,8 @@ export function startWorkers(core:Core,accounts:AiAccounts,payments:AiPayments,l
  const poemTimer=setInterval(()=>{if(poemWork)return;poemWork=core.poemImports.processOne().catch(()=>console.error('Poem import cycle failed')).finally(()=>{poemWork=undefined;});},1000);poemTimer.unref();
  let hanziWork:Promise<void>|undefined;
  const hanziTimer=setInterval(()=>{if(hanziWork)return;hanziWork=core.hanziImports.processOne().catch(()=>console.error('Hanzi import cycle failed')).finally(()=>{hanziWork=undefined;});},1000);hanziTimer.unref();
+ let repairWork:Promise<void>|undefined;
+ const repairTimer=setInterval(()=>{if(repairWork)return;repairWork=core.repairs.processOne().then(()=>{}).catch(()=>console.error('Content repair cycle failed')).finally(()=>{repairWork=undefined;});},1000);repairTimer.unref();
  let audioWork:Promise<void>|undefined;
  const audioTimer=setInterval(()=>{if(audioWork)return;audioWork=core.audio.previews.processOne().then(()=>core.audio.processOne()).catch(()=>console.error('Audio generation cycle failed')).finally(()=>{audioWork=undefined;});},1000);audioTimer.unref();
  const shareImageWorkers=new Set<Promise<void>>();
@@ -27,7 +29,7 @@ export function startWorkers(core:Core,accounts:AiAccounts,payments:AiPayments,l
  const deletionTimer=setInterval(()=>{if(!deletionWork)deletionWork=lifecycle.processOne().catch(()=>console.error('Deletion cycle failed')).finally(()=>{deletionWork=undefined;});},1000);deletionTimer.unref();
  let billingWork:Promise<void>|undefined;const billingTimer=setInterval(()=>{if(!billingWork)billingWork=accounts.sweep().then(()=>payments.reconcile()).catch(()=>console.error('AI account maintenance failed')).finally(()=>{billingWork=undefined;});},30000);billingTimer.unref();
  return {
-  stop(){for(const timer of [sentenceTimer,cleanupTimer,quizTimer,aiTimer,poemTimer,hanziTimer,audioTimer,shareImageTimer,deletionTimer,billingTimer])clearInterval(timer);},
-  async drain(){await Promise.all([sentenceWork,preparation,generation,poemWork,hanziWork,audioWork,cleanup,deletionWork,billingWork,...shareImageWorkers]);}
+  stop(){for(const timer of [repairTimer,sentenceTimer,cleanupTimer,quizTimer,aiTimer,poemTimer,hanziTimer,audioTimer,shareImageTimer,deletionTimer,billingTimer])clearInterval(timer);},
+  async drain(){await Promise.all([repairWork,sentenceWork,preparation,generation,poemWork,hanziWork,audioWork,cleanup,deletionWork,billingWork,...shareImageWorkers]);}
  };
 }

@@ -37,6 +37,7 @@ const schemas:Record<string,any>={
   poemImportDraft:object({batch:poemReviewBatch,expected_batch:poemReviewGeneration}),
   poemAnalyze:object({request_id:id,text:str(6000)}),
   hanziPinyin:object({request_id:id}),
+  contentRepair:object({kind:{enum:['words','sentences','poems','hanzi']},target_id:id,issue:str(40),description:{type:'string',maxLength:500},expected_version:positive,identity_confirmed:{type:'boolean'},accent:{enum:['en-GB','en-US']},voice_id:str(100)},['kind','target_id','issue','expected_version']),
   favoriteMark:object({favorite:{type:'boolean'},expected_version:positive}),
   poemMark:object({memorized:{type:'boolean'},expected_version:positive}),
   assistantAnswer:object({request_id:id,question:str(1000),action:{enum:['auto','summary','article','rewrite','quiz','mistakes','practice','quiz_answer']},days:{enum:[1,7,30]},source:{enum:['studied','mistakes']},date_from:{type:'string',format:'date'},date_to:{type:'string',format:'date'},quiz_id:id,index:{type:'integer',minimum:0,maximum:2},choice:{type:'integer',minimum:0,maximum:2}},['request_id','question']),
@@ -96,7 +97,8 @@ export function validateBody(path:string[],method:string,body:unknown){
   if(!['POST','PUT','PATCH','DELETE'].includes(method))return;
   if(method==='DELETE'){const route=path.join('/');const kind=route==='me/ai-key'?'aiKeyDelete':route==='me'||route==='me/privacy-consent'?'confirmed':path[0]==='children'&&path.length===2?'deleteChild':path[0]==='families'&&path.length===2?'deleteFamily':'empty';ensure(validators[kind](body),422,'INVALID_REQUEST_BODY');return;}
   let kind='';const route=path.join('/');
-  if(path[0]==='children'&&['hanzi','poems'].includes(path[2])&&path.length===5&&path[4]==='favorite')kind='favoriteMark';
+  if(path[0]==='children'&&path[2]==='content-repairs')kind=path.length===3?'contentRepair':'empty';
+  else if(path[0]==='children'&&['hanzi','poems'].includes(path[2])&&path.length===5&&path[4]==='favorite')kind='favoriteMark';
   else if(path[0]==='children'&&['hanzi','poems','words'].includes(path[2])&&path.length===5&&path[4]==='archive')kind='archiveMark';
   else if(path[0]==='children'&&['hanzi-books','poem-books'].includes(path[2]))kind=path[4]==='share'?'shareBook':path.length===3?'book':'bookRename';
   else if(path[0]==='children'&&['shared-hanzi-books','shared-poem-books'].includes(path[2]))kind='empty';

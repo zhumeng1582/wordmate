@@ -4,5 +4,10 @@
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
-  "scripts": { "test": "node --experimental-strip-types --test test/*.test.ts" }
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "dependencies": {
+    "pinyin-pro": "3.29.5"
+  }
 }
