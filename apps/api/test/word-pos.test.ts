@@ -29,6 +29,9 @@ test('textbook migration repairs the matching sense in personal words and shared
       const after = (await pg.query('SELECT * FROM wordmate.' + table + ' ORDER BY id')).rows;
       assert.deepEqual(after, before.map((row,i) => ({...row, part_of_speech: ['adj.；n.','pron.','n.','adj.','教材'][i]})));
     }
+    const reviewed = await pg.query(`SELECT wordmate.textbook_word_pos('dad','爸爸') AS dad,
+      wordmate.textbook_word_pos('happy','高兴的') AS happy`);
+    assert.deepEqual(reviewed.rows,[{dad:'n.',happy:'adj.'}]);
     const escaped = (await pg.query("SELECT wordmate.resolved_word_pos($1,$2,$3) AS pos", ['you','教材；pron.','你\\；你们；你本人'])).rows[0];
     assert.equal(escaped.pos,'pron.；pron.');
     await pg.query("INSERT INTO wordmate.child_words VALUES(6,'to','（用于动词前）','教材',1,false)");
