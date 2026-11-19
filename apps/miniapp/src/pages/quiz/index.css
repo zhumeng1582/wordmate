@@ -56,7 +56,21 @@
 
 .quiz-sense-context{color:var(--muted);font-size:25px;margin:0 0 8px}.quiz-sense-example{color:var(--text);font-size:27px;line-height:1.6;margin:4px 0 16px;word-break:break-word}
 
-.quiz-inline-back{display:flex;align-items:center;gap:6px;width:auto;margin:0 0 12px;padding:8px 0}.quiz-inline-back .chevron{width:20px;height:20px}
+.quiz-page .quiz-inline-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: auto;
+  max-width: 100%;
+  margin: 0 0 12px;
+  padding: 0 12px 0 0;
+  vertical-align: top;
+}
+.quiz-inline-back .ui-chevron {
+  width: 20px;
+  height: 20px;
+}
 .quiz-word-content{display:flex;align-items:center;gap:16px;min-width:0;flex:1}
 .quiz-word-text{min-width:0;font-size:72px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
 .quiz-word-content .quiz-word-audio{flex:0 0 88px;width:88px;min-height:88px;margin:0;padding:12px;justify-content:center;font-size:28px}

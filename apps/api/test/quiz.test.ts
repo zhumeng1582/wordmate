@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {Core} from '../src/core.ts';
 import {DevIdentity,FixtureDictionary,createScheduler} from '../src/providers.ts';
-import {FixtureQuizBuilder,grade} from '../src/quiz.ts';
+import {FixtureQuizBuilder,StoredMeaningQuizBuilder,grade} from '../src/quiz.ts';
 import type {Database} from '../src/ports.ts';
 const require=createRequire(import.meta.url),{PGlite}=require('@electric-sql/pglite');
 const month=(d:Date)=>new Date(d.getTime()+8*3600000).toISOString().slice(0,7);
@@ -69,6 +69,17 @@ test('monthly scope, frozen questions, leases, answer replay, grading and immuta
   const full=await svc.create(dad,'full',c.id,{month:request.month,mode:'full'});assert.equal(full.total_count,4);
   await svc.abandon(dad,'abandon',full.id,{expected_version:full.version});await svc.prepare(new FixtureQuizBuilder());assert.equal((await svc.get(dad,full.id)).status,'abandoned');
   const failed=await svc.create(dad,'failed',c.id,{month:request.month,mode:'full'});await svc.prepare();assert.equal((await svc.get(dad,failed.id)).status,'failed');
+  // A failed attempt remains in history and does not have to be abandoned first.
+  await pg.query("UPDATE wordmate.child_words SET dictionary_source='textbook' WHERE child_id=$1",[c.id]);
+  const retry = await svc.create(dad,'new-sample',c.id,request);
+  await svc.prepare(new StoredMeaningQuizBuilder());
+  assert.equal((await svc.get(dad,retry.id)).status,'ready');
+  assert.equal((await svc.get(dad,failed.id)).status,'failed');
+  const playable = await svc.items(dad,retry.id,{});
+  assert.equal(playable.items.length,4);
+  for (const item of playable.items) {
+    assert.equal(new Set(item.options.map((o:{text:string}) => o.text)).size,4);
+  }
   assert.equal((await svc.list(dad,c.id,{limit:1})).items.length,1);
  }finally{await pg.close();}
 });
@@ -80,7 +91,7 @@ test('full test keeps all 105 eligible entries, pages safely, and expired sessio
   const dad=(await core.login('dev-dad')).user.id,f=await core.createFamily(dad,'family',{name:'分页测试'}),c=await core.createChild(dad,'child',f.id,{nickname:'测试'});
   // Synthetic, individually identified senses exercise pagination, not teaching quality.
   await pg.query(`WITH words AS (INSERT INTO wordmate.child_words(child_id,lemma,normalized_lemma,part_of_speech,sense_key,meaning_zh,dictionary_source,created_by)
-   SELECT $1,'apple','apple','noun','pagination:'||n,'苹果','development-fixture',$2 FROM generate_series(1,105) n RETURNING id,child_id), cards AS (
+   SELECT $1,'apple','apple','noun','pagination:'||n,'苹果',CASE WHEN n<=2 THEN 'textbook' ELSE 'ai:test' END,$2 FROM generate_series(1,105) n RETURNING id,child_id), cards AS (
    INSERT INTO wordmate.review_cards(child_id,child_word_id,scheduler_version,parameter_version) SELECT child_id,id,'test','test' FROM words RETURNING id,child_id,child_word_id)
    INSERT INTO wordmate.daily_word_activity(child_id,local_date,card_id,child_word_id,first_review_at,was_new) SELECT child_id,$3,id,child_word_id,$4,true FROM cards`,[c.id,dad,month(now)+'-01',now]);
   assert.equal((await svc.preview(dad,c.id,month(now))).eligible_count,105);
@@ -90,7 +101,7 @@ test('full test keeps all 105 eligible entries, pages safely, and expired sessio
   let full=await svc.create(dad,'full',c.id,{month:month(now),mode:'full'});assert.equal(full.total_count,105);
   // Freeze means later edits cannot alter a prepared exam.
   await pg.query("UPDATE wordmate.child_words SET meaning_zh='后来修改的释义' WHERE child_id=$1",[c.id]);
-  await svc.prepare(new FixtureQuizBuilder());full=await svc.get(dad,full.id);assert.equal(full.status,'ready');
+  await svc.prepare(new StoredMeaningQuizBuilder());full=await svc.get(dad,full.id);assert.equal(full.status,'ready');
   const first=await svc.items(dad,full.id,{limit:100}),last=await svc.items(dad,full.id,{limit:100,cursor:first.next_cursor});assert.equal(first.items.length,100);assert.equal(last.items.length,5);assert.equal(last.next_cursor,null);
   assert.equal(new Set([...first.items,...last.items].map((r:any)=>r.id)).size,105);
   let started=await svc.resume(dad,'resume',full.id,{expected_version:full.version});now=new Date(now.getTime()+121000);
