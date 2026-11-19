@@ -458,6 +458,11 @@ export class ContentRepairs {
       if (checked.data.data.approved !== true)
         throw Object.assign(new DomainError(422, 'REPAIR_NOT_VERIFIED'), { repairReason: checked.data.data.reason });
       result.values = Object.fromEntries(Object.entries(result.values as Record<string, string>).map(([key, value]) => [key, key === 'part_of_speech' ? shortPos(value) : value]).filter(([key, value]) => input.source.content[key] !== value));
+      if (result.values.part_of_speech !== undefined) {
+        ensure(result.values.part_of_speech.split(/[/；;,、]/).every(label =>
+          /^(?:n|v|vt|vi|adj|adv|pron|prep|conj|interj|art|det|num|phr|part|contr|aux|mod|abbr)\.$/.test(label.trim())),
+        422, 'REPAIR_NOT_VERIFIED');
+      }
       if (!speech && !Object.keys(result.values).length)
         result.note = '已核对，未发现需要修改的内容。';
       const verifiedResult = result;

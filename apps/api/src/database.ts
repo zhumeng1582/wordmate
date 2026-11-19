@@ -63,7 +63,7 @@ export async function connect(url:string,options:{initializeLocal?:boolean}={}):
     for (const name of [
       '054_poem_books.sql','055_import_records.sql','056_import_order.sql',
       '057_sentence_learning.sql','058_word_pos_abbreviations.sql',
-      '059_prepend_library_imports.sql','060_library_favorites.sql','061_content_repairs.sql',
+      '059_prepend_library_imports.sql','060_library_favorites.sql','061_content_repairs.sql','062_textbook_word_pos.sql',
     ]) {
       if (name === '058_word_pos_abbreviations.sql') {
         // Unlike the other local replay scripts, 058 uses CREATE TRIGGER

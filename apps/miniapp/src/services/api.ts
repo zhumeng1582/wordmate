@@ -151,6 +151,7 @@ const errorMessages:Record<string,string>={
   INVALID_EXPORT_SELECTION:'请选择需要导出的单词。',
   WORDBOOK_LIMIT:'一个孩子最多创建或加入 100 个单词本。',
   WORDBOOK_CHANGED:'词本已在其他设备更新，请刷新后重试。',
+  TEXTBOOK_WORD_POS_UNREVIEWED:'这条教材释义的词性尚待核对，暂时无法加入词本。',
   WORDBOOK_NOT_FOUND:'这个词本已不可用，请刷新词本列表。',
   PUBLIC_SHARING_DISABLED:'首发暂不提供公开词本的发布、发现和加入。',
   SHARED_WORDBOOK_READ_ONLY:'共享词本只能学习和导出，不能编辑。',

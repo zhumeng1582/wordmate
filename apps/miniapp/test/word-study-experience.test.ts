@@ -78,3 +78,12 @@ test('resume copy distinguishes recognition progress, unanswered practice and th
  data.phase='test';data.results['card-0']={correct:true,saved:true,meaning:'苹果',selectedMeaning:'苹果',eventId:'first'};assert.equal(studyResumeDetail(data),'本轮练习 1 / 5');
  complete(data);assert.equal(studyResumeDetail(data),'本轮已完成，查看小结');data.phase='practice';data.practiceQueue=['card-0'];assert.equal(studyResumeDetail(data),'还有 1 词待巩固');
 });
+
+test('study and quiz labels retain English abbreviations for current and historical word senses', async () => {
+  const {partOfSpeech} = await import('../src/services/study-flow.ts');
+  assert.equal(partOfSpeech('n.'), 'n.');
+  assert.equal(partOfSpeech('形容词；noun'), 'adj.；n.');
+  assert.equal(partOfSpeech('part.'), 'part.');
+  assert.equal(partOfSpeech('教材'), '');
+  assert.equal(partOfSpeech('modal verb'), 'mod.');
+});

@@ -49,4 +49,21 @@ export function mergeStudyFlow(previous:StudyFlow,session:any,items:StudyCard[],
 }
 function seededShuffle<T>(values:T[],seed:string){let number=2166136261;for(const char of seed)number=Math.imul(number^char.charCodeAt(0),16777619)>>>0;const items=[...values];for(let index=items.length-1;index>0;index--){number=(Math.imul(number,1664525)+1013904223)>>>0;const pick=number%(index+1);[items[index],items[pick]]=[items[pick],items[index]];}return items;}
 export function studyOptions(card:StudyCard,pool:StudyFlow['pool'],seed:string){const meaning=String(card.meaning_zh??'').trim();if(!meaning)return [];const alternatives=[...new Set(pool.filter(word=>word.id!==card.child_word_id).map(word=>String(word.meaning_zh??'').trim()).filter(value=>value&&value!==meaning))];return seededShuffle([meaning,...seededShuffle(alternatives,seed+':alternatives').slice(0,3)],seed);}
-export function partOfSpeech(value?:string){const labels:Record<string,string>={noun:'名词',verb:'动词',adjective:'形容词',adverb:'副词',pronoun:'代词',preposition:'介词',conjunction:'连词',interjection:'感叹词',article:'冠词',numeral:'数词',phrase:'短语',other:'其他','n.':'名词','v.':'动词','adj.':'形容词','adv.':'副词'};return value?labels[value]??value:'';}
+const posLabels: Record<string, string> = {
+  noun: 'n.', verb: 'v.', adjective: 'adj.', adverb: 'adv.', pronoun: 'pron.',
+  preposition: 'prep.', conjunction: 'conj.', interjection: 'interj.', article: 'art.',
+  determiner: 'det.', numeral: 'num.', number: 'num.', phrase: 'phr.', particle: 'part.',
+  contraction: 'contr.', 'auxiliary verb': 'aux.', 'modal verb': 'mod.',
+  'auxiliary v': 'aux.', 'modal v': 'mod.', '名词': 'n.', '动词': 'v.', '形容词': 'adj.',
+  '副词': 'adv.', '代词': 'pron.', '介词': 'prep.', '连词': 'conj.', '感叹词': 'interj.',
+  '助动词': 'aux.', '情态动词': 'mod.', '缩约形式': 'contr.',
+  '冠词': 'art.', '限定词': 'det.', '数词': 'num.', '助词': 'part.', '短语': 'phr.',
+};
+const posAbbreviations = new Set(Object.values(posLabels));
+export function partOfSpeech(value?: string): string {
+  return (value ?? '').split(/[；;、/]/).map(part => {
+    const key = part.trim().toLowerCase().replace(/\.$/, '');
+    const abbreviation = key + '.';
+    return posLabels[key] ?? ((posAbbreviations.has(abbreviation) || /^[a-z]{1,6}\.$/.test(part.trim())) ? abbreviation : '');
+  }).filter(Boolean).join('；');
+}

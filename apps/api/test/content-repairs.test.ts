@@ -112,3 +112,20 @@ test('a failed reservation release rolls back task failure and timeout recovery 
     await f.close();
   }
 });
+
+test('a repair returning a source label as the part of speech cannot overwrite the word', async () => {
+  const f = await setup();
+  try {
+    answer = result({part_of_speech:'教材', meaning_zh:'苹果果实'});
+    const job = await enqueue(f,'words',f.word.id,'meaning');
+    await f.core.repairs.processOne();
+    const failed = await f.core.repairs.get(f.dad,f.child.id,job.id);
+    assert.equal(failed.status,'failed');
+    assert.equal(failed.error_code,'REPAIR_NOT_VERIFIED');
+    const word = await f.core.word(f.dad,f.child.id,f.word.id);
+    assert.equal(word.part_of_speech,f.word.part_of_speech);
+    assert.equal(word.meaning_zh,f.word.meaning_zh);
+  } finally {
+    await f.close();
+  }
+});

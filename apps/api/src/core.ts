@@ -197,16 +197,34 @@ export class Core {
     const c=await one(q,'INSERT INTO children(family_id,nickname,school_grade,gender,accent) VALUES($1,$2,$3,$4,$5) RETURNING *',[family,profile.nickname,profile.grade,profile.gender,body.accent??'en-US']);return childDto(c);
   });}
   private async textbookVolumeData(q:Sql,child:string|null):Promise<Row[]>{
-    const rows=(await q.query(`SELECT u.grade,u.term,u.unit,w.ordinal,w.lemma,w.meaning_zh FROM textbook_units u JOIN textbook_unit_words w ON w.unit_id=u.id ORDER BY u.grade,CASE u.term WHEN '上册' THEN 0 ELSE 1 END,u.unit,w.ordinal`)).rows;
+    const rows=(await q.query(`SELECT u.grade,u.term,u.unit,w.ordinal,w.lemma,w.meaning_zh,wordmate.textbook_word_pos(w.lemma,w.meaning_zh) part_of_speech FROM textbook_units u JOIN textbook_unit_words w ON w.unit_id=u.id ORDER BY u.grade,CASE u.term WHEN '上册' THEN 0 ELSE 1 END,u.unit,w.ordinal`)).rows;
     const joined=child?(await q.query(`SELECT j.volume_id,b.id FROM textbook_volume_joins j JOIN wordbooks b ON b.id=j.wordbook_id AND b.child_id=j.child_id AND b.archived_at IS NULL WHERE j.child_id=$1`,[child])).rows:[];
     const volumes:Row[]=[];
     for(const r of rows){const id=`new-sailing-${r.grade}-${r.term==='上册'?'a':'b'}`;let volume=volumes.find(v=>v.id===id);
       if(!volume){const gradeLabel=`${['','一','二'][Number(r.grade)]??r.grade}年级`;volume={id,kind:'textbook',title:`新起航英语 ${gradeLabel}${r.term}`,author:'教材词本',grade:gradeLabel,textbook:'新起航英语',category:'教材',description:'根据教材配套教学设计的核心词汇整理',joined_book_id:joined.find(x=>x.volume_id===id)?.id??null,items:[]};volumes.push(volume);}
-      if(!volume.items.some((x:Row)=>x.lemma.toLowerCase()===String(r.lemma).toLowerCase()&&x.meaning_zh===r.meaning_zh))volume.items.push({lemma:r.lemma,meaning_zh:r.meaning_zh});
+      if(!volume.items.some((x:Row)=>x.lemma.toLowerCase()===String(r.lemma).toLowerCase()&&x.meaning_zh===r.meaning_zh))volume.items.push({lemma:r.lemma,meaning_zh:r.meaning_zh,part_of_speech:r.part_of_speech});
     }
     return volumes.map(v=>({...v,word_count:v.items.length}));
   }
   async textbookVolumes(actor:string,childId:unknown){return this.tx(async q=>{const child=childId===undefined?null:uuid(childId);if(child)await this.child(q,actor,child);return {items:await this.textbookVolumeData(q,child)};});}
+  private async textbookWord(q: Sql, child: string, actor: string, entry: Row): Promise<Row> {
+    const {lemma, meaning_zh, part_of_speech} = entry;
+    ensure(part_of_speech, 422, 'TEXTBOOK_WORD_POS_UNREVIEWED');
+    const normalized = lemma.toLowerCase();
+    const existing = await mergeExistingWord(q, child, lemma, {part_of_speech, meaning_zh});
+    if (existing) return existing;
+    const archived = await one(q, `SELECT * FROM child_words
+      WHERE child_id=$1 AND normalized_lemma=$2 AND meaning_zh=$3 AND part_of_speech=$4 AND archived_at IS NOT NULL
+      ORDER BY created_at,id LIMIT 1 FOR UPDATE`, [child, normalized, meaning_zh, part_of_speech]);
+    if (archived) {
+      await q.query('UPDATE child_words SET archived_at=NULL WHERE id=$1', [archived.id]);
+      await q.query('UPDATE review_cards SET suspended_at=NULL WHERE child_id=$1 AND child_word_id=$2', [child, archived.id]);
+      return archived;
+    }
+    return one(q, `INSERT INTO child_words(child_id,lemma,normalized_lemma,part_of_speech,sense_key,meaning_zh,dictionary_source,created_by)
+      VALUES($1,$2,$3,$4,$5,$6,'textbook',$7) RETURNING *`,
+    [child, lemma, normalized, part_of_speech, hash(meaning_zh), meaning_zh, actor]);
+  }
   async joinTextbookVolume(actor:string,key:string,child:string,id:string){return this.write(actor,key,`textbook:volume:join:${child}:${id}`,{},q=>this.child(q,actor,child),async q=>{
     ensure(/^new-sailing-[12]-[ab]$/.test(id),404,'WORDBOOK_NOT_FOUND');
     const volume=(await this.textbookVolumeData(q,child)).find(v=>v.id===id);ensure(volume,404,'WORDBOOK_NOT_FOUND');
@@ -218,10 +236,7 @@ export class Core {
     const now=this.clock();
     for(const entry of volume.items){
       if(!isSingleWord(entry.lemma))continue;
-      const normalized=String(entry.lemma).toLowerCase();
-      let word=await mergeExistingWord(q,child,entry.lemma,{part_of_speech:'教材',meaning_zh:entry.meaning_zh})??await one(q,'SELECT * FROM child_words WHERE child_id=$1 AND normalized_lemma=$2 AND meaning_zh=$3 ORDER BY archived_at NULLS FIRST,created_at,id LIMIT 1',[child,normalized,entry.meaning_zh]);
-      if(word?.archived_at){await q.query('UPDATE child_words SET archived_at=NULL WHERE id=$1',[word.id]);await q.query('UPDATE review_cards SET suspended_at=NULL WHERE child_id=$1 AND child_word_id=$2',[child,word.id]);}
-      if(!word)word=await one(q,`INSERT INTO child_words(child_id,lemma,normalized_lemma,part_of_speech,sense_key,meaning_zh,dictionary_source,created_by) VALUES($1,$2,$3,'教材',$4,$5,'textbook',$6) ON CONFLICT(child_id,normalized_lemma,part_of_speech,sense_key) DO UPDATE SET archived_at=NULL RETURNING *`,[child,entry.lemma,normalized,hash(entry.meaning_zh),entry.meaning_zh,actor]);
+      const word = await this.textbookWord(q, child, actor, entry);
       await q.query('INSERT INTO wordbook_words(child_id,wordbook_id,child_word_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[child,book.id,word.id]);
       await q.query('INSERT INTO review_cards(child_id,child_word_id,scheduler_state,scheduler_version,parameter_version,due_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',[child,word.id,JSON.stringify(this.scheduler.empty(now)),this.scheduler.version,this.scheduler.parameterVersion,now]);
     }
@@ -237,13 +252,10 @@ export class Core {
     const name=`新起航 ${unit.grade}年级${unit.term} ${unit.title}`;
     const book=previous?await one(q,'UPDATE wordbooks SET archived_at=NULL,version=version+1 WHERE id=$1 RETURNING id',[previous.id]):await one(q,'INSERT INTO wordbooks(child_id,name,created_by,grade,textbook,category) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[child,name,actor,`${unit.grade}年级`,'新起航英语','教材']);
     if(!previous)await q.query('INSERT INTO textbook_joins(child_id,unit_id,wordbook_id) VALUES($1,$2,$3)',[child,id,book.id]);
-    const entries=(await q.query('SELECT * FROM textbook_unit_words WHERE unit_id=$1 ORDER BY ordinal',[id])).rows, now=this.clock();
+    const entries=(await q.query('SELECT lemma,meaning_zh,wordmate.textbook_word_pos(lemma,meaning_zh) part_of_speech FROM textbook_unit_words WHERE unit_id=$1 ORDER BY ordinal',[id])).rows, now=this.clock();
     for(const entry of entries){
       if(!isSingleWord(entry.lemma))continue;
-      const normalized=String(entry.lemma).toLowerCase();
-      let word=await mergeExistingWord(q,child,entry.lemma,{part_of_speech:'教材',meaning_zh:entry.meaning_zh})??await one(q,'SELECT * FROM child_words WHERE child_id=$1 AND normalized_lemma=$2 AND meaning_zh=$3 ORDER BY archived_at NULLS FIRST,created_at,id LIMIT 1',[child,normalized,entry.meaning_zh]);
-      if(word?.archived_at){await q.query('UPDATE child_words SET archived_at=NULL WHERE id=$1',[word.id]);await q.query('UPDATE review_cards SET suspended_at=NULL WHERE child_id=$1 AND child_word_id=$2',[child,word.id]);}
-      if(!word)word=await one(q,`INSERT INTO child_words(child_id,lemma,normalized_lemma,part_of_speech,sense_key,meaning_zh,dictionary_source,created_by) VALUES($1,$2,$3,'教材',$4,$5,'textbook',$6) ON CONFLICT(child_id,normalized_lemma,part_of_speech,sense_key) DO UPDATE SET archived_at=NULL RETURNING *`,[child,entry.lemma,normalized,hash(entry.meaning_zh),entry.meaning_zh,actor]);
+      const word = await this.textbookWord(q, child, actor, entry);
       await q.query('INSERT INTO wordbook_words(child_id,wordbook_id,child_word_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[child,book.id,word.id]);
       await q.query('INSERT INTO review_cards(child_id,child_word_id,scheduler_state,scheduler_version,parameter_version,due_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',[child,word.id,JSON.stringify(this.scheduler.empty(now)),this.scheduler.version,this.scheduler.parameterVersion,now]);
     }

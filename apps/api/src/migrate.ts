@@ -17,7 +17,7 @@ async function main(){const {db,source}=await connect(process.env.DATABASE_URL??
   await db.query(readFileSync(resolve(__dirname,'../migrations/051_hanzi_study_sessions.sql'),'utf8'));
     await db.query(readFileSync(resolve(__dirname,'../migrations/052_learning_assistant.sql'),'utf8'));
     await db.query(readFileSync(resolve(__dirname,'../migrations/053_tutor_suggestions.sql'),'utf8'));
-  for(const name of ['054_poem_books.sql','055_import_records.sql','056_import_order.sql','057_sentence_learning.sql','058_word_pos_abbreviations.sql','059_prepend_library_imports.sql','060_library_favorites.sql','061_content_repairs.sql'])await db.query(readFileSync(resolve(__dirname,'../migrations',name),'utf8'));
-  console.log('Initial schema and migrations 002–061 created');
+  for(const name of ['054_poem_books.sql','055_import_records.sql','056_import_order.sql','057_sentence_learning.sql','058_word_pos_abbreviations.sql','059_prepend_library_imports.sql','060_library_favorites.sql','061_content_repairs.sql','062_textbook_word_pos.sql'])await db.query(readFileSync(resolve(__dirname,'../migrations',name),'utf8'));
+  console.log('Initial schema and migrations 002–062 created');
 }finally{await source.destroy();}}
 main().catch(e=>{console.error(e.message);process.exitCode=1;});
